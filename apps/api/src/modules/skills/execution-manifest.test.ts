@@ -43,7 +43,7 @@ function fixture(options: { authorityFailure?: boolean; reference?: boolean | 'd
     prepareAuthority: async (_uris, resolve) => ({ value: await resolve(), verify: async () => { verified++; if (options.authorityFailure) throw new Error('authority changed'); } }),
     loadReference: async id => { const m = materials.find(m => m.uri.endsWith(`/${id}`))!; return { id, ...m, updatedAt: m.version, createdAt: m.version, category: 'test', status: 'active' as const }; },
     loadSkillContext: async () => { assert.equal(transactionActive, false); prepared++; return { snapshot: { schemaVersion: 1, references: options.reference ? materials.map(m => ({ uri: m.uri, version: m.version, digest: hash({ title: m.title, content: m.content }) })) : [], tools: options.tool ? [{ native, policy: DEFAULT_TOOL_POLICY_ENTRY }] : [], roles: ['PRE_SALES'], model: { providerId: 'provider', model: 'exact-model', modelSource: 'binding', credentialScope: 'scope', baseUrlDigest: hash('endpoint'), params: definition.model, capabilities: [], supportedParams: [], ...(options.secret ? { apiKey: randomUUID() } : {}) } }, tools: options.tool ? [native] : [] } as never; },
-    loadWorkflowTools: async () => options.workflowTool ? [{ ...toolContract, allowedRoles: ['pre_sales'] }] : [],
+    loadWorkflowTools: async () => options.workflowTool ? [{ ...toolContract, sandboxReadSafe: native.sandboxReadSafe, allowedRoles: ['pre_sales'] }] : [],
   });
   return { service, get snapshot() { return snapshot; }, set snapshot(value) { snapshot = value; }, counts: () => ({ prepared, verified, read }),
     commit: async (request: unknown = { kind: 'skill', skillId: 'skill-one', input: { text: 'hello', apiKey: businessFieldValue } }) => {

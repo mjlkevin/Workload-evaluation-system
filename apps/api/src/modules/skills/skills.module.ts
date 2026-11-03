@@ -27,3 +27,5 @@ export { createSkillOperationDecisionService } from './skills.operation-decision
 
 export { createSkillOperationExecutionService, type SkillLocalTransactionAdapter, type SkillOperationExecutionResult } from './skills.operation-execution';
 export { createExecutionBudgetService, type ExecutionBudgetRequest, type ExecutionBudgetCallbackContext, type ExecutionBudgetSnapshot } from './execution-budget';
+export { createResumableSkillExecutor, ResumableSkillFailure, type ResumableSkillPorts, type ResumableSkillAdvanceRequest, type ResumableSkillAdvanceResult, type ResumableSkillModelRequest, type ResumableSkillToolRequest, type ResumableSkillPendingOperation } from './skills.execution-resumable';
+export type { SkillExecutionState } from './skills.execution-state';

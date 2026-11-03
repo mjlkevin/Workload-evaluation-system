@@ -956,3 +956,5 @@ readForConfirmation不写任何状态；当前basis对应无决定时仅pending�
 **连续完成调度细化：** 为减少阶段等待，D的脱敏样本/人工预期草案、纯业务数据契约与测试准备可与C宿主/API/UI接线并行；D生产运行/真实模型及最终验收仍以前述C门槛通过为前置，不提前关闭D。不得用待测模型生成标准答案，需业务确认的具体预期准备成可审阅样本后再最小化澄清。
 
 **累计预算独立收口：** 固定60/60/128000/300000活动毫秒，跨root/retry持久预留。SPEC同步堵事件循环P2已真实RED并修成performance deadline，最终PG21/21、fresh质量21/21、tsc0，冻结hash一致；readBudget终态只读不grant；根/审计保留，owned Run/Session/user0。API仍server-trusted callback只返回value。Host写事务预算传播另被SPEC发现P1待修，不用预算库绿来掩盖生产host问题；下一提交H会增加绝对deadline并实际传入消费事务，B基础不宣称C/D完成。
+
+**持久游标与原角色证据独立收口：** R source311、V244，SPEC二者通过，fresh质量四pure92/92、0fail/cancel/skip（/tmp/wes-finish-state-roles-quality）；父模块984/984已过。cursor只用于服务器锁定CP结构/绑定损坏检测，不认证任意客户端状态；生产host必须自行读CP且每dispatch真实授权与持久budget。v2direct工具冻结真实V2角色/安全属性并与当前交集，v1无历史证据仍拒绝；prepare-tool仅check不grant，默认写/外发/MCP确认门禁不松。首次RED17fail及35项中24fail保留。C2c host/Workflow scope接线与P1修复仍独立推进，不等同全部C/D已验证。

@@ -2,7 +2,7 @@ import { db, type Database } from '../../db/client';
 import Ajv from 'ajv';
 import type { AuthUser } from '../../types';
 import { TOOL_POLICY_APPROVAL_STRATEGIES, TOOL_POLICY_INJECTION_MODES } from '../../types';
-import { V2_ROLES } from '../../rbac/roles';
+import { V2_ROLES, legacyRoleToV2Roles } from '../../rbac/roles';
 import { ROLE_CAPABILITIES } from '../../rbac/permissions';
 import { resolveBusinessRole } from '../../middleware/auth';
 import { getKnowledgeRepository } from '../knowledge/knowledge.module';
@@ -14,7 +14,7 @@ import { resolveSkillDependencyContext } from './skills.context';
 import { compileSkillPayloadSchema, validateSkillDefinition } from './skills.validation';
 import { copyTrialJson } from './skills.sandbox';
 import { createExecutionManifestPgRepository } from './execution-manifest-pg.repository';
-import type { ExecutionRequest, ExecutionManifest, ExecutionSnapshot, ExecutionManifestRepository, PreparedExecution, ReferenceMaterial, SourceReference } from './execution-manifest.types';
+import type { ExecutionRequest, ExecutionManifest, ExecutionSnapshot, ExecutionManifestRepository, PreparedExecution, ReferenceMaterial, SourceReference, WorkflowToolAuthority } from './execution-manifest.types';
 function invalid(code = 'EXECUTION_INVALID_REQUEST', status = 400): never { throw new SkillError(code, '执行请求或清单无效，请重新读取', status); }
 const object = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === 'object' && !Array.isArray(value));
 const text = (value: unknown, max = 160): value is string => typeof value === 'string' && value.length > 0 && value.length <= max;
@@ -68,6 +68,9 @@ const validateContext = compiler.compile(contextShape);
 const toolBindingsShape = { type: 'array', maxItems: 50, items: fields({ stepId: nonempty, hash: digest,
   contract: fields({ ...toolFields, requiresConfirmation: { type: 'boolean' }, policy: policyShape }) }) };
 const validateToolBindings = compiler.compile(toolBindingsShape);
+const validateToolAuthority = compiler.compile(fields({ schemaVersion: { const: 1 },
+  roles: { type: 'array', minItems: 1, maxItems: V2_ROLES.length, items: { enum: V2_ROLES }, uniqueItems: true },
+  tools: { type: 'array', minItems: 1, maxItems: 50, items: fields({ stepId: nonempty, sandboxReadSafe: { type: 'boolean' } }) } }));
 const validatePublishedDependencies = compiler.compile(fields({ schemaVersion: { const: 1 }, tools: toolBindingsShape,
   skills: { type: 'array', maxItems: 50, items: fields({ stepId: nonempty, skillId: nonempty, skillVersionId: nonempty, hash: digest, context: contextShape }) } }));
 const multiset = (values: unknown[]) => hash(values.map(value => hash(value)).sort());
@@ -109,6 +112,7 @@ export function createExecutionManifestService(options: ServiceOptions = {}) {
         skills.push({ ...skill, context: json(context.snapshot), materials });
       }
       const tools: ExecutionManifest['tools'] = [];
+      const toolEvidence: WorkflowToolAuthority['tools'] = [];
       if (before.kind === 'workflow') {
         const definition = before.target.definition as WorkflowDefinition;
         const native = (await (options.loadWorkflowTools ?? workflowToolMetadata)(user)).filter(tool => tool.allowedRoles.includes(resolveBusinessRole(user)));
@@ -116,6 +120,8 @@ export function createExecutionManifestService(options: ServiceOptions = {}) {
           hash: skill.hash, definition: skill.definition, enabled: true, archived: false, status: 'published' })), tools: native });
         for (const step of definition.steps) if (step.type === 'tool') {
           const current = native.find(tool => tool.name === step.toolName)!;
+          if (typeof current.sandboxReadSafe !== 'boolean') invalid('EXECUTION_CONTEXT_CHANGED', 409);
+          toolEvidence.push({ stepId: step.id, sandboxReadSafe: current.sandboxReadSafe });
           const contract = { name: current.name, description: current.description, parameters: current.parameters, mutates: current.mutates, exfiltrates: current.exfiltrates,
             simulationOnly: current.simulationOnly, source: current.source, capability: current.capability, requiresConfirmation: current.requiresConfirmation, policy: current.policy };
           const published = before.publishedDependencies?.tools.find(tool => tool.stepId === step.id);
@@ -123,9 +129,12 @@ export function createExecutionManifestService(options: ServiceOptions = {}) {
           noCredentials(contract); tools.push({ stepId: step.id, contract, hash: hash(contract) });
         }
       }
-      return json({ ...before, skills, tools });
+      if (tools.length && !['admin', 'user', 'sub_admin'].includes(user.role)) invalid('EXECUTION_FORBIDDEN', 403);
+      const version = tools.length ? { schemaVersion: 2 as const, toolAuthority: { schemaVersion: 1 as const,
+        roles: legacyRoleToV2Roles(user.role), tools: toolEvidence } } : { schemaVersion: 1 as const };
+      return json({ ...before, skills, tools, ...version });
     }, database);
-    const body = json({ ...authority.value, schemaVersion: 1 as const, caller: { id: user.id, businessRole: resolveBusinessRole(user) },
+    const body = json({ ...authority.value, caller: { id: user.id, businessRole: resolveBusinessRole(user) },
       initialInput: request.input, sources: request.sources ?? [], assetBindings: [] as [] });
     const manifest: ExecutionManifest = { ...body, manifestHash: hash(body) };
     // No resolver, provider, pool acquisition or definition lookup survives into this short transaction callback.
@@ -144,14 +153,18 @@ export const prepareExecution = (request: unknown, user: AuthUser) => createExec
 export function readPersistedExecutionManifest(value: unknown): ExecutionManifest {
   const result = json(value) as ExecutionManifest;
   if (!object(result)) invalid('EXECUTION_MANIFEST_INVALID');
-  exactKeys(result, ['schemaVersion', 'kind', 'target', 'skills', 'publishedDependencies', 'tools', 'caller', 'initialInput', 'sources', 'assetBindings', 'manifestHash']);
+  exactKeys(result, ['schemaVersion', 'kind', 'target', 'skills', 'publishedDependencies', 'tools', 'caller', 'initialInput', 'sources', 'assetBindings', 'manifestHash',
+    ...(result.schemaVersion === 2 ? ['toolAuthority'] : [])]);
   const { manifestHash, ...body } = result;
-  if (result.schemaVersion !== 1 || !['skill', 'workflow'].includes(result.kind) || manifestHash !== hash(body)
+  if (![1, 2].includes(result.schemaVersion) || !['skill', 'workflow'].includes(result.kind) || manifestHash !== hash(body)
     || !object(result.target) || !text(result.target.id) || !text(result.target.versionId)
     || !object(result.target.definition) || result.target.hash !== hash(result.target.definition)
     || !object(result.caller) || !text(result.caller.id) || !Array.isArray(result.assetBindings) || result.assetBindings.length
     || !Array.isArray(result.skills) || !validateToolBindings(result.tools)
     || (result.kind === 'workflow' && !validatePublishedDependencies(result.publishedDependencies))) invalid('EXECUTION_MANIFEST_INVALID');
+  if (result.schemaVersion === 2 && (result.kind !== 'workflow' || !result.tools.length || !validateToolAuthority(result.toolAuthority)
+    || new Set(result.toolAuthority.tools.map(tool => tool.stepId)).size !== result.tools.length
+    || multiset(result.toolAuthority.tools.map(tool => tool.stepId)) !== multiset(result.tools.map(tool => tool.stepId)))) invalid('EXECUTION_MANIFEST_INVALID');
   sourcesShape(result.sources);
   const definition = result.target.definition;
   if (!Array.isArray(definition.roles) || !definition.roles.includes(result.caller.businessRole)

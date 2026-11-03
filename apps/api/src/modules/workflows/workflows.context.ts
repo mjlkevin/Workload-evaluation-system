@@ -22,7 +22,7 @@ export type WorkflowContextLoader = ((definition: WorkflowDefinition, user: Auth
 const roles: Record<string, V2Role> = { sales: 'SALES', pre_sales: 'PRE_SALES', delivery: 'IMPL', pm: 'PM', pmo: 'PMO', dev: 'DEV', admin: 'ADMIN' };
 export async function workflowToolMetadata(user: AuthUser) {
     const native = await resolveCurrentSkillTools(user);
-    return native.tools.map(tool => ({ ...skillToolContract(tool), source: tool.source ?? 'code', capability: tool.capability,
+    return native.tools.map(tool => ({ ...skillToolContract(tool), source: tool.source ?? 'code', capability: tool.capability, sandboxReadSafe: tool.sandboxReadSafe === true,
         requiresConfirmation: resolveWorkbenchToolDecisionSlot(tool, resolveToolPolicyEntry(native.policy, tool.name)) === 'ask',
         policy: structuredClone(resolveToolPolicyEntry(native.policy, tool.name)),
         allowedRoles: Object.entries(roles).filter(([, role]) => anyRoleHasCapability([role], tool.capability) && isToolDiscoverableUnderPolicy(tool, native.policy, [role])).map(([name]) => name) }));

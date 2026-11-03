@@ -43,6 +43,11 @@
       "kind": "unit",
       "ref": "/tmp/wes-finish-budget/green-blocked-deadline-final; /tmp/wes-finish-budget-quality",
       "summary": "预算库SPEC/fresh质量通过21/21；source490。同步阻塞deadline P2修复；Host事务超时传播P1正在修，整体C/D未关闭。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-finish-state-roles-quality; /tmp/wes-finish-core-modules",
+      "summary": "游标311+权限244gross，SPEC/fresh纯92/92与模块984通过；服务器CP信任边界与v1直连拒绝保留，host另行接线。"
     }
   ],
   "next": "先闭合生产工具与预算，再接生产宿主和工作台，完成同样本端到端证据。"
