@@ -24,6 +24,8 @@ import { createInvocationPgRepository } from '../skills/skills.invocation-pg.rep
 import { createSkillsPgRepository } from '../skills/skills-pg.repository';
 import { createExecutionAuthority } from '../skills/execution-authority';
 import { createExecutionBudgetService } from '../skills/execution-budget';
+import { createBusinessExecutionProjectionService } from '../skills/skills.workbench-projection';
+import { SkillError } from '../skills/skills.types';
 import { skillToolContract } from '../skills/skills.context';
 import { skillDefinitionHash as hash } from '../skills/skills.hash';
 import { DEFAULT_TOOL_POLICY_ENTRY } from '../../agent/tool-policy';
@@ -75,7 +77,16 @@ async function fixture(edit: (d: WorkflowDefinition) => void = () => {}) {
 }
 before(async () => { await database.insert(schema.users).values({ userId: user.id, username: user.username, role: user.role, businessRole: 'pre_sales', status: 'active', passwordHash: randomUUID(), createdAt: new Date() }); });
 after(async () => { await database.delete(schema.versionRecords).where(eq(schema.versionRecords.ownerUserId, user.id)); await database.delete(schema.harnessRuns).where(eq(schema.harnessRuns.ownerUserId, user.id));
- await database.delete(schema.aiSessions).where(eq(schema.aiSessions.ownerUserId, user.id)); await database.delete(schema.users).where(eq(schema.users.userId, user.id)); await pool.end(); await closeDb(); });
+ await database.delete(schema.aiSessions).where(eq(schema.aiSessions.ownerUserId, user.id)); await database.delete(schema.users).where(eq(schema.users.userId, user.id));
+ const remaining = await Promise.all([
+  database.select({ id: schema.versionRecords.recordId }).from(schema.versionRecords).where(eq(schema.versionRecords.ownerUserId, user.id)),
+  database.select({ id: schema.harnessRuns.harnessRunId }).from(schema.harnessRuns).where(eq(schema.harnessRuns.ownerUserId, user.id)),
+  database.select({ id: schema.aiSessions.sessionId }).from(schema.aiSessions).where(eq(schema.aiSessions.ownerUserId, user.id)),
+  database.select({ id: schema.users.userId }).from(schema.users).where(eq(schema.users.userId, user.id)),
+ ]);
+ assert.deepEqual(remaining.map(rows => rows.length), [0, 0, 0, 0]);
+ console.log('[projection-race cleanup] records=0 runs=0 sessions=0 users=0');
+ await pool.end(); await closeDb(); });
 const saved = async (runId: string) => (await queue.findRunForOwner(runId, user.id))!;
 const checkpoints = (runId: string) => queue.listCheckpointsForRun({ runId });
 const events = (runId: string) => queue.listRunEventsAfter({ runId, afterSequence: 0, limit: 500 });
@@ -361,4 +372,106 @@ for (const changed of ['role', 'epoch', 'stop'] as const) test(`approved create_
   const budget = await createExecutionBudgetService({ database }).readBudget(user.id, f.runId);
   assert.equal(budget.toolCalls, 1); assert.equal(budget.activeMs, 30000);
  } finally { await database.update(schema.users).set({ businessRole: 'pre_sales' }).where(eq(schema.users.userId, user.id)); }
+});
+
+async function projectionFixture(count = 1) {
+ const f = await fixture(d => {
+  const direct = d.steps[3]; if (direct.type !== 'tool') assert.fail();
+  d.steps = Array.from({ length: count }, (_, i) => ({ ...direct, id: `write${i}`, toolName: write.name, requiresConfirmation: true,
+   inputMapping: [path('projectName', '$.input.projectName')] }));
+  d.outputMapping = [path('projectName', '$.input.projectName')];
+ });
+ await worker({ models: 0 }); const run = await saved(f.runId); assert.equal(run.status, 'waiting', run.errorCode ?? undefined);
+ assert.ok((await hostState(f.runId)).pendingOperation);
+ return f;
+}
+async function approveProjectionStep(f: Awaited<ReturnType<typeof fixture>>) {
+ const wait = createBusinessSkillOperationWaitService({ database, inventory }), view = await wait.read(user, f.runId);
+ await wait.answer(user, { runId: f.runId, actionId: view.actionId, confirmationHash: view.confirmationHash, decision: 'approve' });
+ await worker({ models: 0 });
+}
+/** Gate only after COMMIT, so the real Worker can advance even with max:1. Never replace query results. */
+function projectionGate(kind: 'snapshot' | 'owned', advance: (n: number) => Promise<void>) {
+ const wrapped = Object.create(database); let gates = 0;
+ wrapped.transaction = async (callback: any, config: any) => {
+  const value: any = await database.transaction(callback, config);
+  if (kind === 'snapshot' ? value?.run && Array.isArray(value.effects) : value?.run && value?.descriptor && value?.prepared)
+   await advance(++gates);
+  return value;
+ };
+ return { database: wrapped, gates: () => gates };
+}
+const projectionAudit = (runId: string) => database.select().from(schema.harnessToolEvents)
+ .where(eq(schema.harnessToolEvents.harnessRunId, runId)).orderBy(schema.harnessToolEvents.harnessToolEventId);
+for (const window of ['snapshot', 'owned'] as const) test(`projection race ${window} returns the new completed checkpoint without stale actions`, { timeout: 20000 }, async () => {
+ const f = await projectionFixture(), before = (await database.select({ id: schema.versionRecords.recordId }).from(schema.versionRecords)
+  .where(eq(schema.versionRecords.ownerUserId, user.id))).length, captured = (await saved(f.runId)).lastCheckpointId;
+ let committedAudit: unknown, committedRun: unknown;
+ const gated = projectionGate(window, async n => {
+  if (n !== 1) return;
+  await approveProjectionStep(f);
+  assert.equal((await saved(f.runId)).status, 'completed');
+  assert.notEqual((await saved(f.runId)).lastCheckpointId, captured);
+  assert.equal((await hostState(f.runId)).pendingOperation, undefined);
+  committedAudit = await projectionAudit(f.runId); committedRun = await saved(f.runId);
+ });
+ const result = await createBusinessExecutionProjectionService({ database: gated.database, inventory }).read(user, f.runId);
+ assert.deepEqual(result.results.output, { projectName: 'Original project' });
+ assert.equal(result.pendingOperation, undefined); assert.equal(result.pendingInput, undefined);
+ assert.equal((await database.select({ id: schema.versionRecords.recordId }).from(schema.versionRecords)
+  .where(eq(schema.versionRecords.ownerUserId, user.id))).length, before + 1); assert.ok(gated.gates() <= 3);
+ const audit = await database.select().from(schema.harnessToolEvents).where(eq(schema.harnessToolEvents.harnessRunId, f.runId));
+ assert.equal(audit.filter(e => e.eventType === 'business_operation_executed').length, 1);
+ assert.equal(audit.filter(e => e.eventType === 'business_operation_decision').length, 1);
+ assert.deepEqual(await projectionAudit(f.runId), committedAudit); assert.deepEqual(await saved(f.runId), committedRun);
+});
+test('projection race refuses two consecutive normal checkpoint movements', { timeout: 20000 }, async () => {
+ const f = await projectionFixture(3); let committedAudit: unknown;
+ const gated = projectionGate('snapshot', async n => { if (n <= 2) { await approveProjectionStep(f); committedAudit = await projectionAudit(f.runId); } });
+ await assert.rejects(createBusinessExecutionProjectionService({ database: gated.database, inventory }).read(user, f.runId),
+  (e: any) => e.code === 'BUSINESS_SKILLS_PROJECTION_UNAVAILABLE' && e.status === 409);
+ assert.equal(gated.gates(), 3); assert.equal((await saved(f.runId)).status, 'waiting');
+ assert.equal((await hostState(f.runId)).workflow.receipts.length, 2);
+ assert.deepEqual(await projectionAudit(f.runId), committedAudit);
+});
+test('projection race does not retry an unchanged corrupt prepared ledger', { timeout: 20000 }, async () => {
+ const f = await projectionFixture(), operationId = (await hostState(f.runId)).pendingOperation.operationId;
+ const gated = projectionGate('snapshot', async n => { if (n === 1) await database.update(schema.harnessToolEvents)
+  .set({ actionId: 'corrupt' }).where(eq(schema.harnessToolEvents.harnessToolEventId, operationId)); });
+ await assert.rejects(createBusinessExecutionProjectionService({ database: gated.database, inventory }).read(user, f.runId),
+  (e: any) => e.code === 'OPERATION_INTENT_CONFLICT' && e.status === 409);
+ assert.equal(gated.gates(), 1); assert.equal((await hostState(f.runId)).workflow.receipts.length, 0);
+});
+for (const denial of ['role', 'owner', 'inventory'] as const) test(`projection race preserves ${denial} denial`, { timeout: 20000 }, async () => {
+ const f = await projectionFixture(), otherId = randomUUID();
+ if (denial === 'owner') await database.insert(schema.users).values({ userId: otherId, username: `projection-other-${otherId}`,
+  role: 'user', businessRole: 'pre_sales', status: 'active', passwordHash: randomUUID(), createdAt: new Date() });
+ const gated = projectionGate('snapshot', async n => {
+  if (n !== 1) return;
+  if (denial !== 'inventory') await approveProjectionStep(f);
+  if (denial === 'role') await database.update(schema.users).set({ role: 'user' }).where(eq(schema.users.userId, user.id));
+  if (denial === 'owner') await database.update(schema.aiSessions).set({ ownerUserId: otherId }).where(eq(schema.aiSessions.sessionId, f.sessionId));
+ });
+ try {
+  await assert.rejects(createBusinessExecutionProjectionService({ database: gated.database, inventory: denial === 'inventory'
+   ? async () => { throw new SkillError('OPERATION_DECISION_UNAVAILABLE', 'Fixture inventory unavailable', 503); } : inventory }).read(user, f.runId),
+   (e: any) => e.status === (denial === 'role' ? 403 : denial === 'owner' ? 404 : 503));
+  assert.ok(gated.gates() <= 2);
+ } finally {
+  await database.update(schema.users).set({ role: 'admin' }).where(eq(schema.users.userId, user.id));
+  if (denial === 'owner') {
+   await database.update(schema.aiSessions).set({ ownerUserId: user.id }).where(eq(schema.aiSessions.sessionId, f.sessionId));
+   await database.delete(schema.users).where(eq(schema.users.userId, otherId));
+  }
+ }
+});
+test('projection race returns no action after normal cancellation without dispatching the operation', { timeout: 20000 }, async () => {
+ const f = await projectionFixture(), before = reads, gated = projectionGate('snapshot', async n => {
+  if (n === 1) await queue.requestRunCancel({ runId: f.runId, requestedBy: user.id });
+ });
+ const result = await createBusinessExecutionProjectionService({ database: gated.database, inventory }).read(user, f.runId);
+ assert.equal(result.pendingOperation, undefined); assert.equal(result.pendingInput, undefined);
+ assert.equal((await saved(f.runId)).status, 'cancelled'); assert.equal(reads, before);
+ const audit = await database.select().from(schema.harnessToolEvents).where(eq(schema.harnessToolEvents.harnessRunId, f.runId));
+ assert.equal(audit.filter(e => ['business_operation_executed', 'business_operation_decision'].includes(e.eventType)).length, 0);
 });
