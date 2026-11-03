@@ -151,7 +151,7 @@ export default function BusinessValue({ value, depth = 0, context = {}, nativeDr
       </ol>
     ) : <span className="text-ink-2">无</span>
   }
-  const draft = nativeDraft && text(value.assessmentId) && value.assessmentId.trim()
+  const draft = (nativeDraft || context.nativeDraftValues?.includes(value)) && text(value.assessmentId) && value.assessmentId.trim()
   const trace = traceDetail ? [] : Object.entries(value).filter(([key]) => traceKeys.includes(key))
   const fields = Object.entries(value).filter(([key]) => !trace.some(([field]) => field === key) && !(draft && key === 'totalDays'))
   return (
