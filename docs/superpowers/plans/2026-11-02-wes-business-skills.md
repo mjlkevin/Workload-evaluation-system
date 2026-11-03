@@ -970,3 +970,5 @@ readForConfirmation不写任何状态；当前basis对应无决定时仅pending�
 **C取消终态竞态补修：** 整体验证实取取消请求已提交而心跳尚未更新内存时，后到的权限拒绝或模型故障会被Worker判failed。独立小单元在终态仓储锁内按已提交cancelRequestedAt决定实际outcome，统一attempt、Run、事件和错误字段；既有终态不追改，Worker终态回调以仓储真实结果为准。新增真实门闩证明取消先提交与故障先终态两种顺序，禁止移动取消夹具或延长心跳造绿；属既定停止/恢复能力的缺陷修复，不拓展自动化范围。
 
 **W四节点生产宿主独立收口：** 真实Skill、工具、userInput、confirmation复用持久清单、预算、权限与操作消费，默认boot已装配；父精确保留rootSkill原有路径。普通超时遵循节点onFailure，晚到模型/读取/获批写入撤权均保持宿主拒绝与预算结算。新源码696gross，真实反例及旧等待/根宿主/Scope/boot组合95/95、0skip、tsc0；SPEC及fresh五轴质量APPROVE。七源冻结实取通过。取消终态竞态另单元仍开放，不因本组合本次通过而隐藏。C公开接线/统一视图/UI和D尚待整体门禁，未作真实模型或人工MVP验收声明。
+
+**C3工作台界面分单收口：** 同一工作台显式选择发布目标、按Schema填写并启动，支持等待回答、原决定恢复、失败重试、停止及结果回读；普通聊天不作授权。UI①645gross、②644gross分别SPEC/fresh质量APPROVE，focused43/43。local-ref、const/无type枚举与跨会话/ABA迟到结果问题均保留真实RED并修正；原37项未删。仅使用现有Dialog和tokens/Tailwind，无新栈或依赖。全量Web、构建及1440/760真实界面验收仍待整体收口，不用RTL模拟代替业务模型执行。

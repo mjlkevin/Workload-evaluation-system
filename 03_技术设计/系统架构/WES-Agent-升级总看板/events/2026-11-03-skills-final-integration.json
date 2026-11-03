@@ -78,6 +78,11 @@
       "kind": "unit",
       "ref": "/tmp/wes-finish-workflow-host/source-freeze-write-authority.sha256; /tmp/wes-finish-workflow-host/write-authority-green",
       "summary": "四节点生产host696gross，SPEC及fresh质量APPROVE；95/95零跳过与tsc0。普通超时及写入晚撤权均已真实反例验证；取消终态竞态另单元开放。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-finish-workbench-ui/quality-red.log; /tmp/wes-finish-workbench-ui/quality-green.log",
+      "summary": "UI①645与②644gross分别SPEC/fresh质量APPROVE，focused43/43。合法Schema与跨会话迟到问题真实RED修正；全量Web/构建/真实浏览器与模型另行验证。"
     }
   ],
   "next": "闭合独立审查发现的超时、恢复事务围栏及失败节点重试问题，完成C统一工作台验证；随后接D真实材料、原生业务工具和同样本端到端证据。"

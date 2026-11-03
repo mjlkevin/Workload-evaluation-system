@@ -1,0 +1,32 @@
+import { apiClient } from './client.js'
+import { unwrap, unwrapList } from './utils.js'
+
+const options = { suppressUnauthorizedRedirect: true }
+const runPath = (runId) => `/ai-runs/${encodeURIComponent(runId)}`
+export async function listExecutionCatalog() {
+  return unwrapList(await apiClient.get('/ai-executions/catalog', undefined, options))
+}
+export async function listBusinessRuns(sessionId) {
+  return unwrapList(await apiClient.get('/ai-executions/runs', { sessionId }, options))
+}
+export async function startBusinessExecution(sessionId, { submissionKey, content, execution }) {
+  const selection = { kind: execution.kind,
+    [execution.kind === 'skill' ? 'skillId' : 'workflowId']: execution.kind === 'skill' ? execution.skillId : execution.workflowId,
+    input: execution.input }
+  if (execution.sources?.length) selection.sources = execution.sources.map(({ kind, id, location }) => ({ kind, id, ...(location ? { location } : {}) }))
+  return unwrap(await apiClient.post(`/ai-sessions/${encodeURIComponent(sessionId)}/runs`, { submissionKey, content, execution: selection }, options))
+}
+export async function submitBusinessInput(runId, pending, input) {
+  const { actionId, kind, stepId, contentHash } = pending
+  return unwrap(await apiClient.post(`${runPath(runId)}/inputs`, { actionId, kind, stepId, contentHash, input }, options))
+}
+export async function decideBusinessAction(runId, pending, decision) {
+  if (!['confirm', 'reject'].includes(decision)) throw new Error('请选择确认或拒绝')
+  const body = pending.confirmationHash
+    ? { confirmationHash: pending.confirmationHash }
+    : { stepId: pending.stepId, contentHash: pending.contentHash }
+  return unwrap(await apiClient.post(`${runPath(runId)}/actions/${encodeURIComponent(pending.actionId)}/${decision}`, body, options))
+}
+export async function retryBusinessExecution(runId, { submissionKey, reason }) {
+  return unwrap(await apiClient.post(`${runPath(runId)}/retry`, { submissionKey, reason }, options))
+}
