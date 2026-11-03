@@ -1,0 +1,21 @@
+{
+  "id": "BE-2026-11-04-workbench-skill-explanation",
+  "date": "2026-11-04",
+  "type": "question",
+  "issueId": "ISS-2026-11-04-001",
+  "relatedRequirements": [
+    "RP-050"
+  ],
+  "status": "已解释，改版建议未批准",
+  "dedup": "未命中同类设计解释问题，新增question，不派生RP或DEF。",
+  "evidence": [
+    "用户浏览器截图批注1/2",
+    "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/index.jsx:165-218",
+    "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/BusinessExecutionPanel.jsx:145-207"
+  ],
+  "pages": [
+    "issues",
+    "changes"
+  ],
+  "implementationPerformed": false
+}
