@@ -138,10 +138,7 @@ test("buildToolInventory: callable 随查看者权限变化，标记「有这个
 test("批次6b·判据④：tokens 与批次 3 estimateToolsTokens 逐工具一致（同函数同输入，非页面自算）", () => {
   const registry = createDefaultRegistry(fakeUser);
   const byName = new Map(inventory(FULL_CAPS).map((item) => [item.name, item]));
-  for (const [name, definition] of registry.listToolsFor({ id: fakeUser.id, capabilities: FULL_CAPS }).entries()) {
-    void name;
-    const tool = registry.get(definition.function.name);
-    assert.ok(tool);
+  for (const tool of registry.allTools()) {
     const expected = estimateToolsTokens([toToolDefinition(tool)]);
     assert.equal(byName.get(tool.name)?.tokens, expected, `${tool.name} 的清单 token 须等于计量函数输出`);
     assert.ok(expected > 0, `${tool.name} token 必须为正`);
@@ -157,13 +154,13 @@ test("批次6b：当前工具集无外发工具，但维度逐条在场且独立
   }
 });
 
-test("批次6b：缺省策略下 activePolicy=代码默认、injected=capability∩非on-demand降档", () => {
+test("批次6b：缺省策略下 activePolicy=代码默认、injected 仅包含普通会话工具", () => {
   const items = inventory(FULL_CAPS);
   const defaultEntry = { enabled: true, visibleRoles: [], approvalStrategy: "default", injectionMode: "default" };
   for (const item of items) {
     assert.deepEqual(item.activePolicy, defaultEntry);
   }
-  // 全能力位查看者：全部业务工具注入（含 discoverable，与工作台全量通道同口径）；
+  // 全能力位查看者：普通会话工具注入（含 discoverable，与工作台全量通道同口径）；
   // 内置 discovery 类（list_tools）不在该通道
   const byName = new Map(items.map((item) => [item.name, item]));
   assert.equal(byName.get("project_list")?.injected, true);
@@ -230,4 +227,25 @@ test("批次6b：summary 合计 = 各注入工具 tokens 之和（页面与后�
   const expected = full.items.filter((item) => item.injected).reduce((sum, item) => sum + item.tokens, 0);
   assert.equal(full.summary.injectedTokens, expected);
   assert.ok(expected > 0);
+});
+
+test('MVP tools stay auditable while ordinary injection and token totals preserve the original 10 tools', () => {
+  const businessNames = ['requirement_sources', 'requirement_normalize', 'requirement_clarify', 'requirement_confirm',
+    'assessment_catalog', 'assessment_match_validate', 'create_assessment_draft'];
+  const policy: ToolPolicyConfig = { schemaVersion: 1, policies: Object.fromEntries(businessNames.map(name => [name,
+    { enabled: true, visibleRoles: ['ADMIN'], approvalStrategy: 'default' as const, injectionMode: 'default' as const }])) };
+  const result = buildToolInventory(fakeUser, FULL_CAPS, { policy, viewerRoles: ['ADMIN'] });
+  assert.equal(result.items.length, 18);
+  for (const name of businessNames) {
+    const item = result.items.find(tool => tool.name === name);
+    assert.ok(item, `${name} remains in the administration inventory`);
+    assert.equal(item.callable, true, 'capability availability remains separate from execution context');
+    assert.equal(item.injected, false, 'admin policy cannot override the code-owned visibility restriction');
+    assert.ok(item.tokens > 0);
+  }
+  const injected = result.items.filter(item => item.injected);
+  assert.deepEqual(injected.map(item => item.name), ['estimate_implementation', 'project_list', 'estimate_history',
+    'knowledge_query', 'rule_lookup', 'create_project', 'generate_wbs', 'export_report', 'ask_user', 'describe_capabilities']);
+  assert.equal(result.summary.injectedCount, 10);
+  assert.equal(result.summary.injectedTokens, injected.reduce((sum, item) => sum + item.tokens, 0));
 });

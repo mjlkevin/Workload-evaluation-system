@@ -178,6 +178,16 @@
       "kind": "unit",
       "ref": "/tmp/wes-trial-deadline-probe.log; /tmp/wes-trial-deadline-quality.log; /tmp/wes-final-cd-validation/modules-fixed/test:modules.log; /tmp/wes-final-web.log",
       "summary": "旧试运行超时测试独立定位并以test-only时钟控制修正，SPEC/fresh质量APPROVE，独立26/26；原20ms真实timer/abort/旧断言及并发均保留，另证setup超时不调模型。父原并发modules1081/1081、Web93files851/851通过，零跳过；原1080/1079/1失败日志保留，串行/Harness/AI/构建和真实预览继续。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-mvp-visibility/independent-quality.log; /tmp/wes-final-cd-validation/tool-scope-fixed; /tmp/wes-final-cd-validation/remaining",
+      "summary": "Agent整体验证发现七个流程工具进入普通对话，已以代码所有通道标记修复六个注入/发现出口，后台18项和业务契约/hash保留。SPEC/fresh质量120项通过；父Agent254/模块1094/AI286再验通过。串行228/Harness660/规则8/流程17及Web851已过；通用integration仍为原空模板1失败，保留而不seed。"
+    },
+    {
+      "kind": "preview-backup",
+      "ref": "workload_eval_skills_backup_20261103142252; /tmp/wes-preview-final/backup-result.log",
+      "summary": "恢复前已克隆原预览库，10表仅取count和digest；用户4、凭据1、原Skill3/版本7。未迁移或改账号/密钥，待0030升级后复证哈希。"
     }
   ],
   "next": "闭合独立审查发现的超时、恢复事务围栏及失败节点重试问题，完成C统一工作台验证；随后接D真实材料、原生业务工具和同样本端到端证据。"

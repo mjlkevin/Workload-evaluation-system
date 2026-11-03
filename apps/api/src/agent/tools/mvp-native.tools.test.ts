@@ -58,6 +58,7 @@ test('six native tools expose code-owned output contracts and production safe re
   assert.equal(tool.source, 'code'); assert.equal(tool.capability, 'estimates:read'); assert.equal(tool.mutates, false);
   assert.equal(tool.exfiltrates, false); assert.equal(tool.simulationOnly, false); assert.equal(tool.sandboxReadSafe, true);
   assert.equal(tool.outputSchema?.additionalProperties, false);
+  assert.equal(tool.businessExecutionOnly, true);
  }
 });
 test('trusted sources and candidates normalize into stable native IDs; forged input sources fail', async () => {

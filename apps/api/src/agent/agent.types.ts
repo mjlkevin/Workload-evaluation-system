@@ -37,6 +37,13 @@ export interface AgentTool {
   sandboxReadSafe?: boolean;
   /** Code-owned execution restriction. False allows only an explicitly assembled production adapter; it never grants trial writes. */
   simulationOnly?: boolean;
+  /**
+   * Code-owned conversation visibility restriction. True excludes the tool from model
+   * injection and discovery; the raw catalog and explicit business host execution remain.
+   * Defaults false. This never grants execution authority or overrides admin policy;
+   * the implementation must still validate its trusted business execution context.
+   */
+  businessExecutionOnly?: boolean;
   /** SP-2026-007 MS3：工具分类（发现/分组用）；内置发现工具为 "discovery" */
   category?: string;
   /** SP-2026-007 MS3：true 时默认不注入 tools 参数，经 list_tools 发现后进入当轮注入集 */

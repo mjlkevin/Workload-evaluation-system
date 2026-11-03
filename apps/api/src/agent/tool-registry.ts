@@ -87,10 +87,15 @@ export class ToolRegistry {
     return this.tools.get(name);
   }
 
-  /** 仅返回用户能力位覆盖的工具的 Provider 定义 */
+  /** Conversation visibility is a code-owned restriction, separate from execution authority. */
+  private conversationTools(): AgentTool[] {
+    return this.allTools().filter((tool) => tool.businessExecutionOnly !== true);
+  }
+
+  /** 仅返回用户能力位覆盖、可用于普通会话的工具的 Provider 定义 */
   listToolsFor(user: AgentUser): ToolDefinition[] {
     const caps = new Set(user.capabilities);
-    return Array.from(this.tools.values())
+    return this.conversationTools()
       .filter((tool) => caps.has(tool.capability))
       .map(toToolDefinition);
   }
@@ -101,7 +106,7 @@ export class ToolRegistry {
    */
   listFullToolsFor(user: AgentUser): ToolDefinition[] {
     const caps = new Set(user.capabilities);
-    return Array.from(this.tools.values())
+    return this.conversationTools()
       .filter((tool) => tool.category !== DISCOVERY_CATEGORY && caps.has(tool.capability))
       .map(toToolDefinition);
   }
@@ -109,7 +114,7 @@ export class ToolRegistry {
   /** SP-2026-007 MS3：核心注入集（非 discoverable 且非 discovery 类） */
   listCoreToolsFor(user: AgentUser): ToolDefinition[] {
     const caps = new Set(user.capabilities);
-    return Array.from(this.tools.values())
+    return this.conversationTools()
       .filter(
         (tool) =>
           tool.category !== DISCOVERY_CATEGORY && tool.discoverable !== true && caps.has(tool.capability),
@@ -120,7 +125,7 @@ export class ToolRegistry {
   /** SP-2026-007 MS3：内置发现工具（list_tools 本身） */
   listDiscoveryToolsFor(user: AgentUser): ToolDefinition[] {
     const caps = new Set(user.capabilities);
-    return Array.from(this.tools.values())
+    return this.conversationTools()
       .filter((tool) => tool.category === DISCOVERY_CATEGORY && caps.has(tool.capability))
       .map(toToolDefinition);
   }
@@ -134,7 +139,7 @@ export class ToolRegistry {
     const caps = new Set(user.capabilities);
     const intent = (query.intent ?? "").trim().toLowerCase();
     const tokens = intent.split(/\s+/).filter(Boolean);
-    return Array.from(this.tools.values()).filter((tool) => {
+    return this.conversationTools().filter((tool) => {
       if (tool.discoverable !== true) return false;
       if (!caps.has(tool.capability)) return false;
       if (query.category && tool.category !== query.category) return false;
@@ -148,7 +153,7 @@ export class ToolRegistry {
   listDiscoveredToolDefinitionsFor(user: AgentUser, names: string[]): ToolDefinition[] {
     const caps = new Set(user.capabilities);
     const wanted = new Set(names);
-    return Array.from(this.tools.values())
+    return this.conversationTools()
       .filter((tool) => wanted.has(tool.name) && tool.discoverable === true && caps.has(tool.capability))
       .map(toToolDefinition);
   }

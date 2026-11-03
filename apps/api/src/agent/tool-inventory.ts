@@ -24,7 +24,7 @@ export interface ToolInventoryItem {
   tokens: number;
   /**
    * 批次 6b：当前**生效策略**下该工具是否仍会进入查看者的注入集
-   * （capability ∩ 启用 ∩ 角色可见 ∩ 注入模式）。缺省策略时 = callable 且非 on-demand 降档。
+   * （普通会话可见 ∩ capability ∩ 启用 ∩ 角色可见 ∩ 注入模式）。业务执行专用工具始终不注入。
    */
   injected: boolean;
   /** 批次 6b：生效策略的该工具条目（无覆盖条目时为代码默认），供页面呈现当前生效决定 */
@@ -116,8 +116,8 @@ function mcpApprovalOf(tool: AgentTool): "approved" {
  * 批次 6a：从运行时 ToolRegistry 派生工具清单。
  *
  * 清单不落库——落库的清单会与代码注册表漂移，而漂移方向恰是「页面上说有、实际没有」，
- * 那种页面比没有页面更糟。名称取自 listToolsFor（注册表唯一的注册顺序视图），
- * 元数据经公开的 registry.get 回取，全程不改 ToolRegistry 的注册与注入行为。
+ * 那种页面比没有页面更糟。清单取自 allTools 的原始注册顺序视图，保留能力位全集约束，
+ * 业务执行专用工具也须可审计；全程不改 ToolRegistry 的注册与注入行为。
  *
  * 过滤口径：清单列的是【注册表里的全部工具】，不按查看者的业务权限裁剪。
  * 本端点由 system:manage 守卫，目标用户是系统管理员——他们通常不持有 estimates:* 等业务
@@ -152,13 +152,13 @@ export function buildToolInventory(
       ? baseRegistry.cloneWithMcpTools(options.mcpTools)
       : baseRegistry;
   const viewerCaps = new Set(viewerCapabilities);
+  const catalogCapabilities = new Set(ALL_CAPABILITIES);
   const viewerRoles = options.viewerRoles ?? [];
   const mcpServerNames = options.mcpServerNames ?? {};
 
   const items: ToolInventoryItem[] = registry
-    .listToolsFor({ id: user.id, capabilities: ALL_CAPABILITIES })
-    .map((definition) => registry.get(definition.function.name))
-    .filter((tool): tool is AgentTool => tool !== undefined)
+    .allTools()
+    .filter((tool) => catalogCapabilities.has(tool.capability))
     .map((tool) => {
       const activePolicy = resolveToolPolicyEntry(options.policy, tool.name);
       // token 口径与出口预算完全同源：estimateToolsTokens 按序列化 JSON Schema 计费
@@ -175,6 +175,7 @@ export function buildToolInventory(
       // 与工作台全量通道（listFullToolsFor ∩ 策略减法）同一口径逐条对齐：
       // 内置 discovery 类（list_tools）不在此通道；discoverable 业务工具**在**。
       const injected =
+        tool.businessExecutionOnly !== true &&
         capabilityOk &&
         activePolicy.enabled !== false &&
         roleOk &&

@@ -44,7 +44,7 @@ export function mvpReadTool<T>(ownerUserId: string, reader: MvpProofReader | und
 }): AgentTool {
  const { run, ...contract } = spec;
  return { ...contract, capability: 'estimates:read', source: 'code', category: 'estimate', discoverable: true,
-  mutates: false, exfiltrates: false, simulationOnly: false, sandboxReadSafe: true,
+  mutates: false, exfiltrates: false, simulationOnly: false, sandboxReadSafe: true, businessExecutionOnly: true,
   async execute(args, user, runtime) {
    const input = parseMvpContract<T>(spec.parameters, args);
    if (user.id !== ownerUserId || !runtime || runtime.actor.userId !== ownerUserId) mvpInvalid('MVP_EXECUTION_PROOF_INVALID');

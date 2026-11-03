@@ -4,6 +4,8 @@ import assert from "node:assert/strict";
 import { createDefaultRegistry } from "./default-registry";
 import type { AuthUser } from "../types";
 import type { Capability } from "../rbac/permissions";
+import { permittedSkillTools, skillToolContract } from "../modules/skills/skills.context";
+import { skillDefinitionHash } from "../modules/skills/skills.hash";
 
 const fakeUser: AuthUser = {
   id: "u-test",
@@ -25,16 +27,13 @@ function visibleNames(registry: ReturnType<typeof createDefaultRegistry>, caps: 
     .sort();
 }
 
-test("createDefaultRegistry: 注册数 18 且工具名单快照（含内置 list_tools）", () => {
+test("createDefaultRegistry: 普通会话保留 11 个工具快照（含内置 list_tools）", () => {
   const registry = createDefaultRegistry(fakeUser);
   const names = visibleNames(registry, FULL_CAPS);
 
-  assert.equal(names.length, 18);
+  assert.equal(names.length, 11);
   assert.deepEqual(names, [
     "ask_user",
-    "assessment_catalog",
-    "assessment_match_validate",
-    "create_assessment_draft",
     "create_project",
     // 批次 4：capability_discovery 正则退役后的承接工具
     "describe_capabilities",
@@ -45,10 +44,6 @@ test("createDefaultRegistry: 注册数 18 且工具名单快照（含内置 list
     "knowledge_query",
     "list_tools",
     "project_list",
-    "requirement_clarify",
-    "requirement_confirm",
-    "requirement_normalize",
-    "requirement_sources",
     "rule_lookup",
   ]);
 });
@@ -56,26 +51,19 @@ test("createDefaultRegistry: 注册数 18 且工具名单快照（含内置 list
 test("createDefaultRegistry: 能力位 → 工具映射快照", () => {
   const registry = createDefaultRegistry(fakeUser);
 
-  // estimates:read：原 7 个只读工具 + 六个 MVP 原生读工具
+  // estimates:read：原 7 个普通会话只读工具
   // （ask_user 用只读档是裁决：凡能用工作台的人都可被提问）
   assert.deepEqual(visibleNames(registry, ["estimates:read"]), [
     "ask_user",
-    "assessment_catalog",
-    "assessment_match_validate",
     "describe_capabilities",
     "estimate_history",
     "knowledge_query",
     "list_tools",
     "project_list",
-    "requirement_clarify",
-    "requirement_confirm",
-    "requirement_normalize",
-    "requirement_sources",
     "rule_lookup",
   ]);
-  // estimates:create：初估 + 建项目 + 建实施评估草稿
+  // estimates:create：初估 + 建项目
   assert.deepEqual(visibleNames(registry, ["estimates:create"]), [
-    "create_assessment_draft",
     "create_project",
     "estimate_implementation",
   ]);
@@ -116,7 +104,7 @@ test("MS3: 默认注册表含内置 list_tools（发现类，核心注入）", (
   assert.notEqual(tool.discoverable, true, "list_tools 本身应常驻核心注入集");
 });
 
-test("MS3: 全量注入保留原 8 工具顺序，在发现工具前追加 MVP 原生工具", () => {
+test("MS3: 全量注入保留原 10 工具名单和顺序", () => {
   const registry = createDefaultRegistry(fakeUser);
   const names = registry
     .listFullToolsFor({ id: fakeUser.id, capabilities: FULL_CAPS })
@@ -135,13 +123,6 @@ test("MS3: 全量注入保留原 8 工具顺序，在发现工具前追加 MVP �
     "ask_user",
     // 批次 4 追加在 ask_user 之后：前 9 项顺序仍逐字节不变
     "describe_capabilities",
-    "requirement_sources",
-    "requirement_normalize",
-    "requirement_clarify",
-    "requirement_confirm",
-    "assessment_catalog",
-    "assessment_match_validate",
-    "create_assessment_draft",
   ]);
 });
 
@@ -405,4 +386,36 @@ test("批次4·describe_capabilities：可经 list_tools 按意图发现", async
     { id: fakeUser.id, capabilities: FULL_CAPS },
   )) as { tools: Array<{ name: string }> };
   assert.ok(found.tools.map((t) => t.name).includes("describe_capabilities"), `实取 ${JSON.stringify(found.tools)}`);
+});
+
+
+test("MVP contracts remain in the raw catalog while every conversation discovery surface excludes them", async () => {
+  const registry = createDefaultRegistry(fakeUser);
+  const user = { id: fakeUser.id, capabilities: FULL_CAPS };
+  const businessNames = ["requirement_sources", "requirement_normalize", "requirement_clarify", "requirement_confirm",
+    "assessment_catalog", "assessment_match_validate", "create_assessment_draft"];
+  assert.equal(registry.allTools().length, 18);
+  for (const name of businessNames) {
+    const tool = registry.get(name);
+    assert.ok(tool);
+    assert.equal(tool.businessExecutionOnly, true);
+    assert.ok(registry.allTools().includes(tool));
+  }
+  const skillTools = permittedSkillTools(registry.allTools(), { ...fakeUser, role: 'admin' }, { schemaVersion: 1, policies: {} });
+  assert.ok(businessNames.every(name => skillTools.some(tool => tool.name === name)));
+  for (const name of businessNames) {
+    const tool = registry.get(name)!;
+    const { businessExecutionOnly: _visibility, ...beforeVisibility } = tool;
+    const contract = skillToolContract(tool);
+    assert.deepEqual(contract, skillToolContract(beforeVisibility));
+    assert.equal(skillDefinitionHash(contract), skillDefinitionHash(skillToolContract(beforeVisibility)));
+  }
+  const manuals = await registry.execute("list_tools", {}, user) as { tools: Array<{ name: string }> };
+  assert.ok(manuals.tools.length > 0);
+  assert.ok(manuals.tools.every(tool => !businessNames.includes(tool.name)));
+  assert.deepEqual(registry.listDiscoveredToolDefinitionsFor(user, businessNames), []);
+  await assert.rejects(registry.execute("requirement_sources", {}, user),
+    (error: any) => error.code === "MVP_EXECUTION_PROOF_INVALID");
+  await assert.rejects(registry.execute("create_assessment_draft", {}, user),
+    (error: any) => error.code === "confirmedlocaladapterrequired");
 });

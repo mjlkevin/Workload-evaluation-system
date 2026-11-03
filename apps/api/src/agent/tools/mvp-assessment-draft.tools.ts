@@ -21,7 +21,7 @@ export function buildMvpAssessmentDraftTools(_ownerUserId: string): AgentTool[] 
  return [{ name: 'create_assessment_draft', description: '按已核对的需求、实施目录、范围及参数计算并创建关联的项目与实施评估草稿',
   parameters: MVP_ASSESSMENT_DRAFT_PARAMETERS, outputSchema: MVP_ASSESSMENT_DRAFT_OUTPUT,
   source: 'code', capability: 'estimates:create', category: 'estimate', discoverable: true,
-  mutates: true, exfiltrates: false, simulationOnly: false, sandboxReadSafe: false,
+  mutates: true, exfiltrates: false, simulationOnly: false, sandboxReadSafe: false, businessExecutionOnly: true,
   async execute() { throw new SkillError('confirmedlocaladapterrequired', '请通过当前业务任务的操作执行入口创建草稿', 409); },
  }];
 }
