@@ -71,7 +71,7 @@ function currentTools(value: Context, now: Awaited<ReturnType<typeof resolveCurr
 function decisionKey(request: Request, confirmationHash: string) {
   return `business-op-decision:v1:${hash({ operationId: request.operationId, runId: request.runId, confirmationHash })}`;
 }
-async function validateDecision(tx: QueueDbExecutor, row: typeof harnessToolEvents.$inferSelect, value: Context, basis: ReturnType<typeof basisFor>, confirmationHash: string, effectKey: string) {
+export async function validateDecision(tx: QueueDbExecutor, row: typeof harnessToolEvents.$inferSelect, value: Context, basis: ReturnType<typeof basisFor>, confirmationHash: string, effectKey: string) {
   const input = json(row.input) as Record<string, unknown>;
   const choice = input?.decision;
   if (!['approve', 'reject'].includes(choice as string) || row.eventType !== 'business_operation_decision'
@@ -86,24 +86,39 @@ async function validateDecision(tx: QueueDbExecutor, row: typeof harnessToolEven
   if (!time?.equal) fail('OPERATION_DECISION_INVALID');
   return choice as 'approve' | 'reject';
 }
+/** Internal shared 3b pipeline: inventory runs without retaining a transaction connection. */
+export async function prepareOperationConfirmation(database: Database, inventory: typeof resolveCurrentSkillTools, request: Request, user: AuthUser) {
+  const before = await database.transaction(tx => context(tx, request, user));
+  const prepared = await prepareSkillAuthority([], async () => {
+    const now = await inventory({ ...user, ...before.admission.identity, businessRole: before.admission.manifest.caller.businessRole } as AuthUser);
+    return currentTools(before, now);
+  }, database);
+  const basis = basisFor(before, prepared.value), confirmationHash = hash(basis);
+  return { basis, confirmationHash, async verify(tx: QueueDbExecutor) {
+    const after = await context(tx, request, user, false);
+    await prepared.verify(tx);
+    after.stamps = await stamps(tx);
+    if (hash(basisFor(after, prepared.value)) !== confirmationHash || !isDeepStrictEqual(after.pending.input, before.pending.input)) fail('OPERATION_CONFIRMATION_CHANGED');
+    return after;
+  } };
+}
+/** Internal strict fact reader, never an admission grant. Also used for historical receipt provenance. */
+export async function readOperationApproval(tx: QueueDbExecutor, value: Context, basis: ReturnType<typeof basisFor>, confirmationHash: string) {
+  const effectKey = decisionKey({ runId: basis.runId, operationId: value.pending.operationId }, confirmationHash);
+  const [row] = await tx.select().from(harnessToolEvents).where(and(eq(harnessToolEvents.harnessRunId, value.pending.rootRunId), eq(harnessToolEvents.effectKey, effectKey))).for('share');
+  if (!row || await validateDecision(tx, row, value, basis, confirmationHash, effectKey) !== 'approve') fail('OPERATION_APPROVAL_REQUIRED');
+  return row;
+}
 /** Internal explicit-human command service. Facts recorded here are never an execution grant or an AgentTool. */
 export function createSkillOperationDecisionService(options: Options = {}) {
   const database = options.database ?? db;
   async function handle(initialUser: AuthUser, body: unknown, decide: boolean): Promise<ConfirmationView> {
     try {
       const request = command(body, decide), user = structuredClone(initialUser);
-      const before = await database.transaction(tx => context(tx, request, user));
-      const prepared = await prepareSkillAuthority([], async () => {
-        const now = await (options.inventory ?? resolveCurrentSkillTools)({ ...user, ...before.admission.identity,
-          businessRole: before.admission.manifest.caller.businessRole } as AuthUser);
-        return currentTools(before, now);
-      }, database);
-      const basis = basisFor(before, prepared.value), confirmationHash = hash(basis), effectKey = decisionKey(request, confirmationHash);
+      const prepared = await prepareOperationConfirmation(database, options.inventory ?? resolveCurrentSkillTools, request, user);
+      const { basis, confirmationHash } = prepared, effectKey = decisionKey(request, confirmationHash);
       return await database.transaction(async tx => {
-        const after = await context(tx, request, user, false);
-        await prepared.verify(tx);
-        after.stamps = await stamps(tx);
-        if (hash(basisFor(after, prepared.value)) !== confirmationHash || !isDeepStrictEqual(after.pending.input, before.pending.input)) fail('OPERATION_CONFIRMATION_CHANGED');
+        const after = await prepared.verify(tx);
         if (decide && request.confirmationHash !== confirmationHash) fail('OPERATION_CONFIRMATION_CHANGED');
         let [row] = await tx.select().from(harnessToolEvents).where(and(eq(harnessToolEvents.harnessRunId, after.pending.rootRunId), eq(harnessToolEvents.effectKey, effectKey))).for('share');
         if (decide && !row) {

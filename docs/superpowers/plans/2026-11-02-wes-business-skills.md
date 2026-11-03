@@ -903,3 +903,35 @@ readForConfirmation不写任何状态；当前basis对应无决定时仅pending�
 **C2c.3b收尾实取：** 规格与fresh五轴安全复核均APPROVE；四源码/测试改动gross618行（含窄提取搬移），无>1000行整批审查。父原命令modules931/931、确认专项86/86、Harness462/462、AI286/286均fail/cancel/skip0，双构建exit0。integration0/1保留templates_status_not_200；guarded测试库只读核实活动模板0、有效分配0，不填造业务数据。有效RED0/2；PG微秒决定损坏反例15/17含无序快照夹具问题，PK排序修正保留说明；最终配置fence戳顺序RED20/21；首TS编译失败与修正记录均保留。
 
 九页总看板build/check覆盖21页，0错误/0警告；OpenAPI YAML解析193条路径，未新增确认HTTP入口。IAB独立3008只读台账核验RP-050仍C实施中，next为事务写幂等/预算/生产宿主/工作台/D；截图 /Users/kevin/.codex/visualizations/2026/11/02/01a19a18-92f8-7bf1-b70c-df3fd911608f/c2c3b-2026-11-03-board-requirements.png。沿用表格短列换行/长行留白未改，不作视觉优化验收声明；sources无新资产且53唯一需求/54台账行未改。仅自建3008服务/标签，收尾关闭；3006/3004未启动或更新。下一步3c尚未实施，本次不自动进入下一单元。
+
+### C2c.3c.1 精细工单：本地事务消费与写入幂等底座（2026-11-03）
+
+用户继续，基线2d0d3e3/codex/wes-skills-c。沿已评审设计§8和C2c.3拆批：3c.1先建立可信本地事务端口消费确认与完成账的原子保护；3c.2再接具体生产业务工具/仓储，远端不确定结果人工核对。不是扩范围、不是第三运行库，不重开产品审批。此单元可用测试库真实version_records业务行证明同事务；不把测试端口等同生产工具已接入。跨调用预算3d、统一视图/生产宿主/工作台继续后续。保持已批准单次实施，不开启Loop。
+
+独立内部factory createSkillOperationExecutionService(options?: {database, inventory, adapters})，唯一executeOperation(user,{runId,operationId,confirmationHash})；body严格仅3字段，UUID/hash规范小写，不能接受approved、decisionId、toolName、parameters、adapter等。返回{operationId,executionId,rootRunId,status:'succeeded',result}安全JSON拷贝。adapters为服务端可信ReadonlyMap，复制映射/执行函数以隔离调用中变更，端口kind='local-transaction'，execute(tx, {operationId,ownerId,sessionId,parameters})，必须仅经传入tx做本地DB写入，不能使用全局连接、网络、文件、外发/MCP或NativeTool.execute。默认无adapter，失败关闭；此kind是可信装配契约，不能在运行时证明任意JavaScript没有外部副作用，文档须明示。只支持当前原生source=code、mutates=true、非exfiltrates、非simulationOnly的根Skill；只读ask/MCP/远端/文件写/未装配不执行。
+
+窄提取3b既有上下文准备与最终验证事务helper，保留原read/decide公开表面/错误语义。两个短tx之间外部inventory不占连接；最终实际默认admission/精确pending→private配置fence→新微秒revision→当前basis一致→当前scope严格批准事实验证，才可处理receipt和适配器。所有replay同样先真实有效准入、同hash和当前approve，拒绝/无决定/旧hash/撤权/终态/会话失效/紧停都不能消费或回放。既有.2b ToolGate写/外发/MCP/ask默认deny不改；确认仍不是通用grant。3a/3b意图和决定不改写。
+
+执行账复用harness_tool_events和(root,effectKey)唯一约束，无schema/迁移。effectKey/actionId独立business-op-execution:v1:hash({operationId})，跨retry/epoch/确认scope稳定；eventType=business_operation_executed。input严格schema1含operationId/rootRunId/operationKey/payloadHash/manifestHash/ownerId/sessionId/toolName以及实际首次sourceRunId/decisionId/confirmationHash，后者只能来自当前重验批准事实。首次INSERT status=executing、output/resolvedAt/error/risk空，唯一冲突等待后读已有完整成功账，只有实际INSERT赢者调用adapter。adapter(tx)写入和结果safe JSON校验、receipt更新status=succeeded/output={schemaVersion:1,result}/resolvedAt在同一事务。任何异常全部回滚，不能提交半条executing，不能在业务写后另开tx记成功。读损坏/未知状态/legacy碰撞失败关闭，不直接重试副作用。时间用readDbNow，PG精确核对resolved>=created；既有created/resolved合法有限，null风险/错误。结果同1MiB/32层/危险字段安全约束，无原生函数/Date/undefined失真。
+
+重放receipt严格验证完整input/output/envelope，固定内容与当前真实pending完全一致，sourceRun/decisionId/hash小写合法，旧source真实owned同根血缘（可failed，不通过旧admission授予当前权限）；读取其严格3b批准事实，hash/key/actor/时间/原source executionAuthority及basis固定字段均核对。旧basis可仅在明确的run/identity/currentToolsHash/configRevisions/authority绑定部分与当前不同，其他键/固定参数摘要一致；不能仅信stored approved布尔。当前scope已独立真实批准才可返回过去已完成结果。retry获得新确认后复用已完成receipt，绝不再次调用adapter；旧receipt不是新Run权限凭据。不承诺防DB管理员一起伪造所有历史。
+
+文件责任：新增skills.operation-execution.ts与skills.operation-execution.persistence.test.ts；skills.operation-decisions.ts仅窄提取复用上下文/严格决定验证helper，必要共享内部helper可增加但马上登记CI；skills.module.ts导factory/type。父负责package测试脚本/CI、README/OpenAPI既有描述/对齐/计划和九页总板。目标500–850手写行，900预警999前拆分（含物理移动，不净增掩盖）。源冻结后SPEC先审再fresh五轴/安全复验。无新增HTTP/UI/boot/生产adapter；不得动默认ToolGate/WaitService/Worker、凭据、主库/预览库/3006/3004；config/system/model-verify-status.json禁止读/扫描/写/暂存。仅guarded workload_eval_test，测试独占串行，不改原modules并发或旧预算/断言造绿，本地保存不合main/推送。
+
+- [x] RED：真实PG适配器写version_records后异常仍残留/重复调用重复写等行为反例，观察业务行与receipt，不用缺导入/编译当RED。
+- [x] GREEN：当前明确approve才可消费；真实业务行与receipt一次提交，重复/服务重建/新retry新批准后只返回原结果，pending/decision/Run/CP/output/events/model不改，无NativeTool/model调度。
+- [x] 实际PG并发同操作INSERT后门闩+pg_stat_activity证实唯一冲突等待，恰一adapter和一业务行/receipt；异常/坏输出/完成账更新失败全部回滚，重试可再成功。max1库存查库不死锁；有界门闩finally释放。
+- [x] 边界：默认/未知/不安全adapter关闭，read-only/MCP/exfil/simulation工具拒绝；无approve/reject/旧scope/参数篡改/坏receipt/legacy碰撞/source/decision损坏拒绝，当前撤权/epoch/配置微秒/会话失效在调用前或inventory间隙拦截且业务行0；已有成功receipt不能绕过这些。互相交错的撤权/写事务线性化按实际锁提交次序解释，不承诺倒转已先提交写入。
+- [x] 先SPEC后fresh质量独立实测；父原模块/执行专项/Harness/AI及API/Web构建，保留通用integration缺模板0/1与audit45基线；专属version_records/Run/Session/user按owner清理并assert0，不全库truncate/DDL；九板/文档事实同步，3c整体仍待生产工具适配。
+
+**C2c.3c.1首RED实取：** 父基线确认专项86/86、0skip。/tmp/wes-c2c3c1-impl/red-semantic两个真实PG行为反例均失败（0/2，0skip）：重复/重建service创建不同version_records记录ID，Infinity结果未拒绝。更早red因sandboxReadSafe夹具标记导致准入拒绝，保留但不计有效业务RED。正在实现同事务消费；audit实取45（32moderate/12high/1critical），依赖未改。
+
+**C2c.3c.1实现冻结：** 四源码/测试gross586（含3b窄提取39），/tmp/wes-c2c3c1-impl/final-contract新增PG20/20、0skip、exit0，tsc --noEmit exit0。版本夹具改为在役assessment/checked_in/drafting/A/0并断言合法新建契约；测试真实version_records而非仅内存计数。保留green-expanded 11/12的来源/MCP夹具早拒绝，以及首次TS unknown/optional adapter收窄失败输出，未弱化生产准入。新JSON结果检查拒绝Date/Map/getter/自定义数组继承toJSON，写后坏结果完整回滚。独立规格与fresh质量尚待完成，生产具体adapter仍未接线。
+
+**C2c.3c.1 JSON配额口径：** 沿3a/3b完整JSON边界原则，adapter结果、持久output信封与最终返回信封分别满足1MiB/32层和危险字段检查；包装自身占用字节/深度，不承诺原始result吃满限额后再给予额外包装配额。超限整笔事务回滚，不提交业务或receipt半成品。
+
+**C2c.3c.1独立规格实取：** /tmp/wes-c2c3c1-spec新增PG20/20，fail/cancel/skip0、exit0，SPEC APPROVE。核实真实SQL等待/首赢家回滚后接管/撤权锁次序/重新approve后的旧结果复用及四类专属行清零断言；未修改源码。fresh五轴质量静态阶段等待父PG租约，父现运行原modules/执行专项/Harness/AI/通用集成，不并发PG或构建，不改原modules并发。
+
+**C2c.3c.1最终回填：** 本地业务写入与成功回执现可同事务提交：重复、并发和明确重试只写一次，失败整笔回滚；重放也须当前权限与新确认有效。默认没有生产工具适配器。父独立执行专项106、模块931、Harness482、AI286及API/Web双构建通过，测试均0skip。SPEC20后fresh质量PG20/纯测41APPROVE；全阶段0skip。保留专属有效RED0/2、来源/MCP夹具失败和首次TS收窄失败；没有改原modules并发、弱化旧断言/预算或seed模板造绿。真实SQL唯一冲突等待/赢家rollback接管/写与撤权两种锁序、坏JSON和完成更新失败整笔rollback、retry重新approve后只复用、微秒fence与历史source/decision完整性均有无条件断言。完整JSON配额以每个包装边界为准，可信adapter不是自动网络沙箱。仅测试库真实业务记录证明底座，生产工具仍待3c.2；3c整体与C/D/MVP未关闭。九页看板同步，RP-050保持C实施中，sources无新文档资产/计数不变。下一步接具体生产业务工具的事务适配（C2c.3c.2），再做跨调用累计预算（3d）、统一视图、生产宿主、工作台和D验收。实际本地sha和板检截图随后实取补记。
+
+**C2c.3c.1板检实取：** canonical九页build/check覆盖21页，0错误/0警告（/tmp/wes-c2c3c1-board-build-final.log与board-check-final.log）；OpenAPI YAML解析193条path未增公开入口。IAB只读核验RP-050仍C实施中，next明确具体生产工具/预算/宿主/工作台/D；53唯一需求/54数据行不变。截图 /Users/kevin/.codex/visualizations/2026/11/02/01a19a18-92f8-7bf1-b70c-df3fd911608f/c2c3c1-2026-11-03-board-requirements.png；沿用既有短列换行和长行留白，不作UI优化声明。自建3008服务/标签已关闭，不动3006/3004。源码gross586（含搬移），本地提交sha随后实取回填；3c.2具体生产工具未在本次实施。

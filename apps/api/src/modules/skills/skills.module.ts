@@ -24,3 +24,5 @@ export { createSkillRetryService, retryInvocation } from './skills.retry';
 
 export { createSkillOperationService } from './skills.operations';
 export { createSkillOperationDecisionService } from './skills.operation-decisions';
+
+export { createSkillOperationExecutionService, type SkillLocalTransactionAdapter, type SkillOperationExecutionResult } from './skills.operation-execution';
