@@ -4,6 +4,7 @@ import { listExecutionCatalog, listExecutionTemplates, startBusinessExecution, u
 import useInvocationScope from './useInvocationScope.js'
 import { resolveBusinessSchema } from './businessInputSchema.js'
 import BusinessInputForm, { initialBusinessInput, validateBusinessInput } from './BusinessInputForm.jsx'
+import BusinessRecommendationPanel from './BusinessRecommendationPanel.jsx'
 
 function safeError(error, fallback) {
   if (error?.status === 401) return '登录已过期，请重新登录后重试。'
@@ -41,6 +42,7 @@ export default function SkillInvocationDialog({ open, onClose, onStarted, ensure
   const attempt = useRef(null)
   const selectionScope = useRef(null)
   const uploadedSession = useRef(null)
+  const selectionRef = useRef(null)
   const scope = useInvocationScope(open, session?.sessionId ?? null, ensureSession)
   const revision = scope.revision
   useEffect(() => {
@@ -133,18 +135,26 @@ export default function SkillInvocationDialog({ open, onClose, onStarted, ensure
     if (dirty) setDiscard(true)
     else onClose()
   }
-  function select(value) {
+  function select(value, items = catalog) {
     if (inFlight.current) return
     scope.changeTarget()
     selectionScope.current = revision
     setSelection(value)
-    const item = catalog.find(entry => `${entry.kind}:${entry.id}` === value)
+    const item = items.find(entry => `${entry.kind}:${entry.id}` === value)
     const next = initialBusinessInput(item?.inputSchema) ?? {}
     if (hasTemplateField(item?.inputSchema) && next && typeof next === 'object') delete next.templateId
     setInput(next)
     setErrors({})
     setError('')
     setDirty(true)
+  }
+  function selectRecommendation(card, items, token) {
+    if (inFlight.current || !scope.current(token)) return
+    const current = items.find(item => item.kind === card.kind && item.id === card.id && item.versionId === card.versionId)
+    setCatalog(items)
+    select(current ? `${current.kind}:${current.id}` : '', items)
+    if (!current) setError('目录已变化，请手动重新选择。')
+    selectionRef.current?.focus()
   }
   async function submit(event) {
     event.preventDefault()
@@ -184,10 +194,12 @@ export default function SkillInvocationDialog({ open, onClose, onStarted, ensure
   return (
     <Dialog open={open} title="启动 Skill / 工作流" onClose={requestClose} dismissDisabled={busy} wide>
       <form noValidate onSubmit={submit} className="grid min-w-0 gap-4" aria-busy={busy || loading}>
+        <BusinessRecommendationPanel key={`${revision}:${scope.capture().target}`} scope={scope}
+          disabled={busy || loading} onSelect={selectRecommendation} onDirty={() => setDirty(true)} />
         <div className="grid gap-1">
           <label htmlFor="business-execution-selection" className="text-sm font-medium">选择 Skill 或工作流</label>
           <select
-            id="business-execution-selection" className="input" value={selection}
+            id="business-execution-selection" ref={selectionRef} className="input" value={selection}
             disabled={loading || busy} onChange={event => select(event.target.value)}
           >
             <option value="">{loading ? '目录加载中…' : '请选择'}</option>

@@ -6,6 +6,9 @@ const runPath = (runId) => `/ai-runs/${encodeURIComponent(runId)}`
 export async function listExecutionCatalog() {
   return unwrapList(await apiClient.get('/ai-executions/catalog', undefined, options))
 }
+export async function recommendBusinessExecutions(goal) {
+  return unwrap(await apiClient.post('/ai-executions/recommendations', { goal }, options))
+}
 export async function uploadExecutionSource(sessionId, file) {
   const body = new FormData()
   body.append('file', file)

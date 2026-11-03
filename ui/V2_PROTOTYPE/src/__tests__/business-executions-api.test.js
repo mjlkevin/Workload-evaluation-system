@@ -1,9 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiClient } from '../api/client.js'
-import { listExecutionCatalog, listBusinessRuns, startBusinessExecution, submitBusinessInput, decideBusinessAction, retryBusinessExecution, uploadExecutionSource, listExecutionTemplates } from '../api/businessExecutions.js'
+import { listExecutionCatalog, listBusinessRuns, startBusinessExecution, submitBusinessInput, decideBusinessAction, retryBusinessExecution, uploadExecutionSource, listExecutionTemplates, recommendBusinessExecutions } from '../api/businessExecutions.js'
 vi.mock('../api/client.js', () => ({ apiClient: { get: vi.fn(), post: vi.fn(), upload: vi.fn() } }))
 beforeEach(() => { vi.clearAllMocks(); apiClient.get.mockResolvedValue({ data: { items: [] } }); apiClient.post.mockResolvedValue({ data: { runId: 'r1' } }) })
 describe('工作台业务执行API命令', () => {
+  it('推荐仅向现有鉴权客户端发送goal，不创建会话或业务Run', async () => {
+    apiClient.post.mockResolvedValue({ data: { outcome: 'no_match', items: [] } })
+    expect(await recommendBusinessExecutions('拆解需求')).toEqual({ outcome: 'no_match', items: [] })
+    expect(apiClient.post).toHaveBeenCalledWith('/ai-executions/recommendations', { goal: '拆解需求' }, { suppressUnauthorizedRedirect: true })
+    expect(apiClient.get).not.toHaveBeenCalled(); expect(apiClient.upload).not.toHaveBeenCalled()
+  })
   it('从已鉴权客户端读取目录与当前会话Run', async () => {
     await listExecutionCatalog(); await listBusinessRuns('session-a')
     expect(apiClient.get.mock.calls.map(call => call.slice(0, 2))).toEqual([['/ai-executions/catalog', undefined], ['/ai-executions/runs', { sessionId: 'session-a' }]])
