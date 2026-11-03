@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { emergencyHandler } from '../modules/skills/execution-emergency.controller';
 import { requireCapability } from '../rbac/middleware';
 import { createSkillsPgRepository } from '../modules/skills/skills.module';
 import { createWorkflowHandlers, createWorkflowsPgRepository, resolveWorkflowDependencyContext, workflowToolMetadata, type WorkflowControllerDeps } from '../modules/workflows/workflows.module';
@@ -15,6 +16,9 @@ export function createWorkflowsRouter(deps: Partial<WorkflowControllerDeps> = {}
     router.get('/metadata', handlers.metadata);
     router.post('/', handlers.create);
     router.get('/:workflowId/release', handlers.readiness);
+    router.get('/:workflowId/emergency-control', emergencyHandler('workflow'));
+    router.post('/:workflowId/emergency-stop', emergencyHandler('workflow', 'stop'));
+    router.post('/:workflowId/emergency-release', emergencyHandler('workflow', 'release'));
     router.get('/:workflowId/dependencies', handlers.dependencies);
     router.get('/:workflowId', handlers.detail);
     router.patch('/:workflowId/save-draft', handlers.save);

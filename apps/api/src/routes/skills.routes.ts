@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { emergencyHandler } from '../modules/skills/execution-emergency.controller';
 import { createWorkflowsPgRepository } from '../modules/workflows/workflows.module';
 import { requireCapability, requireAuthenticated } from '../rbac/middleware';
 import { resolveCurrentSkillTools, resolveSkillDependencyContext, skillToolContract } from '../modules/skills/skills.context';
@@ -26,6 +27,9 @@ export function createSkillsRouter(deps?: Partial<SkillControllerDeps>): Router 
   router.post('/validate', handlers.validate);
   router.post('/', handlers.create);
   router.get('/:skillId/influences', handlers.influences);
+  router.get('/:skillId/emergency-control', emergencyHandler('skill'));
+  router.post('/:skillId/emergency-stop', emergencyHandler('skill', 'stop'));
+  router.post('/:skillId/emergency-release', emergencyHandler('skill', 'release'));
   router.get('/:skillId/release', handlers.readiness);
   router.post('/:skillId/trial', handlers.trial);
   router.post('/:skillId/review', handlers.review);

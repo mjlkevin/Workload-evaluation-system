@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { randomUUID } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from '../../db/schema';
@@ -20,6 +20,7 @@ import { skillDefinitionHash as hash } from './skills.hash';
 import type { SkillResolvedContext } from './skills.context';
 import type { SkillDefinition } from './skills.types';
 import type { AuthUser } from '../../types';
+import { createExecutionEmergencyRepository } from './execution-emergency';
 const target = resolveExecutionTestDatabaseUrl(process.env);
 const pool = new Pool({ connectionString: target, max: 4 }); const database = drizzle(pool, { schema });
 const user = { id: randomUUID(), username: `invoke-${randomUUID()}`, role: 'admin', businessRole: 'pre_sales', status: 'active' } as AuthUser;
@@ -231,4 +232,144 @@ test('workflow invocation freezes its published old Skill binding after the Skil
   const result = await service().submitInvocation(user, await session(), { submissionKey: randomUUID(), content: 'Workflow', execution: { kind: 'workflow', workflowId: w.workflowId, input: { text: 'original' } } });
   const saved = readPersistedExecutionManifest(((await persisted(result.data.runId)).executionConfig as Record<string, unknown>).executionManifest);
   assert.equal(saved.target.versionId, published.currentVersionId); assert.equal(saved.skills[0].versionId, s.currentVersionId);
+  const controls = createExecutionEmergencyRepository(database);
+  await controls.assertRunAdmission(result.data.runId, user.id);
+  await controls.change('skill', s.skillId, user, 0, 'Stop dependency', 'stop');
+  await assert.rejects(controls.assertRunAdmission(result.data.runId, user.id), (e: any) => e.code === 'EXECUTION_EMERGENCY_STOPPED');
+  await controls.change('skill', s.skillId, user, 1, 'Release dependency', 'release');
+  await assert.rejects(controls.assertRunAdmission(result.data.runId, user.id), (e: any) => e.code === 'EXECUTION_MANUAL_RETRY_REQUIRED');
+  async function startWorkflow() { return service().submitInvocation(user, await session(), { submissionKey: randomUUID(), content: 'Workflow', execution: { kind: 'workflow', workflowId: w.workflowId, input: { text: 'original' } } }); }
+  const fresh = await startWorkflow(); await controls.assertRunAdmission(fresh.data.runId, user.id);
+  await controls.change('workflow', w.workflowId, user, 0, 'Stop workflow', 'stop');
+  await assert.rejects(startWorkflow(), (e: any) => e.code === 'EXECUTION_EMERGENCY_STOPPED');
+  await assert.rejects(controls.assertRunAdmission(fresh.data.runId, user.id), (e: any) => e.code === 'EXECUTION_EMERGENCY_STOPPED');
+  await controls.change('workflow', w.workflowId, user, 1, 'Release workflow', 'release');
+  await assert.rejects(controls.assertRunAdmission(fresh.data.runId, user.id), (e: any) => e.code === 'EXECUTION_MANUAL_RETRY_REQUIRED');
+  const retry = await startWorkflow(); await controls.assertRunAdmission(retry.data.runId, user.id);
+  await workflows.status(w.workflowId, published.revision, { enabled: false, archived: true });
+  await controls.assertRunAdmission(retry.data.runId, user.id);
+});
+const emergency = createExecutionEmergencyRepository(database);
+test('emergency stop rejects new queue work and committed replay, release requires a new explicit submission', async () => {
+  const s = await skill(); const id = await session(); const b = request(s.skillId);
+  const first = await service().submitInvocation(user, id, b);
+  assert.equal((await emergency.assertRunAdmission(first.data.runId, user.id)).runId, first.data.runId);
+  const before = await roots.get(s.skillId);
+  await emergency.change('skill', s.skillId, user, 0, 'Investigate', 'stop');
+  for (const [sid, body] of [[id, b], [await session(), request(s.skillId)]] as const)
+    await assert.rejects(service().submitInvocation(user, sid, body), (e: any) => e.code === 'EXECUTION_EMERGENCY_STOPPED' && e.status === 409);
+  await assert.rejects(emergency.assertRunAdmission(first.data.runId, user.id), (e: any) => e.code === 'EXECUTION_EMERGENCY_STOPPED');
+  await emergency.change('skill', s.skillId, user, 1, 'Reviewed', 'release');
+  assert.deepEqual(await roots.get(s.skillId), before, 'normal revisions and published definitions are untouched');
+  await assert.rejects(service().submitInvocation(user, id, b), (e: any) => e.code === 'EXECUTION_MANUAL_RETRY_REQUIRED');
+  await assert.rejects(emergency.assertRunAdmission(first.data.runId, user.id), (e: any) => e.code === 'EXECUTION_MANUAL_RETRY_REQUIRED');
+  const next = await service().submitInvocation(user, await session(), request(s.skillId));
+  await emergency.assertRunAdmission(next.data.runId, user.id);
+  assert.equal((await persisted(first.data.runId)).status, 'queued', 'release never changes or resumes old Run');
+});
+test('ordinary disable/archive only rejects new starts; existing persisted run remains admissible', async () => {
+  const s = await skill(); const id = await session(); const b = request(s.skillId);
+  const first = await service().submitInvocation(user, id, b);
+  await changes.setStatus(s.skillId, s.revision, actor, { enabled: false, archived: true });
+  await emergency.assertRunAdmission(first.data.runId, user.id);
+  assert.deepEqual(await service().submitInvocation(user, id, b), first);
+  await assert.rejects(service().submitInvocation(user, await session(), request(s.skillId)), (e: any) => e.code === 'INVOCATION_CONTEXT_CHANGED');
+});
+test('admission reads actual owner/session/current identity and rejects corrupt or forged epoch bindings', async () => {
+  const s = await skill(); const first = await service().submitInvocation(user, await session(), request(s.skillId));
+  const saved = await persisted(first.data.runId); const config = saved.executionConfig as Record<string, unknown>;
+  await assert.rejects(emergency.assertRunAdmission(first.data.runId, randomUUID()), (e: any) => e.code === 'EXECUTION_RUN_NOT_FOUND');
+  for (const binding of [undefined, [], [{ kind: 'skill', id: s.skillId, epoch: -1 }], [{ kind: 'skill', id: 'forged', epoch: 0 }],
+    [{ kind: 'skill', id: s.skillId, epoch: 0, extra: true }], [config.executionAuthority, config.executionAuthority]]) {
+    await database.update(schema.harnessRuns).set({ executionConfig: { ...config, executionAuthority: binding } }).where(eq(schema.harnessRuns.harnessRunId, first.data.runId));
+    await assert.rejects(emergency.assertRunAdmission(first.data.runId, user.id), (e: any) => e.code === 'EXECUTION_RUN_BINDING_INVALID');
+  }
+  await database.update(schema.harnessRuns).set({ executionConfig: config }).where(eq(schema.harnessRuns.harnessRunId, first.data.runId));
+  for (const change of [{ status: 'disabled' as const }, { businessRole: 'delivery' }]) {
+    await database.update(schema.users).set(change).where(eq(schema.users.userId, user.id));
+    try { await assert.rejects(emergency.assertRunAdmission(first.data.runId, user.id), (e: any) => e.code === 'EXECUTION_AUTHORITY_CHANGED'); }
+    finally { await database.update(schema.users).set({ status: 'active', businessRole: 'pre_sales' }).where(eq(schema.users.userId, user.id)); }
+  }
+  await database.update(schema.aiSessions).set({ ownerUserId: randomUUID() }).where(eq(schema.aiSessions.sessionId, saved.aiSessionId!));
+  try { await assert.rejects(emergency.assertRunAdmission(first.data.runId, user.id), (e: any) => e.code === 'EXECUTION_RUN_NOT_FOUND'); }
+  finally { await database.update(schema.aiSessions).set({ ownerUserId: user.id }).where(eq(schema.aiSessions.sessionId, saved.aiSessionId!)); }
+});
+test('emergency audit is durable, append only, root constrained and concurrent revision writers cannot both win', async () => {
+  const s = await skill();
+  const outcomes = await Promise.allSettled([emergency.change('skill', s.skillId, user, 0, 'First', 'stop'), emergency.change('skill', s.skillId, user, 0, 'Second', 'stop')]);
+  assert.equal(outcomes.filter(o => o.status === 'fulfilled').length, 1);
+  const rejected = outcomes.find(o => o.status === 'rejected') as PromiseRejectedResult;
+  assert.equal(rejected.reason.code, 'EXECUTION_CONTROL_CONFLICT');
+  const stored = await createExecutionEmergencyRepository(database).read('skill', s.skillId, user);
+  assert.equal(stored.audit.length, 1); assert.equal(stored.control.epoch, 1);
+  for (const mutate of [() => database.update(schema.executionEmergencyAudits).set({ reason: 'tamper' }).where(eq(schema.executionEmergencyAudits.id, stored.audit[0].id)),
+    () => database.delete(schema.executionEmergencyAudits).where(eq(schema.executionEmergencyAudits.id, stored.audit[0].id))])
+    await assert.rejects(mutate(), (e: any) => (e.cause?.code ?? e.code) === '23514');
+  const audit = { id: randomUUID(), actorId: user.id, action: 'stop' as const, reason: 'x', epoch: 1, revision: 1, createdAt: new Date() };
+  for (const refs of [{}, { skillId: randomUUID() }]) await assert.rejects(database.insert(schema.executionEmergencyAudits).values({ ...audit, ...refs }),
+    (e: any) => ['23514', '23503'].includes(e.cause?.code ?? e.code));
+  await database.update(schema.users).set({ role: 'user' }).where(eq(schema.users.userId, user.id));
+  try { await assert.rejects(emergency.change('skill', s.skillId, user, 1, 'stale admin', 'release'), (e: any) => e.code === 'EXECUTION_CONTROL_FORBIDDEN'); }
+  finally { await database.update(schema.users).set({ role: 'admin' }).where(eq(schema.users.userId, user.id)); }
+  assert.equal((await emergency.read('skill', s.skillId, user)).audit.length, 1);
+});
+function deferred<T = void>() { let resolve!: (value: T) => void; const promise = new Promise<T>(r => { resolve = r; }); return { promise, resolve }; }
+async function assertLockWait(pid: number) {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const { rows } = await pool.query('SELECT wait_event_type FROM pg_stat_activity WHERE pid = $1', [pid]);
+    if (rows[0]?.wait_event_type === 'Lock') return;
+    await new Promise(r => setTimeout(r, 10));
+  }
+  assert.fail('Expected actual PostgreSQL lock wait');
+}
+test('a committed stop wins over queue admission even when preparation finished before the stop', async () => {
+  const s = await skill(); const b = request(s.skillId); const id = await session(); const ready = deferred(); const proceed = deferred();
+  const inFlight = service(async (...args) => { const prepared = await manifest.prepareExecution(...args); ready.resolve(); await proceed.promise; return prepared; })
+    .submitInvocation(user, id, b);
+  await ready.promise; await emergency.change('skill', s.skillId, user, 0, 'Stop before queue commit', 'stop'); proceed.resolve();
+  await assert.rejects(inFlight, (e: any) => e.code === 'EXECUTION_EMERGENCY_STOPPED'); assert.equal((await runRows(b.submissionKey)).length, 0);
+});
+test('stop followed by release during preparation rejects the original submission, requiring a new explicit request', async () => {
+  const s = await skill(); const b = request(s.skillId); const id = await session(); const ready = deferred(); const proceed = deferred();
+  const inFlight = service(async (...args) => { const prepared = await manifest.prepareExecution(...args); ready.resolve(); await proceed.promise; return prepared; }).submitInvocation(user, id, b);
+  await ready.promise; await emergency.change('skill', s.skillId, user, 0, 'Stop during preparation', 'stop');
+  await emergency.change('skill', s.skillId, user, 1, 'Reviewed during preparation', 'release'); proceed.resolve();
+  await assert.rejects(inFlight, (e: any) => e.code === 'EXECUTION_MANUAL_RETRY_REQUIRED');
+  assert.equal((await runRows(b.submissionKey)).length, 0);
+});
+test('stop and real run admission serialize on the aggregate root; current user changes wait for an admitted transaction', async () => {
+  const s = await skill(); const first = await service().submitInvocation(user, await session(), request(s.skillId));
+  const locked = deferred(); const release = deferred();
+  const fenced = { transaction: (callback: any) => database.transaction(async tx => { const value = await callback(tx); locked.resolve(); await release.promise; return value; }) } as typeof database;
+  const admission = createExecutionEmergencyRepository(fenced).assertRunAdmission(first.data.runId, user.id);
+  await locked.promise;
+  let stopped = false; let revoked = false;
+  const stopPid = deferred<number>(); const revokePid = deferred<number>();
+  const tracked = (pid: ReturnType<typeof deferred<number>>) => ({ transaction: (callback: any) => database.transaction(async tx => {
+    const result = await tx.execute(sql`SELECT pg_backend_pid() AS pid`); pid.resolve((result.rows[0] as { pid: number }).pid); return callback(tx);
+  }) }) as typeof database;
+  const stop = createExecutionEmergencyRepository(tracked(stopPid)).change('skill', s.skillId, user, 0, 'Concurrent stop', 'stop').then(() => { stopped = true; });
+  const revoke = tracked(revokePid).transaction(tx => tx.update(schema.users).set({ status: 'disabled' }).where(eq(schema.users.userId, user.id))).then(() => { revoked = true; });
+  try { await Promise.all([assertLockWait(await stopPid.promise), assertLockWait(await revokePid.promise)]); assert.equal(stopped, false); assert.equal(revoked, false); }
+  finally { release.resolve(); await admission; await Promise.allSettled([stop, revoke]); }
+  try { await assert.rejects(emergency.assertRunAdmission(first.data.runId, user.id), (e: any) => e.code === 'EXECUTION_AUTHORITY_CHANGED'); }
+  finally { await database.update(schema.users).set({ status: 'active' }).where(eq(schema.users.userId, user.id)); }
+});
+test('queue commit holds the same root fence; a waiting stop then blocks that persisted old run', async () => {
+  const s = await skill(); const locked = deferred(); const release = deferred(); const stopPid = deferred<number>();
+  const waiting = new Proxy(database, { get(base, key) {
+    if (key === 'transaction') return (callback: any) => database.transaction(async tx => { const result = await callback(tx); locked.resolve(); await release.promise; return result; });
+    return Reflect.get(base, key);
+  } });
+  const inFlight = createSkillInvocationService({ queue: createHarnessRuntimeRepository(waiting), repository, prepareExecution: manifest.prepareExecution })
+    .submitInvocation(user, await session(), request(s.skillId));
+  await locked.promise;
+  const tracked = { transaction: (callback: any) => database.transaction(async tx => {
+    const result = await tx.execute(sql`SELECT pg_backend_pid() AS pid`); stopPid.resolve((result.rows[0] as { pid: number }).pid); return callback(tx);
+  }) } as typeof database;
+  const stop = createExecutionEmergencyRepository(tracked).change('skill', s.skillId, user, 0, 'Wait for queue transaction', 'stop');
+  try { await assertLockWait(await stopPid.promise); }
+  finally { release.resolve(); }
+  const submitted = await inFlight; await stop;
+  await assert.rejects(emergency.assertRunAdmission(submitted.data.runId, user.id), (e: any) => e.code === 'EXECUTION_EMERGENCY_STOPPED');
 });

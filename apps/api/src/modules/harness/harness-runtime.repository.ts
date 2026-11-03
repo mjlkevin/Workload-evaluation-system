@@ -64,6 +64,10 @@ const QUEUE_CALLBACK_ERRORS: Record<string, string> = {
   INVOCATION_FORBIDDEN: 'invocation authority changed',
   INVOCATION_SOURCE_CHANGED: 'invocation source changed',
   INVOCATION_CONTEXT_CHANGED: 'invocation execution context changed',
+  EXECUTION_EMERGENCY_STOPPED: 'execution emergency stopped',
+  EXECUTION_MANUAL_RETRY_REQUIRED: 'execution requires explicit new submission',
+  EXECUTION_RUN_BINDING_INVALID: 'execution run authority binding invalid',
+  EXECUTION_AUTHORITY_UNAVAILABLE: 'execution authority unavailable',
 };
 async function safeQueueCallback<T>(callback: () => Promise<T>): Promise<T> {
   try { return await callback(); }

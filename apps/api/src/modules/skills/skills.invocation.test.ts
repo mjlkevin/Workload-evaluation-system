@@ -8,9 +8,11 @@ import { skillDefinitionHash as hash } from './skills.hash';
 import type { AuthUser } from '../../types';
 const user = { id: 'owner', username: 'owner', role: 'admin', businessRole: 'pre_sales', status: 'active' } as AuthUser;
 const body = () => ({ submissionKey: randomUUID(), content: ' Start \n', execution: { kind: 'skill', skillId: 'skill-a', input: { text: 'a' }, sources: [] } });
+const trustedAuthority = { prepare: async () => [], capture: async () => [], verifyReplay: async () => {} };
 function fixture() {
   const tx = {} as any; let prepares = 0; let resolves = 0; let validations = 0; let cached: any = null; let captured: any;
   const service = createSkillInvocationService({
+    authority: trustedAuthority,
     repository: { async prepare() { return { async verify(executor) { assert.equal(executor, tx); validations++; } }; } },
     prepareExecution: async () => { prepares++; return { async resolveInTransaction(executor) { assert.equal(executor, tx); resolves++; return { target: { versionId: 'old' } } as any; } }; },
     queue: { async findRunForSubmissionKey() { return cached; }, async createQueuedRun(input: CreateQueuedHarnessRunInput) {
@@ -62,6 +64,7 @@ function publicationRace(mode: 'same' | 'none' | 'changed' | 'legacy' | 'authori
   let row: any = null; let lookups = 0; let queueCalls = 0; let validations = 0;
   const fingerprint = hash({ sessionId: 'session', content: b.content.trim(), execution: b.execution });
   const service = createSkillInvocationService({
+    authority: trustedAuthority,
     repository: { async prepare() { return { async verify(executor) {
       assert.equal(executor, tx); validations++;
       const code = ({ authority: 'INVOCATION_FORBIDDEN', source: 'INVOCATION_SOURCE_CHANGED', session: 'INVOCATION_NOT_FOUND' } as Record<string, string>)[mode];
@@ -99,4 +102,15 @@ test('concurrent fallback cannot accept changed fingerprints or legacy chat, or 
     await assert.rejects(f.invoke(), (e: any) => e.code === code && !e.message.includes('private'));
     assert.deepEqual(f.counts(), { lookups: 2, queueCalls: 1, validations: 1 });
   }
+});
+test('authority failure closes admission before any model/tool preparation and preserves safe unavailable status', async () => {
+  let prepares = 0;
+  const service = createSkillInvocationService({
+    repository: { async prepare() { return { async verify() {} }; } },
+    authority: { ...trustedAuthority, async prepare() { throw new SkillError('EXECUTION_AUTHORITY_UNAVAILABLE', 'private detail', 503); } },
+    prepareExecution: async () => { prepares++; throw new Error('must not prepare'); },
+    queue: { async findRunForSubmissionKey() { return null; } } as any,
+  });
+  await assert.rejects(service.submitInvocation(user, 'session', body()), (e: any) => e.code === 'EXECUTION_AUTHORITY_UNAVAILABLE' && e.status === 503 && !e.message.includes('private'));
+  assert.equal(prepares, 0);
 });

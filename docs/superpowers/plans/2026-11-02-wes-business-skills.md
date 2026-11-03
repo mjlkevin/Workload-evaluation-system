@@ -613,3 +613,52 @@ createBusinessWorkflowWaitExecutor(service); // 内部服务器装配，仅userI
 
 
 **C2c.1总看板复验：** 九页已同步，board-build及21页一致性0错0警告。浏览器展开RP-050实读仍C实施中，下一步实时权限/紧急禁用/幂等；截图/Users/kevin/.codex/visualizations/2026/11/02/01a19a18-92f8-7bf1-b70c-df3fd911608f/c2c1-2026-11-03-board-requirements.png。原表格窄列/P2换行未改，不声称视觉优化通过。本次自建页及临时3008服务已关闭，用户3006页未操作。
+
+### C2c.2a 精细工单：持久紧急控制与真实任务准入（2026-11-03）
+
+用户“继续下一步”，基线66a8039/codex/wes-skills-c，继续原RP-050。C2c.2整体拆为a持久紧急控制/提交与Run准入，b强制逐次用户/Registry/策略交集校验，c retry授权/会话删除并发；不把可选guard或解析hash称授权。本批先交付管理员真实JWT紧停/解除API及不可变审计、原子提交epoch绑定、按持久runId校验的内部准入，禁止提前宣称模型/工具调用前实时保护已接通。
+
+DB与存储决策：已批准Skill/Workflow领域的PG扩展，不引入新存储主线。新增0030增量迁移及journal：Skill/Workflow根各增emergencyStopped=false、emergencyEpoch=0、emergencyRevision=0，独立于普通enabled/archive与内容revision；另execution_emergency_audits追加审计表，恰好一个Skill/Workflow根FK，action/reason/actor/epoch/revision/DB时间，UPDATE/DELETE触发器拒绝。默认值兼容旧行，发布内容/hash/version完全不动，旧metadata writer不得覆盖紧停列。只通过测试库守卫应用到workload_eval_test，禁止主库/预览库迁移；生产/预览应用及UI独立后续。
+
+语义：stop增加epoch与紧停revision；release只增加紧停revision，不重写旧Run绑定。当前停止拒绝新提交、同submissionKey旧重放及准入；解除后旧epoch仍失败EXECUTION_MANUAL_RETRY_REQUIRED，只有新的显式提交捕获当前epoch。旧或伪造缺失绑定失败关闭。普通停用只影响新启动，已排队原Run不因enabled/archive切换被误杀。工作流目标及全部固定Skill依赖均在紧停作用域；不只检查当前生效版本或latest。
+
+执行配置：C1 manifest shape/hash不扩展，服务端executionConfig.executionAuthority同级保存按kind/id排序且去重的epoch绑定；绑定在队列同事务、同连接解析并保存。validateSubmission在重放之前校验当前身份/来源并读取既有持久Run核验epoch，resolveExecutionConfig只为新Run捕获当前epoch。内部assertRunAdmission(runId,ownerUserId)读取实际持久Run、原manifest/提交指纹/owner及epoch，不接受调用者提供manifest作为权限；当前用户active与业务角色、会话归属应复核，逐工具当前Registry/policy权限仍b批。
+
+事务约束：管理员变更在事务内重验当前active/admin，强制reason与乐观emergencyRevision，伪造actor/time/额外字段拒绝。提交与准入按既有Workflow根→排序Skill根锁定，与stop行锁串行化，无连接跨模型/MCP I/O；明确准入是有限边界检查，紧停不能撤回已经发出的I/O。若epoch/控制状态在准备后变化，事务内失败而不是返回混合绑定。并发stop先提交则新准入失败，准入先提交只代表该边界已获准，不构成可重用授权票据。
+
+API（沿用原JWT/system:manage/实际admin）：GET /api/v1/skills/:skillId/emergency-control，POST .../emergency-stop 与 .../emergency-release；Workflow同样三条。POST仅{revision,reason}，revision是独立紧停revision；返回{code,message,data}内control与追加审计，无凭据/私有执行清单。普通停用API保持原含义；工作台/UI未接，本批不新增调用方可传入执行回调的接口。OpenAPI由parent同步精确字段、错误码与路由。
+
+责任文件：根schema两处、新审计schema/index、0030 SQL/journal、emergency repository/controller及纯类型、两条现有路由、invocation事务接缝与必要module窄出口、真实PG/路由测试。父只维护脚本/文档/看板，不并改业务文件。实际代码测试/迁移diff目标720–880行，超过999先收敛或拆审查单元，不能以净增行数隐藏搬移量。
+
+- [x] RED：真实JWT请求紧停缺口，401/普通用户403/admin成功及事务内旧admin撤权；reason/revision/actor/time校验，stop/release并发与revision冲突。
+- [x] GREEN：增量schema/迁移默认值、根控制独立字段及追加不可变审计；仅测试库守卫落库，真实UPDATE/DELETE审计反例拒绝，普通版本内容与锁不变。
+- [x] 真实PG新Run/同key重放/Workflow依赖紧停、解除后旧epoch拒绝、新显式提交准入；普通停用旧Run仍通过；错owner/坏manifest/伪造或缺失绑定失败。
+- [x] 同事务创建与epoch保存、stop对提交/准入的锁竞争、当前用户禁用/业务角色变化及管理员降权，单连接路径证明不嵌套；无真实模型/工具调用。
+- [x] 先独立规格再fresh五轴质量安全复核，父独立专项/模块/相关PG/双构建及契约检查；保留旧集成缺模板事实，回填README/对齐说明/OpenAPI/九页看板并精确本地提交，未合main/推送。
+
+后续门槛：b批将准入与当前用户/能力/Registry/策略检查强制接到每次模型、工具执行前以及等待恢复，禁止无guard的默认生产路径；c批完成显式retry重新授权/epoch绑定与会话删除并发。现有retry复制旧epoch时仍失败关闭，不把新显式提交称现有重试按钮已改造。C2c.3写入幂等/跨调用预算、C2c.4统一视图、宿主生产接线与C3/D/MVP仍待完成。
+
+
+**C2c.2a迁移与审查拆分：** C8守卫要求db:generate同时产出0030 SQL/journal/完整0030_snapshot.json，禁止手写/豁免快照。工具生成快照可能大于1000行，必须单列全量行数并按与0029的规范化语义差异核验（只允许根控制列及审计表/约束），不得隐藏为净增或混入无关schema变动。交付分schema/生成元数据与运行准入/API两组审查和本地提交；手写业务/测试/SQL实际diff仍受999行上限。先完整验证最终候选，再精确保存两个提交，不拆坏迁移链；不重写旧快照或弱化C8。
+
+
+**C2c.2a开发中验证记录：** 真实JWT紧停请求首RED404与200不符后实现；队列/epoch最初18/22通过、prepare期间stop与release反例失败后补外部准备前捕获和入队事务复核。父独立规范化0030快照差异：仅两根各3列和1审计表，旧表其余完全一致，无移除，prevId链正确；生成文件git行数8823、wc换行8822。新增路由已加入modules和test:execution-emergency显式Node脚本，曾误写journal路径未执行，现正确路径及模块C8补验，不把遗漏项算通过。
+
+首次modules907/910有3项失败：既有两处TRUNCATE清单漏新FK审计表、路由未登记；仅显式补新表和脚本引用，不CASCADE、不禁用trigger、不弱化守卫。随后一轮模块911/914，app-async-errors四断言通过却子进程115秒不退出（无TCP连接），仅终止该测试子进程并保留失败；另外两项原skills.execution短预算用例未进入预期阶段即读取signal而失败，不把负载猜测当确定根因。专用紧停套件42/42通过；隔离app自然退出4/4、10.9秒，无旧测试修改。一次无build并行的安静模块复跑另记，日志/tmp/wes-c2c2-final、/tmp/wes-c2c2-app-isolated。
+
+
+**C2c.2a独立规格复核与隔离修正：** 独立紧停专项42/42、0skip，18项补充业务/安全检查通过（审计insert故障真实UPDATE回滚、约束、严格输入、trim及重复状态）；另1项探针实证并发modules中的旧仓储全表清理能把新HTTP夹具由200变404。接受P2，新增test-file-reference.drift隔离断言先RED3/4，路由文件迁入既有CI可达串行Harness、移出modules后GREEN4/4；规格独立复跑4/4，最终APPROVE。未加测试豁免、未禁用约束或更改旧timeout。父初始913+42均通过，修正隔离后的最终modules910/910（移出4路由+加1守卫），其他跨域回归继续串行；旧计数仅保留历史证据，不混称最终910等于少测。双构建exit0。
+
+
+**C2c.2a跨域回归发现的旧夹具隔离修正：** 父按workflows→serial-store串行运行后，后者193/194，knowledge空表断言读到workflow-pool-reference-d2d84bc4-0c9d-4d24-9274-4073149623ce与workflow-authority-df27f635-6b0c-4c04-8af0-c1dd1d9f3e22两行。源码workflows.pool.test.ts两处insert只有关闭连接、无删除；本批业务实现不写knowledge。在原测试finally精确按生成id清理，失败路径也执行，保持max=1及原权限/连接断言不变。只在受守卫测试库移除这两条已核实旧夹具，再重跑相同workflows→serial-store顺序；不改空表断言、不补业务数据、不清其他记录。此测试卫生修正纳入本批独立规格/质量复核。
+
+
+**C2c.2a夹具复验与看板表格证据：** 修正后父modules910/910、workflows17/17、紧接serial-store194/194均0skip，知识空表及降级断言通过，日志/tmp/wes-c2c2a-fixture-fix；旧193/194记录保留。RP-050仅下一步单元格更新，浏览器展开完整台账实读C实施中和逐次权限后续，截图/Users/kevin/.codex/visualizations/2026/11/02/01a19a18-92f8-7bf1-b70c-df3fd911608f/c2c2a-2026-11-03-board-requirements.png。原表格窄列/P2换行与大空列保留，不宣称视觉优化通过。
+
+
+**C2c.2a最终回填（2026-11-03）：** 规格与fresh五轴质量安全复核均APPROVE。父最终模块910、Harness376、流程17、串行存储194、AI286通过，均0skip；独立专项42通过，API/Web双构建exit0，OpenAPI新增6路径/5schema引用解析通过。日志/tmp/wes-c2c2a-parent-final（含旧serial193/194失败）、/tmp/wes-c2c2a-fixture-fix（modules/workflows/serial最终复验）、/tmp/wes-c2c2a-quality、/tmp/wes-c2c2a-build-{api,web}.log。通用集成0/1仍templates_status_not_200，测试库活动模板与分配均0，不补造业务数据。npm audit仍45项基线（32moderate/12high/1critical），本批无依赖变化，不宣称安全基线已清零。历史RED/回归失败与隔离修正保留；受守卫实查旧两条夹具已由后续测试清理（本次精确清理实际删除0），仍以修正后workflow再次创建/清理、紧接serial空表断言通过为闭环。
+
+管理员6条紧停/解除/读审计API及独立控制存储、提交与持久Run准入已实现；旧epoch不随解除复活，现有retry复制旧权限仍失败关闭。生产逐次调用权限检查（.2b）、显式retry授权与会话删除并发（.2c）、持久幂等/跨调用预算、统一视图、宿主及工作台/MVP后续。仅workload_eval_test迁移，3006/3004与模型配置未操作，本主线未合入/未推送；schema生成元数据和runtime/API分两组精确本地提交。九页总看板同步，构建/一致性和RP-050截图另记。
+
+
+**C2c.2a复核与收尾证据：** fresh质量独立专项42/42、0skip及8项事务/安全探针通过，探针外层回滚后users/root/audit自身夹具均0残留，无DDL变化；规格及质量均APPROVE。schema组7文件含8823行完整生成快照，与runtime/API/tests/docs组21文件分别审查，后者最终diff低于999行。九页总看板新状态与后续门槛已同步，build及21页一致性0错0警；浏览器实读最终标题及RP-050下一步，临时页和自建3008服务已关闭，用户3006页未操作。

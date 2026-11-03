@@ -7,6 +7,7 @@ import { skillDefinitionHash as hash } from './skills.hash';
 import { copyTrialJson } from './skills.sandbox';
 import { SkillError } from './skills.types';
 import { createInvocationPgRepository } from './skills.invocation-pg.repository';
+import { createExecutionEmergencyRepository, type InvocationEmergencyAuthority, type ExecutionAuthorityBinding } from './execution-emergency';
 
 export interface InvocationRepository {
   prepare(user: AuthUser, sessionId: string, sources: SourceReference[]): Promise<{ verify(tx: QueueDbExecutor): Promise<void> }>;
@@ -15,6 +16,7 @@ type Options = {
   repository?: InvocationRepository;
   queue?: Pick<HarnessRuntimeRepository, 'createQueuedRun' | 'findRunForSubmissionKey'>;
   prepareExecution?: typeof prepareExecution;
+  authority?: InvocationEmergencyAuthority;
 };
 const errors: Record<string, [number, string]> = {
   INVOCATION_INVALID_REQUEST: [400, '调用请求无效，请检查输入'],
@@ -26,6 +28,10 @@ const errors: Record<string, [number, string]> = {
   ACTIVE_WORKBENCH_RUN_EXISTS: [409, '该会话存在进行中的异步任务'],
   INVOCATION_TOO_LARGE: [422, '调用内容过长，本次提交已整体回滚'],
   INVOCATION_INTERNAL: [500, '调用暂时不可用'],
+  EXECUTION_EMERGENCY_STOPPED: [409, '技能或流程已被管理员紧急停止'],
+  EXECUTION_MANUAL_RETRY_REQUIRED: [409, '任务曾被紧急停止，请手动重新发起'],
+  EXECUTION_RUN_BINDING_INVALID: [409, '执行任务权限绑定无效'],
+  EXECUTION_AUTHORITY_UNAVAILABLE: [503, '执行权限暂不可用'],
 };
 function fail(code: string): never {
   const [status, message] = errors[code]; throw new SkillError(code, message, status);
@@ -57,6 +63,7 @@ function parse(body: unknown, sessionId: string) {
 export function createSkillInvocationService(options: Options = {}) {
   const repository = options.repository ?? createInvocationPgRepository();
   const queue = options.queue ?? createHarnessRuntimeRepository();
+  const authority = options.authority ?? createExecutionEmergencyRepository();
   return { async submitInvocation(initialUser: AuthUser, sessionId: string, body: unknown): Promise<AiRunsSubmitResult> {
     try {
       const user = structuredClone(initialUser);
@@ -66,8 +73,9 @@ export function createSkillInvocationService(options: Options = {}) {
       const sources = await repository.prepare(user, sessionId, execution.sources);
       const existing = await queue.findRunForSubmissionKey(user.id, request.submissionKey);
       let prepared: PreparedExecution | undefined;
+      let baseline: ExecutionAuthorityBinding[] | undefined;
       if (!existing) {
-        try { prepared = await (options.prepareExecution ?? prepareExecution)(execution, user); }
+        try { baseline = await authority.prepare(execution, user); prepared = await (options.prepareExecution ?? prepareExecution)(execution, user); }
         catch (error) {
           // A concurrent submit can commit after our first miss, then become unavailable to new calls.
           // Only the queue's locked replay path may reuse it; authority, sources and fingerprint still apply.
@@ -78,10 +86,11 @@ export function createSkillInvocationService(options: Options = {}) {
       const result = await queue.createQueuedRun({ ownerUserId: user.id, ownerUsername: user.username, aiSessionId: sessionId,
         submissionKey: request.submissionKey, submissionFingerprint: fingerprint, title: request.content.slice(0, 80),
         workflowId: BUSINESS_SKILLS_WORKFLOW_ID, workflowVersion: BUSINESS_SKILLS_WORKFLOW_VERSION,
-        validateSubmission: tx => queueCheck(() => sources.verify(tx)),
+        validateSubmission: tx => queueCheck(async () => { await sources.verify(tx); await authority.verifyReplay(tx, user, sessionId, request.submissionKey, fingerprint); }),
         resolveExecutionConfig: tx => queueCheck(async () => {
-          if (!prepared) fail('INVOCATION_CONTEXT_CHANGED');
-          return { ...executionConfig, executionManifest: await prepared.resolveInTransaction(tx) };
+          if (!prepared || !baseline) fail('INVOCATION_CONTEXT_CHANGED');
+          const manifest = await prepared.resolveInTransaction(tx);
+          return { ...executionConfig, executionManifest: manifest, executionAuthority: await authority.capture(tx, manifest, user, baseline) };
         }),
         userMessageFact: runId => buildWorkbenchUserMessageFact({ runId, fact, content: request.content }),
       });

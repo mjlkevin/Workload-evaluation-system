@@ -25,7 +25,7 @@ function code(expected: string) {
 }
 after(async () => {
   assert.equal(new URL(process.env.TEST_DATABASE_URL!).pathname, '/workload_eval_test');
-  try { await testDb.execute(sql`TRUNCATE TABLE workflow_skill_dependencies, workflow_revisions, workflow_versions, workflow_definitions, skill_release_events, skill_release_reviews, skill_evaluations, skill_revisions, skill_versions, skill_definitions`); }
+  try { await testDb.execute(sql`TRUNCATE TABLE execution_emergency_audits, workflow_skill_dependencies, workflow_revisions, workflow_versions, workflow_definitions, skill_release_events, skill_release_reviews, skill_evaluations, skill_revisions, skill_versions, skill_definitions`); }
   finally { await testPool.end(); }
 });
 

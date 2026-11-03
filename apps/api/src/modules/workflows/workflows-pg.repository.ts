@@ -17,7 +17,7 @@ async function assemble(tx: WorkflowDbExecutor, rows: typeof roots.$inferSelect[
     const allVersions = await tx.select().from(versions).where(inArray(versions.workflowId, ids)).orderBy(asc(versions.position));
     const allAudit = await tx.select({ id: revisions.id, workflowId: revisions.workflowId, action: revisions.action, actorId: revisions.actorId, actorName: revisions.actorName,
         reason: revisions.reason, versionId: revisions.versionId, createdAt: revisions.createdAt }).from(revisions).where(inArray(revisions.workflowId, ids)).orderBy(asc(revisions.revision));
-    return rows.map(({ name: _name, description: _description, category: _category, ...r }) => ({ ...r, createdAt: r.createdAt.toISOString(), updatedAt: r.updatedAt.toISOString(),
+    return rows.map(({ name: _name, description: _description, category: _category, emergencyStopped: _stop, emergencyEpoch: _epoch, emergencyRevision: _revision, ...r }) => ({ ...r, createdAt: r.createdAt.toISOString(), updatedAt: r.updatedAt.toISOString(),
         versions: allVersions.filter(v => v.workflowId === r.workflowId).map(({ workflowId: _workflowId, position: _position, ...v }) => ({ ...v, createdAt: v.createdAt.toISOString(), updatedAt: v.updatedAt.toISOString() })),
         audit: allAudit.filter(a => a.workflowId === r.workflowId).map(({ workflowId: _workflowId, ...a }) => ({ ...a, createdAt: a.createdAt.toISOString() })),
     }));

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test, after } from 'node:test';
 import { Pool } from 'pg';
+import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from '../../db/schema';
 import { createSkillsPgRepository } from '../skills/skills-pg.repository';
@@ -66,8 +67,8 @@ test('real shared Skill resolver performs system/model/reference/credential DB r
     const { resolveSkillDependencyContext } = await import('../skills/skills.context');
     const oldMax = pool.options.max;
     pool.options.max = 1;
+    const id = `workflow-pool-reference-${crypto.randomUUID()}`;
     try {
-        const id = `workflow-pool-reference-${crypto.randomUUID()}`;
         const now = new Date();
         await db.insert(schema.knowledgeEntries).values({ id, title: 'Pool regression reference', content: 'Local fixture only', category: 'test', tags: [], status: 'active', createdAt: now, updatedAt: now });
         const roots = createSkillsPgRepository(db);
@@ -96,23 +97,24 @@ test('real shared Skill resolver performs system/model/reference/credential DB r
         assert.deepEqual(await roots.get(draft.skillId), draft);
     }
     finally {
-        pool.options.max = oldMax;
-        await closeDb();
+        try { await db.delete(schema.knowledgeEntries).where(eq(schema.knowledgeEntries.id, id)); }
+        finally { pool.options.max = oldMax; await closeDb(); }
     }
 });
 test('authority changes during or after preparation invalidate the fence, including same-timestamp reference corrections', async () => {
     const { prepareSkillAuthority } = await import('../skills/skills.authority');
-    const { eq } = await import('drizzle-orm');
     const f = await fixture(1);
     const id = `workflow-authority-${crypto.randomUUID()}`;
     const now = new Date();
     await f.db.insert(schema.knowledgeEntries).values({ id, title: 'Fence fixture', content: 'before', category: 'test', tags: [], status: 'active', createdAt: now, updatedAt: now });
-    const refs = [`wes://knowledge/${id}`];
-    await assert.rejects(prepareSkillAuthority(refs, async () => {
-        await f.db.update(schema.knowledgeEntries).set({ content: 'corrected without timestamp change' }).where(eq(schema.knowledgeEntries.id, id));
-        return 'ctx';
-    }, f.db), (e: unknown) => e instanceof Error && 'code' in e && e.code === 'SKILL_CONTEXT_CHANGED');
-    const prepared = await prepareSkillAuthority(refs, async () => 'ctx', f.db);
-    await f.db.update(schema.knowledgeEntries).set({ content: 'changed after preparation' }).where(eq(schema.knowledgeEntries.id, id));
-    await assert.rejects(f.db.transaction(tx => prepared.verify(tx)), (e: unknown) => e instanceof Error && 'code' in e && e.code === 'SKILL_CONTEXT_CHANGED');
+    try {
+        const refs = [`wes://knowledge/${id}`];
+        await assert.rejects(prepareSkillAuthority(refs, async () => {
+            await f.db.update(schema.knowledgeEntries).set({ content: 'corrected without timestamp change' }).where(eq(schema.knowledgeEntries.id, id));
+            return 'ctx';
+        }, f.db), (e: unknown) => e instanceof Error && 'code' in e && e.code === 'SKILL_CONTEXT_CHANGED');
+        const prepared = await prepareSkillAuthority(refs, async () => 'ctx', f.db);
+        await f.db.update(schema.knowledgeEntries).set({ content: 'changed after preparation' }).where(eq(schema.knowledgeEntries.id, id));
+        await assert.rejects(f.db.transaction(tx => prepared.verify(tx)), (e: unknown) => e instanceof Error && 'code' in e && e.code === 'SKILL_CONTEXT_CHANGED');
+    } finally { await f.db.delete(schema.knowledgeEntries).where(eq(schema.knowledgeEntries.id, id)); }
 });

@@ -8219,6 +8219,252 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /api/v1/skills/{skillId}/emergency-control:
+    get:
+      tags:
+        - Skills
+      summary: Read emergency control and recent immutable audit
+      description: Requires JWT, system:manage and an active current database admin.
+        Control uses an independent revision. Stop increments epoch; release
+        leaves the epoch unchanged, so old Runs require explicit reauthorization.
+        This API provides submission/admission fencing only; per-model/tool
+        dispatch checks and production host wiring remain separate.
+        Already-dispatched I/O cannot be revoked.
+      parameters:
+        - name: skillId
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 160
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecutionEmergencyReadResponse"
+        "400":
+          $ref: "#/components/responses/SkillFailure"
+        "401":
+          $ref: "#/components/responses/SkillFailure"
+        "403":
+          $ref: "#/components/responses/SkillFailure"
+        "404":
+          $ref: "#/components/responses/SkillFailure"
+        "409":
+          $ref: "#/components/responses/SkillFailure"
+        "503":
+          $ref: "#/components/responses/SkillFailure"
+  /api/v1/skills/{skillId}/emergency-stop:
+    post:
+      tags:
+        - Skills
+      summary: Emergency stop new submission and Run admission
+      description: Requires JWT, system:manage and an active current database admin.
+        Control uses an independent revision. Stop increments epoch; release
+        leaves the epoch unchanged, so old Runs require explicit reauthorization.
+        This API provides submission/admission fencing only; per-model/tool
+        dispatch checks and production host wiring remain separate.
+        Already-dispatched I/O cannot be revoked.
+      parameters:
+        - name: skillId
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 160
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExecutionEmergencyInput"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecutionEmergencyChangeResponse"
+        "400":
+          $ref: "#/components/responses/SkillFailure"
+        "401":
+          $ref: "#/components/responses/SkillFailure"
+        "403":
+          $ref: "#/components/responses/SkillFailure"
+        "404":
+          $ref: "#/components/responses/SkillFailure"
+        "409":
+          $ref: "#/components/responses/SkillFailure"
+        "503":
+          $ref: "#/components/responses/SkillFailure"
+  /api/v1/skills/{skillId}/emergency-release:
+    post:
+      tags:
+        - Skills
+      summary: Release emergency control without reviving old Runs
+      description: Requires JWT, system:manage and an active current database admin.
+        Control uses an independent revision. Stop increments epoch; release
+        leaves the epoch unchanged, so old Runs require explicit reauthorization.
+        This API provides submission/admission fencing only; per-model/tool
+        dispatch checks and production host wiring remain separate.
+        Already-dispatched I/O cannot be revoked.
+      parameters:
+        - name: skillId
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 160
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExecutionEmergencyInput"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecutionEmergencyChangeResponse"
+        "400":
+          $ref: "#/components/responses/SkillFailure"
+        "401":
+          $ref: "#/components/responses/SkillFailure"
+        "403":
+          $ref: "#/components/responses/SkillFailure"
+        "404":
+          $ref: "#/components/responses/SkillFailure"
+        "409":
+          $ref: "#/components/responses/SkillFailure"
+        "503":
+          $ref: "#/components/responses/SkillFailure"
+  /api/v1/workflows/{workflowId}/emergency-control:
+    get:
+      tags:
+        - Workflows
+      summary: Read emergency control and recent immutable audit
+      description: Requires JWT, system:manage and an active current database admin.
+        Control uses an independent revision. Stop increments epoch; release
+        leaves the epoch unchanged, so old Runs require explicit reauthorization.
+        This API provides submission/admission fencing only; per-model/tool
+        dispatch checks and production host wiring remain separate.
+        Already-dispatched I/O cannot be revoked.
+      parameters:
+        - name: workflowId
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 160
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecutionEmergencyReadResponse"
+        "400":
+          $ref: "#/components/responses/SkillFailure"
+        "401":
+          $ref: "#/components/responses/SkillFailure"
+        "403":
+          $ref: "#/components/responses/SkillFailure"
+        "404":
+          $ref: "#/components/responses/SkillFailure"
+        "409":
+          $ref: "#/components/responses/SkillFailure"
+        "503":
+          $ref: "#/components/responses/SkillFailure"
+  /api/v1/workflows/{workflowId}/emergency-stop:
+    post:
+      tags:
+        - Workflows
+      summary: Emergency stop new submission and Run admission
+      description: Requires JWT, system:manage and an active current database admin.
+        Control uses an independent revision. Stop increments epoch; release
+        leaves the epoch unchanged, so old Runs require explicit reauthorization.
+        This API provides submission/admission fencing only; per-model/tool
+        dispatch checks and production host wiring remain separate.
+        Already-dispatched I/O cannot be revoked.
+      parameters:
+        - name: workflowId
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 160
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExecutionEmergencyInput"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecutionEmergencyChangeResponse"
+        "400":
+          $ref: "#/components/responses/SkillFailure"
+        "401":
+          $ref: "#/components/responses/SkillFailure"
+        "403":
+          $ref: "#/components/responses/SkillFailure"
+        "404":
+          $ref: "#/components/responses/SkillFailure"
+        "409":
+          $ref: "#/components/responses/SkillFailure"
+        "503":
+          $ref: "#/components/responses/SkillFailure"
+  /api/v1/workflows/{workflowId}/emergency-release:
+    post:
+      tags:
+        - Workflows
+      summary: Release emergency control without reviving old Runs
+      description: Requires JWT, system:manage and an active current database admin.
+        Control uses an independent revision. Stop increments epoch; release
+        leaves the epoch unchanged, so old Runs require explicit reauthorization.
+        This API provides submission/admission fencing only; per-model/tool
+        dispatch checks and production host wiring remain separate.
+        Already-dispatched I/O cannot be revoked.
+      parameters:
+        - name: workflowId
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 160
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExecutionEmergencyInput"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecutionEmergencyChangeResponse"
+        "400":
+          $ref: "#/components/responses/SkillFailure"
+        "401":
+          $ref: "#/components/responses/SkillFailure"
+        "403":
+          $ref: "#/components/responses/SkillFailure"
+        "404":
+          $ref: "#/components/responses/SkillFailure"
+        "409":
+          $ref: "#/components/responses/SkillFailure"
+        "503":
+          $ref: "#/components/responses/SkillFailure"
 components:
   securitySchemes:
     bearerAuth:
@@ -8545,6 +8791,126 @@ components:
         revision:
           type: integer
           minimum: 1
+    ExecutionEmergencyControl:
+      type: object
+      additionalProperties: false
+      required:
+        - stopped
+        - epoch
+        - revision
+      properties:
+        stopped:
+          type: boolean
+        epoch:
+          type: integer
+          minimum: 0
+          description: Incremented on stop; release does not restore old Run authority.
+        revision:
+          type: integer
+          minimum: 0
+          description: Independent emergency-control revision, unrelated to definition revision.
+    ExecutionEmergencyInput:
+      type: object
+      additionalProperties: false
+      required:
+        - revision
+        - reason
+      properties:
+        revision:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        reason:
+          type: string
+          minLength: 1
+          description: Trimmed value must contain 1–1000 characters; actor and time are
+            assigned by server.
+    ExecutionEmergencyAudit:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - actorId
+        - action
+        - reason
+        - epoch
+        - revision
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        actorId:
+          type: string
+        action:
+          enum:
+            - stop
+            - release
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        epoch:
+          type: integer
+          minimum: 0
+        revision:
+          type: integer
+          minimum: 1
+        createdAt:
+          type: string
+          format: date-time
+    ExecutionEmergencyReadResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+        - message
+        - data
+      properties:
+        code:
+          const: 0
+        message:
+          type: string
+        data:
+          type: object
+          additionalProperties: false
+          required:
+            - control
+            - hasMore
+            - audit
+          properties:
+            control:
+              $ref: "#/components/schemas/ExecutionEmergencyControl"
+            hasMore:
+              type: boolean
+              description: Older audit rows exist beyond the latest 100 returned.
+            audit:
+              type: array
+              maxItems: 100
+              description: Latest 100 events, ordered by ascending emergency revision;
+                historical database rows remain immutable.
+              items:
+                $ref: "#/components/schemas/ExecutionEmergencyAudit"
+    ExecutionEmergencyChangeResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+        - message
+        - data
+      properties:
+        code:
+          const: 0
+        message:
+          type: string
+        data:
+          type: object
+          additionalProperties: false
+          required:
+            - control
+          properties:
+            control:
+              $ref: "#/components/schemas/ExecutionEmergencyControl"
     SkillError:
       type: object
       additionalProperties: true

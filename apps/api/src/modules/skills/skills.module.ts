@@ -17,3 +17,4 @@ export { compileSkillPayloadSchema, skillPathParts } from './skills.validation';
 export { skillDefinitionHash } from './skills.hash';
 export { copyTrialJson } from './skills.sandbox';
 export { createSkillExecutionService, type SkillExecutionRequest, type SkillExecutionResult, type SkillExecutionPorts, type SkillExecutionToolRequest } from './skills.execution';
+export { createExecutionEmergencyRepository, type InvocationEmergencyAuthority, type ExecutionAuthorityBinding } from './execution-emergency';
