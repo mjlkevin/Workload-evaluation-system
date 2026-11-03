@@ -1057,3 +1057,89 @@ readForConfirmation不写任何状态；当前basis对应无决定时仅pending�
 证据：`/tmp/wes-final-closure-api-summary.log`、`/tmp/wes-final-closure-web-status.log`、`/tmp/wes-final-closure-build-web-status.log`、`/tmp/wes-preview-final/browser-acceptance-state.json`、`browser-write-receipt.json`、`browser-terminal-runs.json`、`original-records-preserved.json`、`user-metadata-differences.json`。浏览器截图位于会话visualizations：`mvp-recommendation-760.jpg`、`mvp-wait-restored-760.jpg`、`mvp-workbench-completed-1440.jpg`、`mvp-browser-final-1440.jpg`、`mvp-browser-final-760.jpg`。本地技术检查不是最终用户验收，详情页范围/参数的再编辑仍不在本次交付口径。
 
 **最终治理复核：** 独立证据一致性审阅APPROVE，未发现阻断性事实；总看板12个相关页面已同步，21页构建和一致性0错误/0警告。问题55行/52编号（原历史撞号保留），缺陷39项=7待修复+13已修复/关闭+19人工待复核，桶闭合。真实浏览器展开RP-050及ISS/DEF-004/005核对状态并留截图，页面无横向溢出；原台账窄列/编号折行未改，不宣称共享表格视觉优化。最终用户验收和主线集成/推送保持待执行。
+
+### 执行过程进入消息流（2026-11-04）
+
+用户明确要求Skill完整执行过程与交互记录进入消息界面。中间承载分析说明、进度、工具结果、补充、确认和产物；右侧仅辅助摘要。命中ISS-2026-11-04-001，复用RP-050，交互调整尚未实施。
+
+C/D技术验证已完成；按用户反馈调整消息流主交互，完成后重新进行工作台体验验收。
+
+
+## 2026-11-04消息流交互调整实施计划
+
+> 执行方式：按 subagent-driven-development 分单实施，每单先RED后GREEN，独立规格复核通过后进行独立质量复核。用户已确认3007交互稿并授权实现，不再重复询问是否开始。
+
+**目标：** 把Skill/Workflow的阶段、实际分析与工具明细、回答、确认和结果接入中间消息流；右侧只留摘要；显式启动入口移至输入区“选择业务任务”。
+**架构：** 现有Run/检查点/事件/操作回执为唯一权威，必要时补最小只读timeline投影。前端只做合并、排序、分组与呈现，不执行流程、不自动批准、不建立第二份消息存储。
+**技术栈：** Express/TypeScript、既有PostgreSQL与Drizzle、React18/Vite、Tailwind语义tokens、共享Dialog与现有结构化表单。
+
+### 当前预检与明确边界
+
+- 分支 `codex/wes-skills-c`，既有独立工作区；主目录仅窄改本任务文档/看板，保留无关dirty。
+- 禁止读取、扫描、修改或暂存 `config/system/model-verify-status.json`；不读取/输出凭据，不调用写入该文件的模型验证接口。
+- 原模型、账号、正式Skill/Workflow定义和发布状态不变。普通角色模板链路不与业务目录静默互换。
+- 自动化只使用guarded `workload_eval_test`；不清理/seed预览。测试、PG与构建按租约串行执行。
+- UI前置 `npx --offline ui-skills start`本轮已实际exit0，日志 `/tmp/wes-message-ui-prereq.log`。
+- 三个问题根因均已由用户截图和实际接线证实；不扩展系统管理或评估详情页面族。
+
+### A：真实只读执行历史
+
+责任文件：新增 `apps/api/src/modules/skills/skills.workbench-timeline.ts` 及纯/PG测试；按最小需要修改 `skills.workbench-view.ts`、`skills.workbench-projection.ts`；新增测试纳入实际脚本。公开DTO字段在 `docs/openapi.yaml` 同步。
+
+- [ ] RED：相同stepId重复执行具有不同occurrenceId；重试继承的成功前缀不重复；实际回答来自receipt，valueHash与对应answer事件一致；approved:false显示拒绝；操作ledger的批准、拒绝和成功回执均保留。
+- [ ] RED：无关owner/会话/Run事件及ledger不进入投影；失败/取消不伪装成功；敏感basis/权限证明不输出；GET不增加业务行或消息。
+- [ ] GREEN：在现有锁内读取中查询当前已验证Run血缘范围的事件/ledger，构建可加性的timeline字段，已有snapshot字段和完成竞态围栏保持。
+- [ ] 稳定ID采用实际事件/ledger ID或command.operationId，保留iteration、真实物理runId和rootRunId。只显示真实持久化时间；缺少阶段时间时保留顺序不造时间，不以updatedAt代替。
+- [ ] 真实历史回答/决定不再调用要求“当前待办”的确认接口；复用历史批准证明边界。仅投影白名单业务值并使用safeBusinessJson，查询有界且不重新加载每份巨大checkpoint正文。
+- [ ] 用已确认脱敏样本与实际operation/answer结构的测试验证；独立SPEC→QUALITY，定向及guarded模块通过后本地精确提交。
+
+接口约束：`businessExecution.timeline={version:1,rootRunId,entries:[{id,runId,kind,stepId?,occurrenceId?,iteration?,occurredAt?,sequence?,name?,stepType?,status?,prompt?,value?,decision?,toolName?,parameters?,result?}]}`；只含实际事实，按可信因果顺序提供。现有客户端可以忽略该新增字段，不能改请求/批准契约。
+
+测试命令沿既有guard脚本：
+`CREDENTIAL_KEK='' WES_REAL_NODE=/Users/kevin/.nvm/versions/node/v24.15.0/bin/node WES_KEEP_LOGS=/tmp/wes-message-history-modules bash scripts/verify-local-db-tests.sh test:modules`。
+
+### B1：消息合并与阶段映射
+
+责任文件：新增 `ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/utils/businessMessageTimeline.js` 和对应测试；只在 `utils/messageFormatter.js` 加白名单的 `metadata.projectionSource` 关联信息。
+
+- [ ] RED：实际启动消息使用projectionSource.runId/deduplicationKey关联，单Skill与Workflow均可映射；普通对话和附件不丢失。
+- [ ] RED：时间/sequence相同仍稳定排序；循环stepId不碰撞；重试继承前缀只显示一次；轮询刷新不复制条目；其他会话无污染。
+- [ ] GREEN：导出纯映射函数 `buildBusinessConversationEntries(messages,runs)`，结果保留稳定id、role、实际source及stage/action/result语义。无实际时间不生成精确时间。
+- [ ] 阶段名称来自固定流程步骤和Skill名称，工具明细按阶段折叠；不得以销售MVP关键词硬编码通用流程顺序。重复输出只在呈现层关联同一事实，不能丢弃未匹配、问题或确认信息。
+- [ ] 独立SPEC→QUALITY后提交；新测试按Vitest实际运行。结构化内容沿既有BusinessValue约定，禁止任意HTML或执行模型文本。
+
+关键断言：
+`expect(entries.filter(x=>x.id===stableId)).toHaveLength(1)`；
+`expect(entries.some(x=>x.role==='user' && x.value===actualAnswer)).toBe(true)`；
+`expect(entries.find(x=>x.id===rejectedId).decision).toBe('reject')`。
+
+### B2：消息中的阶段与交互组件
+
+责任文件：新增页内 `BusinessExecutionMessage.jsx` / 必要的小组件；从现有 `BusinessExecutionPanel.jsx` 提取可复用的等待输入、确认、重试/停止交互，保留原API回调；对应测试独立。
+
+- [ ] RED：阶段默认收起分析和工具明细，展开可查看真实结果；当前待办无须展开即可操作。
+- [ ] RED：提交补充后原问答仍显示，历史只读；需求/范围/写入批准分别操作；approved:false不能标同意；轮询不重置尚未提交的表单。
+- [ ] RED：409保留可恢复输入并显示最新待办；503显示错误；重复点击只提交一次；失败重试原因及停止确认保持既有行为。
+- [ ] GREEN：待办卡片置于对应阶段消息，沿用actionId/hash、原结构化Schema表单与共享Dialog。确认/拒绝只调用原动作端口，普通消息不替代批准。
+- [ ] 结果卡片保留REQ编号、引用、未匹配、人天和草稿链接；工具/阶段日志只列一遍。没有真实推理字段时不生成虚构“模型思考”。
+- [ ] 定向测试及scope检查通过，独立SPEC→QUALITY后提交。新组件只用既有语义tokens，不扩增冻结共享CSS。
+
+### C：单工作台接线与右侧摘要
+
+责任文件：`AiHomeWorkbench/index.jsx`、`ChatArea/index.jsx`、`ChatArea/MessageList.jsx`、`ChatArea/Composer.jsx`；新增 `BusinessExecutionSummary.jsx`，必要修改 `WorkspacePanel/index.jsx`；相关页面接线/交互测试。
+
+- [ ] RED：中央消息pane出现业务执行历史，右侧不存在第二份完整表单/确认和15步结果；有业务任务时不展示无关旧占位进度。
+- [ ] RED：左上原“启动Skill/工作流”入口移除；消息输入区“选择业务任务”打开原授权目录/推荐/显式启动Dialog，关闭回焦正确。
+- [ ] RED：普通聊天、既有角色模板、文件发送、消息复制、后台状态仍按原路径工作；用户滚动查看旧消息时不被每次轮询强制拉到底部，新待办可定位。
+- [ ] GREEN：把B1投影作为MessageList输入，B2作为消息节点；右侧仅当前任务、状态/阶段、待办数量和产物定位。右侧定位将焦点交给中央对应卡片。
+- [ ] 保持单一服务端Run权威和已有状态请求围栏；不增加第二消息缓存，不重复轮询/无条件刷新统一视图。
+- [ ] 独立SPEC→QUALITY后提交；原生键盘和1440/760实际验证另由父任务执行。
+
+### D：完整验证和过程回填
+
+- [ ] 完整Web测试及build:web；后端有改动则guarded模块/Harness/AI/Agent和build:api串行；OpenAPI唯一键/新增字段正反例验证。
+- [ ] 预览当前无活跃Run时才安全重启本任务3004服务，主3000/3002不动。原用户/凭据/Skill/流程保留性复查，不使用测试库清理脚本操作预览。
+- [ ] 真实3006回看旧完成Run、刷新问答/确认历史；普通聊天与业务任务共存；至少一条真实新Workflow从消息区补充、范围确认、写入批准到WES5天，单Skill也可查看。
+- [ ] 1440/760、展开/收起、焦点、Tab/Escape、关闭保护和滚动行为实际留图；用户看同一已批准场景验收。
+- [ ] 命中原ISS/RP同步总看板、当前实现文档和既有资产，不新增重复问题或虚增文档数。保留integration空活动模板基线、历史失败与本地未合入/未推送边界。
+

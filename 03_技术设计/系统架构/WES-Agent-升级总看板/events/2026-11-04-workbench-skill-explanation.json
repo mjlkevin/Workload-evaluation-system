@@ -1,13 +1,13 @@
 {
   "id": "BE-2026-11-04-workbench-skill-explanation",
   "date": "2026-11-04",
-  "type": "question",
+  "type": "requirement",
   "issueId": "ISS-2026-11-04-001",
   "relatedRequirements": [
     "RP-050"
   ],
-  "status": "已解释，改版建议未批准",
-  "dedup": "未命中同类设计解释问题，新增question，不派生RP或DEF。",
+  "status": "交互稿已确认，实施中",
+  "dedup": "Matched ISS-2026-11-04-001; extend RP-050, no new RP",
   "evidence": [
     "用户浏览器截图批注1/2",
     "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/index.jsx:165-218",
@@ -15,7 +15,19 @@
   ],
   "pages": [
     "issues",
+    "requirements",
+    "plan",
+    "design",
     "changes"
   ],
-  "implementationPerformed": false
+  "implementationPerformed": false,
+  "previousDisposition": "question",
+  "decision": "用户明确要求Skill完整执行过程与交互记录进入消息界面。中间承载分析说明、进度、工具结果、补充、确认和产物；右侧仅辅助摘要。命中ISS-2026-11-04-001，复用RP-050，交互调整尚未实施。",
+  "userApproval": {
+    "defaultDisplay": "stages; analysis and tool details expandable",
+    "prototype": "http://127.0.0.1:3007/",
+    "decision": "adopt and implement",
+    "date": "2026-11-04"
+  },
+  "implementationStarted": true
 }
