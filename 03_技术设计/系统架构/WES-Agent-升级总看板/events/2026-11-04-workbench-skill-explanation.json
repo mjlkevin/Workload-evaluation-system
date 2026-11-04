@@ -6,7 +6,7 @@
   "relatedRequirements": [
     "RP-050"
   ],
-  "status": "实现与自动检查完成，最终界面验收待登录",
+  "status": "实现与浏览器补验完成；模块2例待复核；用户验收待回填",
   "dedup": "Matched ISS-2026-11-04-001; extend RP-050, no new RP",
   "evidence": [
     "用户浏览器截图批注1/2",
@@ -33,7 +33,7 @@
     "date": "2026-11-04"
   },
   "implementationStarted": true,
-  "implementationProgress": "消息流交互已实现，Web974、模块1159、执行套件679及双构建通过；3006最终界面验收待登录后执行。",
+  "implementationProgress": "mjlkevin已登录，新消息流业务补验完成；Web974与构建通过，模块2个取消/超时竞态用例待复核，用户验收待回填。",
   "validationEvidence": {
     "unit": "A1",
     "commit": "e193d48",
@@ -93,31 +93,44 @@
       "focused": "33/33 before final compatibility-call replacement; final API build passed",
       "review": "SPEC PASS;QUALITY APPROVE",
       "fullHarness": "679/679;0skip on final compatibility-call revision"
+    },
+    {
+      "unit": "source-cite-wrap",
+      "commit": "f65d22b",
+      "focused": "16/16",
+      "browserRedGreen": "591/677->591/591;760 width647/647",
+      "review": "SPEC PASS;QUALITY APPROVE"
     }
   ],
   "latestModules": {
-    "result": "1159/1159;0skip",
-    "log": "/tmp/wes-message-final-verified-summary.log"
+    "result": "1157/1159;2 cancel-timeout failures;0skip",
+    "log": "/tmp/wes-account-ui-final-modules-rerun-summary.log",
+    "isolated": "66/66;0skip /tmp/wes-account-ui-final-isolated-summary.log",
+    "firstRun": "1158/1159;1 cancel-timeout failure /tmp/wes-account-ui-final-modules-summary.log",
+    "previousPassingRun": "1159/1159 /tmp/wes-message-final-verified-summary.log"
   },
   "runtimeObservation": {
     "fullHistoryMs": 5069,
     "internalSummaryMs": 1317,
     "sameReadScope": false,
     "source": "owned preview standard catalog completed run",
-    "uiAcceptance": "pending"
+    "uiAcceptance": "pending",
+    "nativePendingFullReadMs": 20568,
+    "nativePendingHistoryCoverage": "complete;34entries;hasPendingOperation=true",
+    "performanceStatus": "observed slow read/transient unavailable;not fixed or declared optimized"
   },
   "implementationCompleted": true,
   "verificationSnapshot": {
-    "web": "99 files;974/974;0skip",
-    "modules": "1159/1159;0skip",
+    "web": "99 files;974/974;0skip;after f65d22b",
+    "modules": "1157/1159;2 existing cancel-timeout failures;0skip;isolated file66/66 passed",
     "harness": "679/679;0skip",
     "ai": "286/286;0skip",
     "agent": "254/254;0skip",
-    "buildWeb": "passed",
+    "buildWeb": "passed after f65d22b",
     "buildApi": "passed",
     "openApi": "199 unique paths;19 positive/negative cases passed",
     "integration": "failed templates_status_not_200;active_templates=0;assignment_rows=0;baseline unchanged",
-    "browser": "still login;no new UI/manual acceptance",
+    "browser": "actual UI verified using mjlkevin;15-stage workflow/native5days,single Skill,ordinary chat,copy,history reload,keyboard,1440/760",
     "reviews": "all units SPEC PASS then QUALITY APPROVE;B2+C seam review APPROVE",
     "logs": [
       "/tmp/wes-message-final-web-v2.log",
@@ -125,7 +138,12 @@
       "/tmp/wes-projection-gate-build-api.log",
       "/tmp/wes-message-final-verified-summary.log",
       "/tmp/wes-message-final-api-summary.log",
-      "/tmp/wes-message-timeline-openapi-validation.log"
+      "/tmp/wes-message-timeline-openapi-validation.log",
+      "/tmp/wes-account-ui-final-web.log",
+      "/tmp/wes-account-ui-final-build-web.log",
+      "/tmp/wes-account-ui-final-modules-summary.log",
+      "/tmp/wes-account-ui-final-modules-rerun-summary.log",
+      "/tmp/wes-account-ui-final-isolated-summary.log"
     ]
   },
   "previewPreservation": {
@@ -142,13 +160,17 @@
     "credentialDifferencePredatesFinalRegression": true,
     "credentialCurrentValueRetained": true,
     "strictOldBackupCheck": "failed and retained /tmp/wes-message-final-preservation.log",
-    "boundedMetadataRecheck": "passed /tmp/wes-message-final-preservation-v2.log"
+    "boundedMetadataRecheck": "passed /tmp/wes-message-final-preservation-v2.log",
+    "currentUsers": 5,
+    "authorizedNewUser": "mjlkevin",
+    "sourceUserWrites": 0,
+    "originalPreviewUsersPreserved": 4
   },
   "latestHarness": {
     "result": "679/679;0skip",
     "log": "/tmp/wes-message-final-verified-summary.log"
   },
-  "userInterfaceAcceptance": "pending login and actual browser/manual verification",
+  "userInterfaceAcceptance": "agent browser verification completed;final user acceptance pending",
   "integrationState": "local only;not merged;not pushed",
   "boardValidation": {
     "pages": 21,
@@ -156,5 +178,37 @@
     "warnings": 0,
     "worktreeLog": "/tmp/wes-message-final-board-0.log",
     "canonicalLog": "/tmp/wes-message-final-board-1.log"
+  },
+  "accountAlignment": "BE-2026-11-04-preview-account-alignment",
+  "browserEvidence": {
+    "operator": "Codex via ordinary UI under user-approved anonymized sample;not final user acceptance",
+    "account": "mjlkevin",
+    "sessionId": "a1d2dbd9-c411-4c4e-8626-7c70586fda25",
+    "runId": "c6683fe0-36de-4f7e-aab1-eabf06e8b0c4",
+    "fileId": "8cb2d365-e97f-4b69-9e72-e3c3980883f9",
+    "projectId": "59e7b9cd-0601-40e0-bef1-841b1811779c",
+    "assessmentId": "087f00f2-286d-4bfe-b74f-a6ca727af3b7",
+    "nativeDays": 5,
+    "nativeSuccessReceipts": 1,
+    "singleSkillRun": "5ec9fe33-19ef-4641-8f0f-f53230377e15",
+    "ordinaryChatRun": "e398fca5-bda5-41b5-90dc-619cbba82b70",
+    "ordinaryChatWorkflow": "workbench_chat_v1",
+    "completedStageCards": 16,
+    "terminalFormInputs": 0,
+    "terminalPartialHistory": false,
+    "screenshot": "message-flow-final-mjlkevin.jpg",
+    "visualRed": "message-flow-overflow-red.json",
+    "visualGreen": "message-flow-overflow-green.json",
+    "wrapCommit": "f65d22b",
+    "afterPreviewRestart": {
+      "accountStillLoggedIn": true,
+      "businessCardIds": 30,
+      "uniqueBusinessCardIds": 30,
+      "stageCards": 16,
+      "formalDays": 5,
+      "normalReplyRetained": true,
+      "inputs": 0,
+      "partialHistory": false
+    }
   }
 }

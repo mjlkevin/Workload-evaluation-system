@@ -82,7 +82,7 @@
   </header>
 
   <main class="doc-wrap">
-<section data-board-event-id="BE-2026-11-04-message-timeline-core:monitoring"><h2>RP-050 消息流实施与自动检查完成</h2><p>消息流交互已实现，Web974、模块1159、执行套件679及双构建通过；3006最终界面验收待登录后执行。</p><details data-tech-collapse><summary>实现与验证依据</summary><p>A1 e193d48：18/18；A2 25a3209：66/66；B1 740e55f：93/93；摘要读取52ea8d5：38/38及加强断言9/9；B2 26a0e25：60/60；C a80049b：中央消息、摘要及入口接线。各单元独立规格与质量复核通过，B2+C跨单元接线复核APPROVE，定向套件存在重叠，不合计为总数。最终完整Web99文件974/974、模块1159/1159、Harness679/679均0 skip，Web/API构建通过；AI286/286、Agent254/254通过。竞态测试观察器d037e45保留全部业务、权限与重试断言，最终完整Harness覆盖兼容调用替换。初次取消/超时、登录异常处理、Harness六项旧观察器失败及API兼容构建失败证据保留，修订和复验分别记录。integration仍报templates_status_not_200；新近只读核实专用测试库活动模板0、产品行项0，不seed数据掩盖失败。旧任务完整历史5069ms与内部摘要1317ms读取范围不同。预览3004/3006健康200；原用户及Skill/流程记录保留，凭据旧备份差异有00:50既有set审计，保留现值。3006仍在登录页，原生键盘、1440/760与真实新流程页面复验待执行，不等同用户验收；本地未合入主线或推送。</p></details></section>
+<section data-board-event-id="BE-2026-11-04-message-timeline-core:monitoring"><h2>消息流实现与浏览器补验</h2><p>mjlkevin已登录，新消息流业务补验完成；Web974与构建通过，模块2个取消/超时竞态用例待复核，用户验收待回填。</p><details data-tech-collapse><summary>实现、运行与剩余边界</summary><p>按用户明确授权，仅在3006隔离预览库新增mjlkevin，复用当前认证信息与角色；主库零写入、原4个临时账号保留，实际页面登录成功。新消息流Run c6683fe0-36de-4f7e-aab1-eabf06e8b0c4完成15步，需求补充、需求确认、范围参数确认、写入批准均经普通UI操作；真实原生回执仅1条，正式工期5天，草稿087f00f2-286d-4bfe-b74f-a6ca727af3b7详情为两项2+3天。单Skill 5ec9fe33-19ef-4641-8f0f-f53230377e15与普通聊天e398fca5-bda5-41b5-90dc-619cbba82b70均完成，后者仍走workbench_chat_v1，回复与复制可用。1440/760、键盘Tab/Enter/Escape、未保存保护、回焦、摘要定位、刷新问答和滚动保持已实际复验。f65d22b仅修来源编号折行，真实RED591/677到GREEN591/591，窄屏647/647无整页溢出；定向16/16，SPEC与QUALITY通过。最新Web99文件974/974和build:web通过；最新模块1157/1159，2个既有取消/超时用例返回TOTAL_TIMEOUT而非CANCELLED，隔离文件66/66通过，原配置与失败证据均保留。此前完整模块1159/1159、Harness679/679、AI286/286、Agent254/254及API构建通过，不混称本轮模块全绿。integration空活动模板基线仍在。完整待办只读实测20568ms，曾出现等待卡片延迟和短暂不可用；之后正常加载，性能待分析优化，未宣称已修复。3004/3006已恢复健康200且仍为mjlkevin登录；最终用户验收另记，未合入主线或推送。</p></details></section>
     <div class="toc">
       <h5>导航</h5>
       <ol>
@@ -357,7 +357,8 @@ harness_tool_events
     <footer class="footer">
       <a href="index.html">返回总览</a> · 监控与审计 · WES 项目管理 · 2026-09-23
     </footer>
-  </main>
+  <section data-board-event-id="BE-2026-11-04-preview-account-alignment:monitoring"><h2>预览登录账号已对齐</h2><p>mjlkevin已同步至3006并实际登录，沿用当前密码；主环境账号未修改。</p><details data-tech-collapse><summary>授权、操作与复核依据</summary><p>3006登录指向隔离预览库；主环境mjlkevin为active/admin，预览原无该账号，造成日常账号无法登录。用户明确确认仅同步该账号、沿用当前密码。执行仅在预览新增一行，主库只读，原四个临时账号无变更；复核身份、密码校验值、角色与状态一致。浏览器使用现有表单密码实际登录成功，未重置密码、未复制其他业务记录。密码、哈希和token未写入对话或文档。该项是环境支持，无产品源码变更；沿用ISS-2026-11-02-004，不新建需求或缺陷。</p></details></section>
+</main>
   <script src="assets/board-ui.js" defer></script>
 </body>
 </html>
