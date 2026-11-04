@@ -5,9 +5,8 @@ import WorkspaceTabs from '../components/Layout/WorkspaceTabs.jsx'
 
 const STORAGE_KEY = 'wes-v2-workspace-tabs-v1'
 
-// 360 档手机上页签条会横着排不下：.workspace-tabs 确实 overflow-x:auto
-// （layout.css:56），但 macOS/移动端 overlay 滚动条平时不显示，用户看不出右边还有页签，
-// 当前激活那一格也可能整个在屏幕外。这里把几何量成「内容 900 / 视口 360」的溢出形状，
+// 模拟内容900 / 视口360的溢出。滚动条视觉隐藏后，固定箭头及全部页签选择
+// 仍须提供完整访问；jsdom不做布局，需要显式提供几何量。
 // jsdom 不做布局、几何恒为 0，不 stub 就永远测不到溢出分支。
 function stubGeometry({ scrollWidth = 900, clientWidth = 360, scrollLeft = 0 }) {
   Object.defineProperty(HTMLElement.prototype, 'scrollWidth', { configurable: true, get: () => scrollWidth })
@@ -54,7 +53,7 @@ describe('WorkspaceTabs 窄屏滚动提示', () => {
     renderTabs()
 
     expect(screen.getByRole('button', { name: '页签向右滚动' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '页签向左滚动' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '页签向左滚动' })).toBeDisabled()
   })
 
   test('滚到最右边后提示翻向左边', () => {
@@ -63,7 +62,7 @@ describe('WorkspaceTabs 窄屏滚动提示', () => {
     renderTabs()
 
     expect(screen.getByRole('button', { name: '页签向左滚动' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '页签向右滚动' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '页签向右滚动' })).toBeDisabled()
   })
 
   test('页签没溢出时不出多余按钮', () => {

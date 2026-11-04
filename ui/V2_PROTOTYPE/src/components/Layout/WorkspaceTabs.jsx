@@ -104,15 +104,13 @@ function menuPosition(x, y) {
   }
 }
 
-// 溢出时贴在条两侧的滚动按钮：滚动条在 macOS / 手机上默认不占位，
-// 不给出可点的箭头，用户不知道右边还有页签。sticky 在横向滚动容器里
-// 能贴在 scrollport 边缘，所以它们可以当普通 flow 子项放进 track，
-// 不必新增 DOM 层，也不动已冻结的 layout.css。
-const SCROLL_CUE_BASE = 'sticky z-10 grid h-7 w-7 shrink-0 place-items-center rounded-md border border-line bg-surface text-ink-3 cursor-pointer hover:bg-bg-soft'
+// 翻页控件不参与滚动内容宽度，边界禁用时也保留位置，避免页签跳动。
+const SCROLL_CUE_BASE = 'grid size-8 shrink-0 cursor-pointer place-items-center rounded-md border border-transparent bg-surface text-lg text-ink-2 hover:border-line hover:bg-bg-soft disabled:cursor-default disabled:text-ink-3 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-brand'
 
 // jsdom 不实现这些几何 API，组件侧得先探一下；真实浏览器全部可用。
 function scrollByAmount(el, amount) {
-  if (typeof el?.scrollBy === 'function') el.scrollBy({ left: amount, behavior: 'smooth' })
+  const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  if (typeof el?.scrollBy === 'function') el.scrollBy({ left: amount, behavior: reducedMotion ? 'auto' : 'smooth' })
   else if (el) el.scrollLeft += amount
 }
 
@@ -126,6 +124,12 @@ export default function WorkspaceTabs() {
   const [menu, setMenu] = useState(null)
   const stripRef = useRef(null)
   const [cue, setCue] = useState({ left: false, right: false })
+  const overflowing = cue.left || cue.right
+
+  const revealActive = useCallback(() => {
+    const active = stripRef.current?.querySelector('.workspace-tab.on')
+    active?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+  }, [])
 
   const measureCue = useCallback(() => {
     const el = stripRef.current
@@ -141,24 +145,25 @@ export default function WorkspaceTabs() {
     if (!el) return undefined
     measureCue()
     // 页签增减、窗口缩放、字体回位都会改变溢出量，三个信号都得重测
-    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(measureCue) : null
-    if (observer) observer.observe(el)
+    const resize = () => { revealActive(); measureCue() }
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(resize) : null
+    if (observer) {
+      observer.observe(el)
+      if (el.firstElementChild) observer.observe(el.firstElementChild)
+    }
     el.addEventListener('scroll', measureCue, { passive: true })
-    window.addEventListener('resize', measureCue)
+    window.addEventListener('resize', resize)
     return () => {
       el.removeEventListener('scroll', measureCue)
-      window.removeEventListener('resize', measureCue)
+      window.removeEventListener('resize', resize)
       if (observer) observer.disconnect()
     }
-  }, [measureCue, tabs])
+  }, [measureCue, revealActive, tabs])
 
   // 当前页签可能在屏幕外：只给箭头不够，切页时自己滚过来
   useEffect(() => {
-    const active = stripRef.current?.querySelector('.workspace-tab.on')
-    if (active && typeof active.scrollIntoView === 'function') {
-      active.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-    }
-  }, [currentRouteKey, tabs])
+    revealActive()
+  }, [currentRouteKey, tabs, overflowing, revealActive])
 
   function nudgeCue(direction) {
     const el = stripRef.current
@@ -269,23 +274,15 @@ export default function WorkspaceTabs() {
   if (!ready) return null
 
   return (
-    <div className="workspace-tabs" role="tablist" aria-label="已打开页面" tabIndex={0} ref={stripRef}>
+    <div className="sticky top-0 z-30 flex h-[var(--workspace-tabs-height)] shrink-0 items-center gap-1 border-b border-line bg-surface px-2">
+      {overflowing && <button type="button" className={SCROLL_CUE_BASE} aria-label="页签向左滚动" disabled={!cue.left} onClick={() => nudgeCue(-1)}>‹</button>}
+    <div className="workspace-tabs [&::-webkit-scrollbar]:hidden" role="tablist" aria-label="已打开页面" tabIndex={0} ref={stripRef}>
       <div className="workspace-tabs-track">
-        {cue.left && (
-          <button
-            type="button"
-            className={`${SCROLL_CUE_BASE} left-0`}
-            aria-label="页签向左滚动"
-            onClick={() => nudgeCue(-1)}
-          >
-            ‹
-          </button>
-        )}
         {tabs.map((tab) => {
           const isActive = normalizeTabPath(tab.path) === normalizeTabPath(currentRouteKey)
           return (
             <div
-              className={isActive ? 'workspace-tab on' : 'workspace-tab'}
+              className={isActive ? 'workspace-tab on shrink-0' : 'workspace-tab shrink-0'}
               key={tab.path}
               role="tab"
               aria-selected={isActive}
@@ -313,17 +310,21 @@ export default function WorkspaceTabs() {
             </div>
           )
         })}
-        {cue.right && (
-          <button
-            type="button"
-            className={`${SCROLL_CUE_BASE} right-0`}
-            aria-label="页签向右滚动"
-            onClick={() => nudgeCue(1)}
-          >
-            ›
-          </button>
-        )}
       </div>
+    </div>
+      {overflowing && <>
+        <button type="button" className={SCROLL_CUE_BASE} aria-label="页签向右滚动" disabled={!cue.right} onClick={() => nudgeCue(1)}>›</button>
+        <label className="relative flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-line bg-surface px-2 text-xs text-ink-2 hover:bg-bg-soft focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-brand">
+          <svg aria-hidden="true" className="size-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.4"><path d="M3 5h14M3 10h14M3 15h14" /></svg>
+          <span aria-hidden="true" className="hidden sm:inline">全部页签</span>
+          <span aria-hidden="true" className="tabular-nums text-ink-3">{tabs.length}</span>
+          <span aria-hidden="true">⌄</span>
+          <select aria-label="全部页签" value="" onChange={event => openTab(event.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0">
+            <option value="" disabled>全部页签 · {tabs.length}</option>
+            {tabs.map(tab => <option key={tab.path} value={tab.path}>{normalizeTabPath(tab.path) === normalizeTabPath(currentRouteKey) ? '当前 · ' : ''}{tab.title}</option>)}
+          </select>
+        </label>
+      </>}
       {menu && createPortal(
         <div
           className="workspace-tab-menu"

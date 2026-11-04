@@ -1,0 +1,169 @@
+{
+  "id": "BE-2026-11-04-workspace-tabs-overflow",
+  "date": "2026-11-04",
+  "type": "implementation",
+  "issueId": "ISS-2026-11-04-005",
+  "relatedRequirements": [
+    "RP-068"
+  ],
+  "dedup": "未命中同根因记录；WorkspaceTabs为全局页签表面，独立于RP-032/033会话侧栏及RP-050中央消息流，新增ISS-2026-11-04-005 / RP-068。",
+  "originalFeedback": "这里的横向滚动条别出现，用uiskill设计一下当页签过多时候的前端显示方式",
+  "disposition": "requirement",
+  "priority": "P2",
+  "scope": "全局顶部已打开页面页签栏",
+  "summary": "隐藏原生横向滚动条；固定翻页按钮、全部页签选择与当前页签可见性。",
+  "status": "本地实现及专项/浏览器验证完成；全量失败留证，用户验收待回填",
+  "pages": [
+    "issues",
+    "requirements",
+    "plan",
+    "testing",
+    "monitoring",
+    "changes",
+    "index"
+  ],
+  "additionalPages": [
+    "design"
+  ],
+  "roots": [
+    {
+      "problem": "原生15px滚动条挤占42px页签栏，箭头属于滚动track流内可能遮标题且改变测量。",
+      "contract": "用户1379×945截图批注；现有42px页签栏",
+      "runtime": "3006实际tablist宽1171、高42、clientHeight26、scrollbarHeight15，共12页签。",
+      "owner": "WorkspaceTabs.jsx 与 layout.css现有workspace-tabs规则"
+    },
+    {
+      "problem": "过多页签只有横向逐段浏览，缺少直接跳转的完整列表。",
+      "contract": "用户要求设计过多页签显示；原路由去重及未保存保护不变。",
+      "runtime": "当前12项页签、右侧被裁；现有openTab/requestNavigation路径。",
+      "owner": "WorkspaceTabs.jsx"
+    }
+  ],
+  "design": {
+    "alternatives": [
+      "多行页签会挤占业务高度",
+      "压缩所有标题会降低可辨认性",
+      "选择单行页签+固定翻页+全部页签原生下拉"
+    ],
+    "selected": "保持42px单行；滚动条视觉隐藏，触控板和键盘滚动保留；两端固定箭头，边界禁用；溢出时右侧全部页签N原生select可跳转。",
+    "stack": "React/现有Tailwind tokens/native select；不新增UI依赖，不扩增冻结CSS，只改既有页签规则。"
+  },
+  "plan": [
+    "先补全部页签切换、未保存取消保护和固定边界箭头的失败测试。",
+    "仅修改WorkspaceTabs与现有页签CSS，保持持久化/去重/右键关闭。",
+    "专项、全Web、隔离模块、构建、UI范围和1379/1440/760/360浏览器验证。"
+  ],
+  "acceptance": [
+    "条高42px，无可见横向滚动条",
+    "溢出时两端箭头固定且边界禁用，所有页签可通过下拉到达",
+    "选择已打开页面不产生重复项，未保存取消仍停在原页面",
+    "当前页签在切换/缩放后可见，窄屏无页面横向溢出"
+  ],
+  "boundaries": [
+    "只处理全局顶部页签一个表面",
+    "不新增第三方组件系统，不更改业务页面、API或用户任务",
+    "保留本会话之前的左栏、中央对话和紧凑文件卡，以及其他dirty改动"
+  ],
+  "implementationPerformed": true,
+  "uiSkills": {
+    "category": "craft",
+    "selected": [
+      "ibelick/baseline-ui"
+    ],
+    "start": "首次网络失败，NODE_USE_ENV_PROXY=1重试成功",
+    "categoryLookup": "本轮CLI目录请求失败，复用本会话已读取的craft目录；baseline-ui重新get成功，与之前版本cmp一致。",
+    "stack": "现有React、Tailwind语义tokens与原生select；layout.css仅修改两个既有页签规则"
+  },
+  "verification": {
+    "red": "6项预期失败/5项通过：4项完整选择与未保存保护入口缺失、2项固定边界箭头缺失。",
+    "focused": "3文件13/13通过，零跳过；去重、自动可见、视口滚动、原生选择和未保存取消/确认。",
+    "web": "107文件105通过/2失败；1022/1041通过、19失败、零跳过。assessment-frozen-basis18为同会话基线；StateMachinesSection1在单独运行10/10通过。",
+    "extraIsolated": "工具清单15/15、状态机10/10单独通过；进度中曾误报工具清单失败，已核对日志更正。",
+    "modules": "隔离模块1241/1244通过、3失败、零跳过：两项取消后迟到动作时序与resolveKek缺省警告，均在之前轮次出现。",
+    "build": "通过",
+    "scope": "No new deterministic UI findings",
+    "diffCheck": "本轮组件、CSS和测试通过",
+    "logs": [
+      "/tmp/wes-tabs-overflow-red.log",
+      "/tmp/wes-tabs-overflow-green.log",
+      "/tmp/wes-tabs-overflow-web.log",
+      "/tmp/wes-tabs-state-machines-isolated.log",
+      "/tmp/wes-tabs-tool-inventory-isolated.log",
+      "/tmp/wes-tabs-overflow-db/test:modules.log",
+      "/tmp/wes-tabs-overflow-build.log"
+    ]
+  },
+  "browserEvidence": {
+    "url": "http://127.0.0.1:3006/",
+    "account": "mjlkevin",
+    "tabCount": 12,
+    "before": {
+      "barHeight": 42,
+      "clientHeight": 26,
+      "scrollbarHeight": 15
+    },
+    "after": {
+      "barHeight": 42,
+      "clientHeight": 41,
+      "scrollbarHeight": 0
+    },
+    "desktop1379": {
+      "stripWidth": 958.21,
+      "arrowLeftBefore": 1214.21,
+      "arrowLeftAfter": 1214.21,
+      "scrollAtEnd": 249.5,
+      "rightDisabledAtEnd": true
+    },
+    "desktop1440": {
+      "barHeight": 42,
+      "stripWidth": 1019.21,
+      "scrollbarHeight": 0,
+      "activeVisible": true,
+      "pageWidth": 1440
+    },
+    "narrow760": {
+      "barHeight": 42,
+      "stripWidth": 483.21,
+      "scrollbarHeight": 0,
+      "activeVisible": true,
+      "pickerRight": 751,
+      "pageWidth": 760
+    },
+    "mobile360": {
+      "barHeight": 42,
+      "stripWidth": 137.21,
+      "scrollbarHeight": 0,
+      "pageWidth": 360,
+      "pickerRight": 351,
+      "workflowTabWidth": 131,
+      "activeVisible": true
+    },
+    "interactions": [
+      "原生下拉显示12个完整标题及当前标记",
+      "选择最右工具策略后当前项可见（几何比较容忍1px子像素舍入），数量仍12；返回AI工作台",
+      "360宽选择Workflow管理，当前131px页签在137px滚动区内可见",
+      "翻页按钮坐标固定，右端禁用；返回起始位置",
+      "临时视口reset后一次延迟resize导致恢复当前项，重取状态后固定视口翻页稳定，无需改代码"
+    ],
+    "viewportReset": true,
+    "originalRouteRestored": true,
+    "newBusinessMutation": false,
+    "screenshots": [
+      "tabs-overflow-1440.png",
+      "tabs-overflow-760.png",
+      "tabs-overflow-360.png",
+      "tabs-overflow-final.png",
+      "tabs-overflow-detail.png"
+    ],
+    "path": "/Users/kevin/.codex/visualizations/2026/11/04/01a1a670-524f-7c90-9f7d-d83601fdcac1",
+    "final": {
+      "tabCount": 12,
+      "scrollLeft": 0,
+      "barHeight": 42,
+      "scrollbarHeight": 0
+    }
+  },
+  "integrationState": "main本地未提交、未推送，其他dirty改动保留",
+  "review": "五轴自查：原openTab和未保存门闩复用；原生select承担键盘与关闭行为；控件不参与scrollWidth；resize observer与事件清理完整；无业务/鉴权/后端变更。",
+  "boardValidation": "board-build 21页；board-consistency-check 0错误0警告；board-event-check通过。需求主台账新增RP-068，当前摘要55项：25已验收、16待验、12待处理/推进、2暂缓。"
+}
