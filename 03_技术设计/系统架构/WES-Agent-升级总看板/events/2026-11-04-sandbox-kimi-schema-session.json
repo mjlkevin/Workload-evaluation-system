@@ -1,0 +1,93 @@
+{
+  "eventId": "BE-2026-11-04-sandbox-kimi-schema-session",
+  "date": "2026-11-04",
+  "originalRequest": "看下我刚刚测试的session是什么情况：33782966-44d4-476f-b38e-6af1a96856cc",
+  "sessionId": "33782966-44d4-476f-b38e-6af1a96856cc",
+  "issueId": "ISS-2026-11-04-004",
+  "requirementId": "RP-067",
+  "defectId": "DEF-2026-11-04-003",
+  "triage": {
+    "dedup": "命中既有沙箱文件交付ISS-004/RP-067，不新增Issue或需求；本次补充Kimi实际验收缺陷",
+    "disposition": "defect",
+    "priority": "P1",
+    "severity": "S2",
+    "status": "open",
+    "scope": "diagnosis only, no code fix or retry"
+  },
+  "environment": {
+    "ui": "http://127.0.0.1:3006/",
+    "apiPort": 3004,
+    "checkout": "codex/wes-skills-c",
+    "head": "62a11a7",
+    "database": "workload_eval_skills_preview_20261102",
+    "queryMode": "read-only transactions, only supplied session"
+  },
+  "runs": [
+    {
+      "id": "9227fb4d-d90c-4328-a3a4-a053c6fa5257",
+      "workflow": "workbench_chat_v1",
+      "status": "completed",
+      "purpose": "greeting"
+    },
+    {
+      "id": "11d2a2ea-6c90-4b00-9812-46d081882f86",
+      "workflow": "business_skills_v1",
+      "status": "completed",
+      "requirementsCount": 7,
+      "startedAtCST": "2026-11-04 18:11:44",
+      "completedAtCST": "2026-11-04 18:12:07"
+    },
+    {
+      "id": "e5cb8cb6-12c2-45ee-90d8-5adda4814787",
+      "workflow": "sandbox-task-v1",
+      "status": "failed",
+      "createdAtCST": "2026-11-04 18:12:09",
+      "failedAtCST": "2026-11-04 18:12:11",
+      "errorCode": "WORKER_STEP_FAILED",
+      "providerError": "HTTP 400; properties.language: type is not defined"
+    }
+  ],
+  "rootCause": {
+    "file": "apps/api/src/agent/tools/sandbox.tools.ts",
+    "fields": [
+      "properties.language",
+      "properties.outputs.items.properties.format"
+    ],
+    "observed": "两个enum节点未显式声明type；本次上游错误首先指向language。注册器原样转交parameters。",
+    "suggestedFix": "两个字段补type:string，并增加实际出站工具定义的Kimi兼容回归，再用独立生产连接验收。"
+  },
+  "effects": {
+    "sandboxJobCount": 0,
+    "artifactCount": 0,
+    "approvalReached": false,
+    "cloudExecutionReached": false,
+    "upstreamResultRetained": true
+  },
+  "separatePrerequisite": {
+    "sandboxConnectionRows": 0,
+    "causedThis400": false,
+    "temporaryKeySaved": false
+  },
+  "priorAcceptanceBoundary": "此前qwen-plus合成闭环通过，不能替代这次实际Kimi工具Schema验收。",
+  "tests": "只读运行记录和源码核对；未调用模型/云，未运行产品测试，未修改会话或重试任务。",
+  "nextStep": "修复工具Schema并补回归；随后配置独立沙箱连接与Key，重新验收生成HTML。",
+  "boardAudit": {
+    "defectRawRows": 32,
+    "defectUniqueIds": 32,
+    "buckets": {
+      "pending": 8,
+      "manual": 13,
+      "done": 11
+    },
+    "requirementsCountChanged": false,
+    "issueCountChanged": false,
+    "sourceAssetCountChanged": false
+  },
+  "boardValidation": {
+    "build": "21 pages",
+    "consistency": "0 errors / 0 warnings",
+    "scope": "candidate and main",
+    "productCodeChanged": false,
+    "sessionOrRunMutated": false
+  }
+}
