@@ -21,7 +21,7 @@ function fixture(output: unknown = { candidateKeys: ['skill:target'] }, tokens =
     catalog: { list: async actor => { readers.push(structuredClone(actor)); return lists[Math.min(readers.length - 1, lists.length - 1)]; } },
     model: {
       loadSettings: async () => settings,
-      loadCredential: async scope => { assert.equal(scope, 'provider:custom-provider'); return 'fixture-placeholder'; },
+      loadCredential: async scope => { assert.equal(scope, 'provider:custom-provider'); return 'placeholder'; },
       provider: { chatCompletion: async request => {
         calls.push(request);
         return { content: JSON.stringify(output), rawContent: 'PRIVATE_RAW', model: 'generation-model', provider: 'fixture', attempts: 1,
@@ -49,7 +49,7 @@ test('authorized recommendation uses real generation binding once, no tools, can
   assert.ok(sent.abortSignal); assert.equal(sent.responseFormat, 'json_object');
   const input = JSON.parse(sent.messages[1].content);
   assert.deepEqual(input, { goal: '拆解需求', catalog: [{ kind: 'skill', id: 'target', name: '目录名称 skill', description: '目录用途' }] });
-  for (const text of ['PRIVATE_RAW', 'fixture-placeholder', 'https://provider.invalid', 'credentialScope', 'inputSchema']) assert.equal(JSON.stringify(result).includes(text), false);
+  for (const text of ['PRIVATE_RAW', 'placeholder', 'https://provider.invalid', 'credentialScope', 'inputSchema']) assert.equal(JSON.stringify(result).includes(text), false);
 });
 
 for (const body of [null, [], {}, { goal: '' }, { goal: '  ' }, { goal: 7 }, { goal: 'x'.repeat(4001) },
@@ -112,7 +112,7 @@ test('reread uses original caller role and propagates current authority denial s
     reads++; assert.equal(actor.role, 'admin'); assert.equal(actor.businessRole, 'pre_sales');
     if (reads === 2) throw new SkillError('EXECUTION_AUTHORITY_CHANGED', '当前用户权限已变化，请重新读取', 403);
     return [entry()];
-  } }, model: { loadSettings: async () => settings, loadCredential: async () => 'fixture-placeholder', provider: {
+  } }, model: { loadSettings: async () => settings, loadCredential: async () => 'placeholder', provider: {
     chatCompletion: async request => { f.calls.push(request); return { content: '{"candidateKeys":["skill:target"]}', rawContent: '', model: 'fixture', provider: 'fixture', attempts: 1, usage: { completionTokens: 5, promptTokens: 5, totalTokens: 10 } }; },
   } } });
   await assert.rejects(service.recommend(user, { goal: '目标' }), errorCode('EXECUTION_AUTHORITY_CHANGED'));
@@ -134,7 +134,7 @@ test('missing or invalid generation binding never falls back to other models', a
 for (const mode of ['tool', 'invalid-json', 'over-tokens', 'provider-error'] as const) {
   test(`model ${mode} fails closed without leaking provider data`, async () => {
     const service = createExecutionRecommendationService({ catalog: { list: async () => [entry()] }, model: {
-      loadSettings: async () => settings, loadCredential: async () => 'fixture-placeholder', provider: { chatCompletion: async () => {
+      loadSettings: async () => settings, loadCredential: async () => 'placeholder', provider: { chatCompletion: async () => {
         if (mode === 'provider-error') throw Error('PRIVATE_PROVIDER_DETAIL');
         return { content: mode === 'invalid-json' ? 'PRIVATE_INVALID_JSON' : '{"candidateKeys":["skill:target"]}', rawContent: 'PRIVATE_RAW', provider: 'fixture', model: 'fixture', attempts: 1,
           ...(mode === 'tool' ? { toolCalls: [{ id: 'call', name: 'write', arguments: {} }] } : {}),
@@ -151,7 +151,7 @@ test('30-second total deadline aborts a provider that ignores cancellation and i
   let dispatched!: () => void; const started = new Promise<void>(resolve => { dispatched = resolve; });
   let signal!: AbortSignal, finish!: (value: any) => void; let reads = 0;
   const service = createExecutionRecommendationService({ catalog: { list: async () => { reads++; return [entry()]; } }, model: {
-    loadSettings: async () => settings, loadCredential: async () => 'fixture-placeholder', provider: { chatCompletion: async request => {
+    loadSettings: async () => settings, loadCredential: async () => 'placeholder', provider: { chatCompletion: async request => {
       signal = request.abortSignal!; dispatched(); return new Promise(resolve => { finish = resolve; });
     } },
   } });
@@ -170,7 +170,7 @@ for (const phase of ['catalog', 'settings'] as const) test(`total deadline cover
   let settingsReads = 0, credentialReads = 0, modelCalls = 0;
   const service = createExecutionRecommendationService({ catalog: { list: async () => phase === 'catalog' ? delayed() : [entry()] }, model: {
     loadSettings: async () => { settingsReads++; return phase === 'settings' ? delayed() : settings; },
-    loadCredential: async () => { credentialReads++; return 'fixture-placeholder'; },
+    loadCredential: async () => { credentialReads++; return 'placeholder'; },
     provider: { chatCompletion: async () => { modelCalls++; assert.fail('late work cannot dispatch'); } },
   } });
   const pending = service.recommend(user, { goal: '目标' }); const rejected = assert.rejects(pending, errorCode('EXECUTION_RECOMMENDATION_TIMEOUT'));
@@ -184,7 +184,7 @@ function realProviderService(modelId = 'generation-model') {
   active.modelProviders![0].models[0].id = modelId;
   active.scenarioBindings!.generation.modelId = modelId;
   return createExecutionRecommendationService({ catalog: { list: async () => [entry()] }, model: {
-    loadSettings: async () => active, loadCredential: async () => 'fixture-placeholder', provider: new KimiProvider({ apiKey: 'fixture-placeholder' }),
+    loadSettings: async () => active, loadCredential: async () => 'placeholder', provider: new KimiProvider({ apiKey: 'placeholder' }),
   } });
 }
 const rawSuccess = (extra: Record<string, unknown> = {}) => new Response(JSON.stringify({ choices: [{ message: {

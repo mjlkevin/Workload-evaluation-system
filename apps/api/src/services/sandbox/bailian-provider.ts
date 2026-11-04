@@ -137,7 +137,9 @@ export function createBailianSandboxProvider(connection: SandboxConnection, apiK
   if (!connection.enabled || !/^[a-zA-Z0-9-]+$/.test(connection.workspaceId) || !/^cn-[a-z0-9-]+$/.test(connection.region) || !/^[0-9a-f]+$/.test(connection.aliyunUid) || !/^[a-zA-Z0-9_-]+$/.test(connection.templateCode) || !connection.id || !connection.templateRevision || !apiKey || /[\r\n]/.test(apiKey)) throw new Error('SANDBOX_CONNECTION_INVALID');
   const config = { ...connection };
   const baseUrl = `https://${config.workspaceId}.${config.region}.maas.aliyuncs.com/api/v1/agentstudio/sandbox`;
-  const options = { apiUrl: baseUrl, apiKey: `e2b_${config.aliyunUid}`, apiHeaders: { Authorization: `Bearer ${apiKey}` }, requestTimeoutMs: 15000 };
+  // E2B validates this SDK placeholder; only the Authorization header authenticates Bailian.
+  const sdkApiKeyPlaceholder = `e2b_${config.aliyunUid}`;
+  const options = { apiUrl: baseUrl, apiKey: sdkApiKeyPlaceholder, apiHeaders: { Authorization: `Bearer ${apiKey}` }, requestTimeoutMs: 15000 };
   const sdk: NonNullable<BailianProviderDependencies['sdk']> = deps.sdk ?? {
     create: async (template, opts) => { const { Sandbox } = await import('e2b'); return Sandbox.create(template, opts); },
     connect: async (id, opts) => { const { Sandbox } = await import('e2b'); return Sandbox.connect(id, opts); },

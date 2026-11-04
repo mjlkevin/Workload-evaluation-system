@@ -112,7 +112,7 @@ test(
       const runtime = startHarnessRuntime({
         repo,
         enabled: true,
-        resolveApiKey: () => ({ apiKey: "fixture-only" }),
+        resolveApiKey: () => ({ apiKey: "placeholder" }),
         resolveScenario: async () => ({
           model: "fixture",
           baseUrl: "https://fixture.invalid",
