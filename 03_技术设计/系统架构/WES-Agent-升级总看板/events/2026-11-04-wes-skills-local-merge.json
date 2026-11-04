@@ -1,0 +1,108 @@
+{
+  "id": "BE-2026-11-04-wes-skills-local-merge",
+  "date": "2026-11-04",
+  "type": "verification",
+  "scope": "RP-050业务Skill与RP-067受控沙箱",
+  "summary": "用户同意本版提交合并，候选已合入本地main；未推送，既有SKU工作保持未提交。",
+  "status": "已本地合并",
+  "pages": [
+    "index",
+    "plan",
+    "testing",
+    "monitoring",
+    "risks",
+    "changes"
+  ],
+  "userDecision": "这一版可以提交合并了",
+  "git": {
+    "base": "6a30bec",
+    "candidate": "ac0a078",
+    "merge": "bb208c16237d0bd3492d2630ddc62c74647aeaa4",
+    "pushPerformed": false
+  },
+  "tests": {
+    "modules": {
+      "tests": 1236,
+      "pass": 1236,
+      "fail": 0,
+      "skipped": 0
+    },
+    "harness": {
+      "tests": 697,
+      "pass": 697,
+      "fail": 0,
+      "skipped": 0
+    },
+    "agent": {
+      "tests": 260,
+      "pass": 260,
+      "fail": 0,
+      "skipped": 0
+    },
+    "ai": {
+      "tests": 286,
+      "pass": 286,
+      "fail": 0,
+      "skipped": 0
+    }
+  },
+  "harnessEvidenceLayer": "此前完整697通过；本轮混合目录长套件中止，固定提交沙箱专项49通过，非新一轮全量通过",
+  "evidence": [
+    {
+      "ref": "bb208c16237d0bd3492d2630ddc62c74647aeaa4",
+      "result": "本地合并"
+    },
+    {
+      "ref": "/tmp/wes-merge-web.log",
+      "result": "102文件/1001通过"
+    },
+    {
+      "ref": "/tmp/wes-merge-security-green.log",
+      "result": "17+2测试及扫描通过"
+    },
+    {
+      "ref": "/tmp/wes-merge-build-api.log",
+      "result": "API构建通过"
+    },
+    {
+      "ref": "/tmp/wes-merge-build-web.log",
+      "result": "Web构建通过"
+    }
+  ],
+  "review": {
+    "scope": "最后Kimi参数定义、占位值调整及沙箱高风险边界抽核；沿用各批既有规格/质量复核，不声称累计全量静态审查",
+    "criticalBlockers": 0,
+    "importantBlockers": 0
+  },
+  "dependencyAudit": {
+    "passed": false,
+    "candidate": {
+      "critical": 1,
+      "high": 11,
+      "moderate": 33,
+      "total": 45
+    },
+    "baseline": {
+      "critical": 1,
+      "high": 12,
+      "moderate": 32,
+      "total": 45
+    },
+    "introduced": "e2b到glob的moderate告警；SDK目录上传入口未由本次WES适配器暴露，未扩大范围升级SDK"
+  },
+  "integration": {
+    "passed": false,
+    "candidate": "templates_status_not_200",
+    "baselineCurrentEnvironment": "api_server_not_ready",
+    "testAndScriptUnchangedFromBaseline": true,
+    "businessDataChangedToPass": false
+  },
+  "preservation": {
+    "mainTrackedBackedUp": 25,
+    "mainUntrackedBackedUp": 120,
+    "sourcePolicy": "原SKU源文件逐字节保留为未提交；本次版本测试针对合并提交，不包含该独立WIP",
+    "runtimeConfigurationCommitted": false,
+    "worktreesRetained": true
+  },
+  "next": "原长提示超时、后续结构化结果衔接、Office人工编辑及生产独立配置继续按原范围验证。"
+}
