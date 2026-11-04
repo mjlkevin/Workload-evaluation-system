@@ -1,3 +1,4 @@
+import { skillDefinitionHash as modelDecisionHash } from "../../modules/skills/skills.hash";
 import type { ChatRole, ToolCall, ToolDefinition } from "../../ai/provider/model-provider";
 import type { AgentEvent, AgentTool, AgentUser } from "../../agent/agent.types";
 import type { ToolRegistry } from "../../agent/tool-registry";
@@ -276,7 +277,14 @@ type WorkbenchToolLoopCommon = {
    * 命中已记录的 effect 时必须直接返回既有产出、不再执行工具。
    */
   recordToolEffect?: WorkbenchToolEffectRecorder;
+  /** Persist visible model decisions before executing tools; reasoning stays transient. */
+  modelTurns?: {
+    read(ordinal: number): Promise<WorkbenchModelTurn | undefined>;
+    save(ordinal: number, value: WorkbenchModelTurn): Promise<WorkbenchModelTurn>;
+  };
 };
+
+export type WorkbenchModelTurn = { content: string; toolCalls?: ToolCall[]; model?: string; finishReason?: string };
 
 export type WorkbenchToolLoopInput = WorkbenchToolLoopCommon & {
   invoke: (params: {
@@ -456,7 +464,15 @@ export async function runWorkbenchToolLoop(
   for (let turn = 1; turn <= maxTurns; turn += 1) {
     // 批次 3 · ②③：出口预算——每一轮发请求前按 token 裁一次（确定性剪枝 + 早期历史压缩）
     workingMessages = applyEgressContextBudget(workingMessages, input.contextBudget);
-    const response = await input.invoke({ messages: [...workingMessages], turnOrdinal: turn });
+    let transientReasoning: string | undefined;
+    const invoke = async () => {
+      const response = await input.invoke({messages:[...workingMessages],turnOrdinal:turn});
+      transientReasoning = response.reasoningContent;
+      return {content:response.content, ...(response.toolCalls ? {toolCalls:response.toolCalls} : {})};
+    };
+    const cached = await input.modelTurns?.read(turn);
+    const generated = cached ?? await invoke();
+    const response = !cached && input.modelTurns ? await input.modelTurns.save(turn, generated) : generated;
     content = response.content ?? "";
     const calls = response.toolCalls ?? [];
     if (calls.length === 0) return toWorkbenchToolLoopResult(content, turn, false, trace, knowledgeTrace);
@@ -467,7 +483,7 @@ export async function runWorkbenchToolLoop(
     workingMessages.push({
       role: "assistant",
       content,
-      reasoning_content: response.reasoningContent,
+      reasoning_content: transientReasoning,
       tool_calls: calls,
     });
     await executeToolCallBatch({ ...input, workingMessages, trace, callCursor, knowledgeTrace }, calls);
@@ -483,6 +499,32 @@ export async function runWorkbenchToolLoop(
  * 该批调用并补发一个 kind:"metadata" 的 chunk 承载调用轨迹，使 dispatch
  * 能把 trace.toolCalls 落到 assistant metadata（与同步路径同一数据通路）。
  */
+/** Cache only complete visible decisions. Direct iteration preserves stream return/cancel semantics. */
+async function* replayableModelStream(input: WorkbenchToolLoopStreamInput, messages: WorkbenchToolLoopMessage[], turn: number): AsyncGenerator<StreamingChunk> {
+  const cached = await input.modelTurns?.read(turn);
+  if (cached) { yield {contentDelta:cached.content,toolCalls:cached.toolCalls,model:cached.model,finishReason:cached.finishReason}; return; }
+  if (!input.modelTurns) { yield* input.invokeStream({messages,turnOrdinal:turn}); return; }
+  let content = "", model: string | undefined, finishReason: string | undefined;
+  const calls: ToolCall[] = [], seen = new Set<string>();
+  for await (const chunk of input.invokeStream({messages,turnOrdinal:turn})) {
+    if (input.runtime?.abortSignal?.aborted) throw new Error("model_turn_cancelled");
+    if (chunk.kind !== "metadata") content += chunk.contentDelta ?? "";
+    if (typeof chunk.model === "string") model = chunk.model.slice(0,160);
+    if (typeof chunk.finishReason === "string") finishReason = chunk.finishReason.slice(0,160);
+    for (const call of chunk.toolCalls ?? []) {
+      const key = call.id || `${call.name}:${calls.length}`;
+      if (!seen.has(key)) { seen.add(key); calls.push(call); }
+    }
+    // Tool calls are exposed only after their durable decision commits. Text stays live.
+    const {toolCalls: _transientCalls, ...visible} = chunk;
+    yield visible;
+  }
+  if (input.runtime?.abortSignal?.aborted) throw new Error("model_turn_cancelled");
+  const saved = await input.modelTurns.save(turn, {content,...(calls.length ? {toolCalls:calls} : {}),...(model ? {model} : {}),...(finishReason ? {finishReason} : {})});
+  if (saved.content !== content || modelDecisionHash(saved.toolCalls ?? []) !== modelDecisionHash(calls)) throw new Error("model_turn_conflict");
+  if (saved.toolCalls?.length) yield {contentDelta:"",kind:"metadata",toolCalls:saved.toolCalls,model:saved.model,finishReason:saved.finishReason};
+}
+
 export async function* runWorkbenchToolLoopStream(
   input: WorkbenchToolLoopStreamInput,
 ): AsyncGenerator<StreamingChunk, WorkbenchToolLoopResult, void> {
@@ -503,7 +545,7 @@ export async function* runWorkbenchToolLoopStream(
     // 而 id 缺失时 provider 按 index 兜底成 call_0，故第二轮的同名调用是合法新调用。
     // 集合声明在轮循环内 → 每轮天然重置；若改成全局去重会吞掉后续轮次的调用。
     const seenTurnCallIds = new Set<string>();
-    for await (const chunk of input.invokeStream({ messages: [...workingMessages], turnOrdinal: turn })) {
+    for await (const chunk of replayableModelStream(input, [...workingMessages], turn)) {
       yield chunk;
       if (chunk.kind !== "metadata") turnContent += chunk.contentDelta ?? "";
       if (chunk.reasoningContentDelta) turnReasoningContent += chunk.reasoningContentDelta;

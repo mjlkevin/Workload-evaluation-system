@@ -134,6 +134,7 @@ export type WorkbenchDispatchInput = {
    * 同步直写路径不经 Harness 步骤提交点，无重放语义，不注入即为 undefined。
    */
   recordToolEffect?: WorkbenchToolEffectRecorder;
+  modelTurns?: import("./workbench-tool-loop").WorkbenchToolLoopStreamInput["modelTurns"];
   /**
    * 批次 0.5 · ②：工具事件 UI 投影接缝（additive）。仅异步 Run 通道注入——
    * 由 workbench-chat.workflow 用 createWorkbenchToolEventSink 实现，把工具循环

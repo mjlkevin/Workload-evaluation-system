@@ -27,7 +27,7 @@ test("boot: enabled=true 启动 worker 恰 1 次", async () => {
   let workerStarted = 0;
 
   const runtime = startHarnessRuntime({
-    repo: {} as any,
+    repo: { findToolEffectByKey: async () => null } as any,
     enabled: true,
     createWorker: () => ({
       start: async () => { workerStarted += 1; },
@@ -49,7 +49,7 @@ test("boot: enabled=false 零 start 零副作用", async () => {
   let workerStarted = 0;
 
   const runtime = startHarnessRuntime({
-    repo: {} as any,
+    repo: { findToolEffectByKey: async () => null } as any,
     enabled: false,
     createWorker: () => ({
       start: async () => { workerStarted += 1; },
@@ -70,7 +70,7 @@ test("boot: stop 调用 worker.stop 恰 1 次", async () => {
   let workerStops = 0;
 
   const runtime = startHarnessRuntime({
-    repo: {} as any,
+    repo: { findToolEffectByKey: async () => null } as any,
     enabled: true,
     createWorker: () => ({
       start: async () => {},
@@ -90,7 +90,7 @@ test("boot: 默认组装出的 workflow dispatch 不是占位", async () => {
   let dispatched = false;
 
   const runtime = startHarnessRuntime({
-    repo: {} as any,
+    repo: { findToolEffectByKey: async () => null } as any,
     enabled: true,
     createWorker: ({ registry }) => ({
       start: async () => {
@@ -152,7 +152,7 @@ test("boot: G-E1 focused 端到端——stub modelChat 注入后被调用", asyn
   let modelChatCalled = false;
 
   const runtime = startHarnessRuntime({
-    repo: {} as any,
+    repo: { findToolEffectByKey: async () => null } as any,
     enabled: true,
     // 注入 stub modelChat，模拟真实 AI 调用
     createModelChat: () => async () => {
@@ -252,6 +252,7 @@ function makeDistillHook(overrides: {
   const errors: Array<{ harnessRunId: string; outcome: string; error: string }> = [];
   const hook = createRunTerminalMemoryHook({
     repo: {
+      findToolEffectByKey: async () => null,
       getRunSnapshot: async () => ({
         output: { content: { answer: overrides.snapshotAnswer ?? "这是 AI 回答" } },
       }),
@@ -484,7 +485,7 @@ test("DEF-2026-08-27-001：同一会话连发两轮，第二轮 provider 实收�
   };
 
   const runtime = startHarnessRuntime({
-    repo: { appendRunEvent: async (input: unknown) => input, getRunSnapshot: async () => null } as any,
+    repo: { findToolEffectByKey: async () => null, appendRunEvent: async (input: unknown) => input, getRunSnapshot: async () => null } as any,
     enabled: true,
     // CI 无 KIMI_API_KEY：密钥与 provider 走注入钩子，其余链路用生产默认装配。
     // 值刻意取 tracked-secret 扫描器认可的「非密钥形态」占位（isMeaningfulSecret 直接放行），
@@ -604,7 +605,7 @@ test("批次0·⑤：provider 边界实收 messages 与存储侧推导当场对�
   };
 
   const runtime = startHarnessRuntime({
-    repo: { appendRunEvent: async (input: unknown) => input, getRunSnapshot: async () => null } as any,
+    repo: { findToolEffectByKey: async () => null, appendRunEvent: async (input: unknown) => input, getRunSnapshot: async () => null } as any,
     enabled: true,
     resolveApiKey: () => ({ apiKey: "placeholder" }),
     getProvider: () => fakeProvider as never,
@@ -705,6 +706,7 @@ test("批次0.5·②：四类 tool.call.* 经生产装配落入 run 事件流，
 
   const runtime = startHarnessRuntime({
     repo: {
+      findToolEffectByKey: async () => null,
       appendRunEvent: async (input: { eventType: string; payload: Record<string, unknown> }) => {
         runEvents.push({ eventType: input.eventType, payload: input.payload });
         return input;
@@ -947,7 +949,7 @@ test("批次6b·判据①②：策略停用/提权方向在 provider 请求体�
     };
 
     const runtime = startHarnessRuntime({
-      repo: { appendRunEvent: async (input: unknown) => input, getRunSnapshot: async () => null } as any,
+      repo: { findToolEffectByKey: async () => null, appendRunEvent: async (input: unknown) => input, getRunSnapshot: async () => null } as any,
       enabled: true,
       resolveApiKey: () => ({ apiKey: "placeholder" }),
       getProvider: () => fakeProvider as never,

@@ -105,6 +105,7 @@ test(
       }).executionConfig,
     });
     const id = queued.run.harnessRunId;
+    let generatedPrograms = 0;
     async function phase() {
       let turns = 0;
       let issue: unknown;
@@ -132,9 +133,10 @@ test(
             chatCompletion: async () => {
               throw Error("not used");
             },
-            streamChatCompletion: async function* () {
+            streamChatCompletion: async function* (input: any) {
               turns++;
-              if (turns === 1)
+              if (input.messages.at(-1)?.role !== "tool") {
+                generatedPrograms++;
                 yield {
                   contentDelta: "",
                   model: "fixture",
@@ -143,11 +145,11 @@ test(
                     {
                       id: "sandbox-call",
                       name: "sandbox_execute",
-                      arguments: request,
+                      arguments: {...request,code:request.code+(generatedPrograms>1?"\n":"")},
                     },
                   ],
                 };
-              else
+              } else
                 yield {
                   contentDelta: "文件已生成。",
                   model: "fixture",
@@ -193,7 +195,7 @@ test(
       assert.equal(
         snap!.run.status,
         "waiting",
-        JSON.stringify(
+        JSON.stringify(snap!.run) + JSON.stringify(
           (
             await db
               .select()
@@ -237,6 +239,7 @@ test(
         ),
       );
       assert.equal(releases, 1);
+      assert.equal(generatedPrograms, 1, "resume must use persisted model call, not ask model to regenerate approved code");
       const files = await db
         .select()
         .from(harnessSandboxArtifacts)

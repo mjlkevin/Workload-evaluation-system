@@ -197,6 +197,11 @@ test(
       .set({ expiresAt: new Date(0) })
       .where(eq(harnessSandboxArtifacts.id, file.id));
     await assert.rejects(() => readSandboxArtifact(file.id, f.user.id));
+    // Compensation retries update updatedAt; they must not reserve a user slot after the instance TTL.
+    await f.repo.patch(id, {state:"unknown",cleanup:"pending",execution:{claimedAt:new Date(Date.now()-17*60000).toISOString()}});
+    const nextId = randomUUID(), nextScope = {...f.scope,ordinal:2};
+    await f.repo.insertJob({...job,id:nextId,ordinal:2});
+    assert.equal(await f.repo.claim(nextId,nextScope),true,"expired cleanup retry cannot monopolize capacity");
   },
 );
 test(
@@ -227,3 +232,12 @@ test(
     );
   },
 );
+test("PG model decision commit is fenced by active attempt and cancellation", {skip:!process.env.TEST_DATABASE_URL}, async()=> {
+  const {createHarnessRuntimeRepository} = await import("../harness-runtime.repository");
+  for (const cancelled of [false,true]) {
+    const f=await fixture();
+    if(cancelled) await db.update(harnessRuns).set({cancelRequestedAt:new Date()}).where(eq(harnessRuns.harnessRunId,f.scope.runId));
+    else await db.update(harnessRunAttempts).set({leaseExpiresAt:new Date(0)}).where(eq(harnessRunAttempts.harnessRunAttemptId,f.scope.attemptId));
+    await assert.rejects(()=>createHarnessRuntimeRepository().recordToolEffectOnce({runId:f.scope.runId,attemptId:f.scope.attemptId,effectKey:randomUUID(),toolName:"workbench_chat_model_turn",input:{ordinal:1},output:{content:"late"}}), (e:any)=>e.code==="HARNESS_MODEL_TURN_LEASE_LOST");
+  }
+});

@@ -58,6 +58,7 @@ import { deriveSessionMessages } from "../ai-sessions/session-history";
 import type { recordWorkbenchTurnTrace, recordWorkbenchTurnFailureTrace } from "../trace/trace.usecase";
 
 export type WorkbenchChatWorkflowDeps = {
+  readModelTurn?(runId: string, effectKey: string): Promise<import("../../services/ai/workbench-tool-loop").WorkbenchModelTurn | undefined>;
   /**
    * 复用 workbench-dispatch.service.ts 的分发入口。
    * 调用方注入真实 dispatch 或测试 stub。
@@ -343,6 +344,19 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps, mod
               // 批次 0 · ④：工具副作用逐次落独立 effectKey（N = 全局第 N 次工具调用）。
               // 命中已记录 effect 时 recordToolEffectOnce 直接回存量 output 且不调用
               // execute —— 重放同一 Run 不会重复执行工具，幂等语义与外层同构。
+              ...(deps.readModelTurn ? {modelTurns: {
+                read: (ordinal: number) => deps.readModelTurn!(run.harnessRunId,ctx.makeEffectKey("workbench_chat_model_turn",ordinal)),
+                save: async (ordinal: number, value: import("../../services/ai/workbench-tool-loop").WorkbenchModelTurn) => {
+                  if (ctx.abortSignal.aborted) throw new Error("model_turn_cancelled");
+                  const {output} = await ctx.recordToolEffectOnce({
+                    effectKey:ctx.makeEffectKey("workbench_chat_model_turn",ordinal),
+                    toolName:"workbench_chat_model_turn",input:{ordinal},
+                    execute:async()=> {if(ctx.abortSignal.aborted) throw new Error("model_turn_cancelled"); return value;},
+                  });
+                  if (!output || typeof output.content !== "string") throw new Error("model_turn_output_missing");
+                  return output as import("../../services/ai/workbench-tool-loop").WorkbenchModelTurn;
+                },
+              }} : {}),
               recordToolEffect: async (ordinal, execute, toolEffectContext) => {
                 const { output } = await ctx.recordToolEffectOnce({
                   effectKey: ctx.makeEffectKey("workbench_chat_tool_call", ordinal),

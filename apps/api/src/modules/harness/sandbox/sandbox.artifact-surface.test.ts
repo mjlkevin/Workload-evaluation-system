@@ -51,6 +51,6 @@ test("server-frozen program remains fully reviewable before approval, no hidden 
 
 test("formal host cannot bypass durable tool approval through legacy report execution", async () => {
   const { readFile } = await import("node:fs/promises");
-  const source = await readFile(new URL("../workbench-chat.workflow.ts", import.meta.url), "utf8");
+  const source = await readFile(require("node:path").join(__dirname, "../workbench-chat.workflow.ts"), "utf8");
   assert.equal(source.includes("runExplicitHomeReportFlow"), false, "legacy report side effects must not run outside Harness tool approval");
 });

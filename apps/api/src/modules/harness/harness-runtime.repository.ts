@@ -1283,7 +1283,18 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
         const effectOutput = input.output !== undefined ? normalizeJsonObject(input.output) : null;
 
         return await dbInstance.transaction(async (tx) => {
-          await lockRunRow(tx, input.runId);
+          const run = await lockRunRow(tx, input.runId);
+          if (input.toolName === "workbench_chat_model_turn") {
+            const now = await readDbNow(tx);
+            const [active] = input.attemptId ? await tx.select({id:harnessRunAttempts.harnessRunAttemptId}).from(harnessRunAttempts).where(and(
+              eq(harnessRunAttempts.harnessRunAttemptId,input.attemptId),
+              eq(harnessRunAttempts.harnessRunId,input.runId),
+              inArray(harnessRunAttempts.status,["claimed","running"]),
+              gt(harnessRunAttempts.leaseExpiresAt,now),
+            )) : [];
+            if (!active || run.status !== "running" || run.cancelRequestedAt)
+              throw new HarnessRuntimeError("HARNESS_MODEL_TURN_LEASE_LOST", "model decision cannot commit after cancellation or lease loss");
+          }
           const existing = await tx
             .select()
             .from(harnessToolEvents)

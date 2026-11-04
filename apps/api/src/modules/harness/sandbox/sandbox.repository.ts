@@ -173,7 +173,7 @@ export function createSandboxRepository(
           .select({ owner: jobs.ownerId })
           .from(jobs)
           .where(
-            sql`(${jobs.state} IN ('provisioning','staging','executing','collecting','unknown') OR ${jobs.cleanup} = 'pending') AND ${jobs.updatedAt} > now()-interval '16 minutes'`,
+            sql`(${jobs.state} IN ('provisioning','staging','executing','collecting','unknown') OR ${jobs.cleanup} = 'pending') AND COALESCE((${jobs.execution}->>'claimedAt')::timestamptz, ${jobs.createdAt}) > now()-interval '16 minutes'`,
           );
         if (rows.length >= 4 || rows.some((r) => r.owner === scope.ownerId))
           return false;
