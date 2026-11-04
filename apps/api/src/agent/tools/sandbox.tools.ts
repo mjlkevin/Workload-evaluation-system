@@ -41,7 +41,7 @@ export function buildSandboxTool(
   return {
     name: "sandbox_execute",
     description:
-      "在受控云沙箱运行Python或Node完整脚本，生成HTML/Word(docx)/Excel(xlsx)文件。只有用户明确要求处理或生成文件才调用，问用途应直接介绍。当前工作目录就是任务目录，输入和输出均按声明的相对文件名读写，不要切换目录。必须把outputs的每个产物分别实际写入文件系统；返回BytesIO/字符串、打印文件内容或把所有产物放入另一个ZIP都不算交付。inputs.sourceId必须来自系统材料目录。代码和材料外发须逐次确认。无需文件的文字问答直接回复。不要联网或安装依赖；可用Python标准库zipfile生成OOXML。",
+      "在受控云沙箱运行Python或Node完整脚本，生成HTML/Word(docx)/Excel(xlsx)文件。只有用户明确要求处理或生成文件才调用，问用途应直接介绍。整理任务须忠实于用户原文，未经要求不要新增业务字段、功能、约束或原始数据；缺失信息标为待确认。当前工作目录就是任务目录，输入和输出均按声明的相对文件名读写，不要切换目录。必须把outputs的每个产物分别实际写入文件系统；返回BytesIO/字符串、打印文件内容或把所有产物放入另一个ZIP都不算交付。inputs.sourceId必须来自系统材料目录。代码和材料外发须逐次确认。无需文件的文字问答直接回复。不要联网或安装依赖；可用Python标准库zipfile生成OOXML。",
     capability: "estimates:read",
     mutates: false,
     exfiltrates: true,

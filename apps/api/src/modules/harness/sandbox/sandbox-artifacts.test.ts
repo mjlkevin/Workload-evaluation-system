@@ -28,6 +28,17 @@ test('valid HTML and genuine Office packages return actual byte hashes and MIME'
 test('artifact path, extension, empty document and file bound checks fail closed', async () => {
   for (const [path, bytes] of [['../report.html', Buffer.from('<html></html>')], ['report.docx', Buffer.from('x')], ['report.html', Buffer.from('fragment')], ['report.html', Buffer.alloc(20 * 1024 * 1024 + 1)]] as const) await assert.rejects(validateSandboxArtifact(path, 'html', bytes));
 });
+test('Office text nodes cannot contain nested elements that readers silently omit', async () => {
+  const word = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const wrap = (text: string) => `<w:document xmlns:w="${word}"><w:body><w:p><w:r>${text}</w:r></w:p></w:body></w:document>`;
+  const valid = await office('docx', { 'word/document.xml': wrap('<w:t>角色：仓库管理员</w:t>') });
+  assert.ok(await validateSandboxArtifact('report.docx', 'docx', valid));
+  for (const text of ['<w:t><w:t>角色：仓库管理员</w:t></w:t>', '<w:t><w:br/></w:t>']) {
+    await assert.rejects(validateSandboxArtifact('report.docx', 'docx', await office('docx', { 'word/document.xml': wrap(text) })));
+  }
+  const sheet = '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t><t>正文</t></t></is></c></row></sheetData></worksheet>';
+  await assert.rejects(validateSandboxArtifact('report.xlsx', 'xlsx', await office('xlsx', { 'xl/worksheets/sheet1.xml': sheet })));
+});
 test('Office rejects missing structure, external relationships, macros, embeddings and formulas', async () => {
   const bad: Array<Record<string, string>> = [ { 'word/vbaProject.bin': 'payload' }, { 'word/embeddings/object.bin': 'payload' }, { 'word/_rels/document.xml.rels': '<Relationships><Relationship TargetMode="External" Target="https://bad.example"/></Relationships>' }, { 'word/document.xml': '<!DOCTYPE foo [<!ENTITY x SYSTEM "file:///etc/passwd">]><w:document>&x;</w:document>' }, { '_rels/.rels': '<Relationships/>' }, { 'word/document.xml': '<w:document><w:altChunk/></w:document>' } ];
   for (const extra of bad) await assert.rejects(validateSandboxArtifact('x.docx', 'docx', await office('docx', extra)));

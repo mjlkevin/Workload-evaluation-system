@@ -131,6 +131,12 @@ function validateOffice(format: 'docx' | 'xlsx', bytes: Buffer): void {
     if (path.endsWith('.xml') || path.endsWith('.rels')) {
       const tags = parseXml(content, budget); xml.set(path, tags);
       if (tags.some(tag => /^(?:object|oleObject|altChunk|externalLink|externalData|connection|queryTable|ddeLink|webQuery|control|attachedTemplate|f|instrText|fldSimple|definedName|hyperlink)$/i.test(tag.name))) fail();
+      // OOXML text elements are leaves. Some readers ignore nested markup while
+      // others repair it, so well-formed XML alone cannot establish delivery.
+      for (let i = 0; i < tags.length; i++) {
+        const tag = tags[i];
+        if (tag.name === 't' && /^http:\/\/schemas\.openxmlformats\.org\/(?:wordprocessingml|spreadsheetml)\/2006\/main$/.test(tag.namespace) && tags[i + 1]?.depth > tag.depth) fail();
+      }
     } else if (!/\.(?:png|jpe?g|gif)$/i.test(path)) fail();
   }
   const types = xml.get('[Content_Types].xml')!;
