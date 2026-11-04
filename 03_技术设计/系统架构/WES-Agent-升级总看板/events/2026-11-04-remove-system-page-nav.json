@@ -1,0 +1,66 @@
+{
+  "id": "BE-2026-11-04-remove-system-page-nav",
+  "date": "2026-11-04",
+  "type": "requirement",
+  "issueId": "ISS-2026-10-21-001",
+  "relatedRequirements": [
+    "RP-065"
+  ],
+  "dedup": "命中系统管理统一化ISS-2026-10-21-001 / RP-065；按用户新反馈扩展，不另建重复项",
+  "originalFeedback": "这里一整个分类的控件去掉吧，放在这很别扭。每个菜单独立进来对应的页面就行了",
+  "status": "本地实现并验证 / 待用户验收",
+  "surface": "系统管理子页面的共享导航壳",
+  "owner": "SystemManagement.jsx / SystemManagementNav.jsx",
+  "scope": "移除页面正文中分组及子分类两层导航；左侧各子菜单直接进入对应路由，保留旧书签跳转与业务内容",
+  "acceptance": [
+    "正文无系统管理分组/配置分类Tab列表",
+    "从左侧菜单分别进入对应页面",
+    "直达链接和旧路径重定向仍可用"
+  ],
+  "pages": [
+    "issues",
+    "requirements",
+    "design",
+    "plan",
+    "testing",
+    "changes"
+  ],
+  "implementation": "移除SystemManagementNav挂载、专用组件及遗留上间距；保留Sidebar路由、旧路径重定向、Tab缓存和每页业务内容",
+  "verification": {
+    "red": "旧实现对新导航契约2失败6通过",
+    "focused": "导航及目录13/13",
+    "web": {
+      "files": 101,
+      "passed": 992,
+      "failed": 0
+    },
+    "buildWeb": "passed",
+    "uiScope": "No new deterministic UI findings"
+  },
+  "browser": {
+    "routes": [
+      "/system/ai/skills",
+      "/system/ai/model-config",
+      "/system/ai/workflows"
+    ],
+    "duplicateClassificationNavCount": 0,
+    "viewportWidths": [
+      1440,
+      760
+    ],
+    "narrowPageWidth": 760,
+    "nativeViewportRestored": true,
+    "screenshots": [
+      "skills-without-page-nav.png",
+      "system-nav-1440.png",
+      "system-nav-760.png"
+    ]
+  },
+  "noMergeOrPush": true,
+  "localCommits": {
+    "backend": "47609f5",
+    "workbench": "1bab599",
+    "systemNavigation": "6c8cc5c"
+  },
+  "deliveryState": "隔离预览已加载，本地提交；未合并主线、未推送，待用户验收"
+}

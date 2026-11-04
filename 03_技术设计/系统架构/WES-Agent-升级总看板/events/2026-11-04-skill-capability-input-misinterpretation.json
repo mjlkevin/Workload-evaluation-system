@@ -1,0 +1,181 @@
+{
+  "id": "BE-2026-11-04-skill-capability-input-misinterpretation",
+  "date": "2026-11-04",
+  "type": "defect",
+  "issueId": "ISS-2026-11-04-002",
+  "defectId": "DEF-2026-11-04-001",
+  "relatedRequirements": [
+    "RP-050"
+  ],
+  "dedup": "未命中同类语义缺陷，新增ISS-2026-11-04-002；与布局问题ISS-2026-11-04-001相关但独立",
+  "originalFeedback": "你看看我刚才的输入",
+  "observedInput": "这个skill能做什么？",
+  "selectedSkill": "B批验收_需求拆解试运行",
+  "runId": "dc4ddbc2-a8c8-4ccb-8d6b-760878166f36",
+  "actual": [
+    "查询这个skill能做什么",
+    "导出这个skill能做什么"
+  ],
+  "expected": "说明所选技能的用途/适用输入，或明确此输入不适用并请求业务材料；不能编造查询和导出诉求。",
+  "disposition": "defect",
+  "priority": "P1",
+  "severity": "S2",
+  "status": "open / 本地修复，待用户验收",
+  "rootCauseEvidence": {
+    "source": "隔离预览库只读实取本次Run使用的已发布版本；未修改任何业务或模型配置",
+    "skillVersionId": "fd1af881-5689-4c81-b322-cf3b4bb30ab1",
+    "versionCode": "SK-729a4d0e-VB.0",
+    "status": "published",
+    "instructions": "将原始文本拆解为独立需求条目，保留查询和导出两个动作。只输出符合输出 Schema 的 JSON，不补充未提及的需求。",
+    "inputContract": "text: string;required",
+    "outputContract": "requirements: string[];minItems:2",
+    "interpretation": "验收用定义把样本中的查询/导出写成通用指令，并至少要求两项；输入框选标签后固定进入执行通道，未将能力询问单独处理。结构通过及Run已完成均不证明语义正确。"
+  },
+  "proposal": [
+    "将验收专用技能与正常业务目录隔离，避免作为通用技能使用",
+    "通过新版本修正按原文拆解与非适用输入契约，重新执行真实反例验证和审核发布，不修改既有不可变发布版本",
+    "带标签能力询问的交互处理另行确认具体方案，不在本次观察中添加正则意图路由"
+  ],
+  "acceptance": [
+    "同一能力询问不生成查询/导出需求",
+    "输入不包含对应业务动作时不能凭空补齐",
+    "正常查询/导出样本及来源约束仍保持正确",
+    "Run结构检查与业务语义验收分别记录"
+  ],
+  "verification": {
+    "web": {
+      "files": 101,
+      "passed": 992,
+      "failed": 0
+    },
+    "modules": {
+      "passed": 1174,
+      "total": 1176,
+      "failed": 2,
+      "skipped": 0,
+      "failures": [
+        "late authority after cancel cannot prepare model",
+        "late post-prepare checker after cancel cannot complete model"
+      ]
+    },
+    "focused": {
+      "conversationUnit": 13,
+      "persistence": 5,
+      "routesWithRecommendationRegression": 7
+    },
+    "buildApi": "passed",
+    "buildWeb": "passed",
+    "uiScope": "No new deterministic UI findings",
+    "audit": {
+      "existing": {
+        "moderate": 32,
+        "high": 12,
+        "critical": 1
+      },
+      "dependenciesChanged": false
+    },
+    "secretScan": "既有skills.recommendations.test.ts:L187占位夹具被inline-secret规则命中；未修改该测试或豁免",
+    "earlierFailuresPreserved": [
+      "/tmp/wes-skill-chat-web-final.log（并发负载时5例超时；单独复跑990通过，最终气泡新增后991通过）",
+      "/tmp/wes-skill-chat-modules.log（初次含新测试未接CI守卫及5例时序失败；已接CI，最终剩2例）"
+    ],
+    "ai": {
+      "passed": 286,
+      "failed": 0,
+      "skipped": 0
+    },
+    "integration": {
+      "passed": 0,
+      "failed": 1,
+      "reason": "templates_status_not_200，既有活动模板环境缺口保留"
+    },
+    "invocationAndHttpRegression": {
+      "passed": 28,
+      "failed": 0
+    },
+    "finalConversationFocus": {
+      "passed": 21,
+      "failed": 0
+    }
+  },
+  "screenshot": "/Users/kevin/.codex/visualizations/2026/11/04/01a1a4db-1dd5-7c33-9b3d-2077e4e7ccb4/skill-capability-question-result.png",
+  "implementationPerformed": true,
+  "pages": [
+    "issues",
+    "defects",
+    "requirements",
+    "design",
+    "runtime",
+    "plan",
+    "testing",
+    "monitoring",
+    "risks",
+    "changes",
+    "sources",
+    "index"
+  ],
+  "authorizedChange": "用户明确要求按LLM对话能力上下文方案实施：用途回答、任务执行、缺失信息追问；不使用关键词硬路由。",
+  "design": "docs/superpowers/specs/2026-11-04-skill-conversation-design.md",
+  "plan": "docs/superpowers/plans/2026-11-04-skill-conversation.md",
+  "implementation": "选择能力后由LLM先理解；reply/clarify原子存对话，execute校验后复用现有执行器；发布定义不修改",
+  "browserVerification": {
+    "url": "http://127.0.0.1:3006/",
+    "api": "http://127.0.0.1:3004",
+    "sessionId": "e912ccd3-3157-4567-b414-30110176c537",
+    "user": "mjlkevin",
+    "model": "kimi-k3",
+    "cases": [
+      {
+        "input": "这个skill能做什么？",
+        "actual": "自然语言用途介绍，无需求明细结果，无新增任务"
+      },
+      {
+        "input": "帮我拆解一下",
+        "actual": "请提供需要拆解的原始文本内容，我会将其拆解为独立的需求条目。无新增任务"
+      },
+      {
+        "input": "销售主管需要按客户查询销售订单，并将查询结果导出为Excel。",
+        "runId": "497b9f1e-34c3-4f57-a55e-6a0829d89091",
+        "actual": [
+          "销售主管需要按客户查询销售订单",
+          "销售主管需要将查询结果导出为Excel"
+        ]
+      },
+      {
+        "input": "请拆解这段需求：仓库管理员按日期查询入库单，并将查询结果导出。",
+        "runId": "a3551a8f-c04a-431a-9ba1-78738bf23188",
+        "actual": [
+          "仓库管理员按日期查询入库单",
+          "仓库管理员将查询结果导出"
+        ]
+      }
+    ],
+    "refresh": "用途和追问恢复；标签恢复；执行后原始用户消息完整且只出现一次；验收会话最终2个completed Run、6条普通消息",
+    "projectionRepair": "首次真实任务发现混合历史回落漏用户正文；从原canonical user/message事件幂等补投影；第二次真实任务自动路径验证通过",
+    "viewports": {
+      "desktop": 1440,
+      "narrow": 760,
+      "narrowPageWidth": 760,
+      "narrowComposerWidth": 647,
+      "nativeRestored": 1543
+    },
+    "senderStyles": {
+      "user": "右侧 / 浅品牌色底 / 你",
+      "assistant": "左侧 / 表面色底 / AI"
+    },
+    "screenshots": [
+      "message-senders-final.png",
+      "message-senders-1440.png",
+      "message-senders-760.png",
+      "skill-conversation-clarify.png"
+    ],
+    "screenshotDirectory": "/Users/kevin/.codex/visualizations/2026/11/04/01a1a4db-1dd5-7c33-9b3d-2077e4e7ccb4"
+  },
+  "evidence": "docs/superpowers/evidence/2026-11-04-skill-conversation-and-message-senders.json",
+  "localCommits": {
+    "backend": "47609f5",
+    "workbench": "1bab599",
+    "systemNavigation": "6c8cc5c"
+  },
+  "deliveryState": "隔离预览已加载，本地提交；未合并主线、未推送，待用户验收"
+}

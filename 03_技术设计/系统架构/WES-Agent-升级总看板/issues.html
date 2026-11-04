@@ -49,15 +49,9 @@
         <div class="meta">
           <span><b>定位</b> 用户原始反馈、截图、疑问和未定性现象的第一入口</span>
           <span><b>流转</b> Issue → triage → Defect / Requirement / Risk / Close</span>
-          <span><b>更新日期</b> 2026-09-23</span>
+          <span><b>更新日期</b> 2026-11-04</span>
         </div>
-        <div class="pill-row" style="margin-top:18px">
-          <span class="pill brand">41 问题（38 个编号，ISS-2026-09-03-003/004/005 各撞号 1 次）</span>
-          <span class="pill warn">3 待分诊/待裁决</span>
-          <span class="pill warn">20 转缺陷</span>
-          <span class="pill brand">8 转需求</span>
-          <span class="pill">10 不转/关闭/治理</span>
-        </div>
+        <div class="pill-row" style="margin-top:18px"><span class="pill brand">43 问题（40 个编号，历史撞号3次保留）</span><span class="pill warn">4 待分诊/待裁决</span><span class="pill warn">21 转缺陷</span><span class="pill brand">9 转需求</span><span class="pill">9 不转/关闭/治理</span></div>
       </div>
     </div>
 
@@ -96,6 +90,7 @@
             <col style="width:11%">
           </colgroup>
           <tr><th>ID</th><th>日期</th><th>标题</th><th>来源</th><th>原始反馈</th><th>证据</th><th>分析状态</th><th>分流</th><th>下一步</th></tr>
+<tr data-board-event-id="BE-2026-11-04-skill-capability-input-misinterpretation:issues"><td class="mono">ISS-2026-11-04-002</td><td>2026-11-04</td><td>询问技能用途被误拆成业务需求</td><td>用户实测 / AI工作台</td><td>选中验收Skill询问“这个skill能做什么？”，被生成查询和导出两条需求。</td><td><a href="events/2026-11-04-skill-capability-input-misinterpretation.json">实际Run、发布指令与截图</a></td><td><span class="status run">本地修复</span></td><td>转缺陷 · DEF-2026-11-04-001</td><td>P1；LLM先理解再决定回答/追问/执行；真实反例已回归，待用户验收。</td></tr>
             <tr data-board-event-id="BE-2026-10-21-system-controls-polish:issues">
               <td class="mono">ISS-2026-10-21-001</td><td>2026-10-21</td><td>系统管理对象展示不统一（控件优化 → 全模块列表化方案）</td><td>用户截图及后续设计调研请求</td>
               <td>用户要求系统管理下各业务对象统一为清晰的列表展示，并与系统风格一致；本轮先调研和方案。<details><summary>原始截图反馈</summary>“这里的前端控件做的太丑了，帮我重新设计实现一下”；涉及分组导航、搜索筛选、折叠列表。</details></td>
@@ -558,6 +553,8 @@
     </section>
 <section class="section" data-board-event-id="BE-2026-11-04-composer-skill-invocation:issues"><h2>工作台 / 技能调用 · 技术验证完成</h2><p>命中 ISS-2026-11-04-001，扩展 RP-050。/ 搜索、单项可移除标签、提示词与附件统一发送已实现；缺参补齐，失败保留草稿，切会话隔离。</p><p>Web 988/988、定向36及构建通过；实际Skill完成两条需求拆解。模块1157/1159，既有取消/超时2例保留，隔离66/66；目录性能观察保留。</p><p>1440/760浏览器验证完成，用户验收待回填。<a href="events/2026-11-04-composer-skill-invocation.json">验证证据与边界</a> · <a href="../../../docs/superpowers/specs/2026-11-04-composer-skill-invocation-design.md">批准设计</a> · <a href="../../../docs/superpowers/plans/2026-11-04-composer-skill-invocation.md">实施计划</a>。本地候选，未合主线、未推送。</p></section>
 <section class="section" data-board-event-id="BE-2026-11-04-workbench-remove-inspector:issues"><h2>工作台移除右侧摘要 · 本地实现</h2><p>命中 ISS-2026-11-04-001 / RP-050。按用户指定方案移除整个右侧工作区及折叠空列；执行、确认、结果统一在中央，旧会话确认、材料、产物和关联仍可访问。</p><p>Web990/990、构建和UI范围检查通过；模块1156/1159及隔离65/66，取消/超时时序失败保留，未改后端逻辑或测试预算。</p><p><a href="events/2026-11-04-workbench-remove-inspector.json">实取验证与浏览器证据</a>；左下角色快捷提问保持原样。本地候选，未合主线、未推送；用户验收待回填。</p></section>
+<section class="section" data-board-event-id="BE-2026-11-04-remove-system-page-nav:issues"><h2>系统管理菜单独立页面 · 本地实现</h2><p>命中ISS-2026-10-21-001 / RP-065。按用户要求移除正文内两层分类导航；左侧菜单直接进入页面，原路由、书签跳转及业务内容保留。</p><p>导航专项13/13，完整Web992/992、构建和两个表面分别UI范围检查通过。实际Skill/模型/Workflow入口及1440/760已验证，分类导航0处。<a href="events/2026-11-04-remove-system-page-nav.json">证据与截图</a>；候选待用户验收，未合主线未推送。</p></section>
+<section class="section" data-board-event-id="BE-2026-11-04-execution-parameters:issues"><h2>执行参数与用户原话 · 已区分</h2><p>命中ISS-2026-11-04-001 / RP-050。初始执行输入为参数快照，并非用户另发消息；改为左侧中性执行参数记录且默认折叠，原数据不变。消息专项36/36，实际展开核对原文，后台真实Run不变。</p><p><a href="events/2026-11-04-message-sender-distinction.json">截图、问题与检查结果</a>。用户确认/补充记录保留，未把系统执行记录冒充LLM自然语言回复。</p></section>
 </main>
   </div>
   <footer>问题池 · WES 项目管理 · 2026-09-02</footer>

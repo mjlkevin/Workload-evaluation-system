@@ -295,6 +295,7 @@ knowledge feedback
       <a href="index.html">返回总览</a> · AI 任务执行 · WES 项目管理 · 2026-08-03
     </footer>
   <section data-board-event-id="BE-2026-11-04-message-timeline-core:runtime"><h2>业务消息与执行事实</h2><p>消息流展示真实交互；服务端Run仍是执行权威。</p><details data-tech-collapse><summary>投影与批准边界</summary><p>执行历史是现有服务端事实的只读投影：验证所属用户、会话和重试血缘，仅输出白名单业务值，历史缺失标partial；阶段保留稳定逻辑身份和真实物理来源，不造时间。readSummary仅缩减内部摘要读取范围，完整快照仍返回严格timeline。当前待办沿用既有确认、哈希和幂等接口，历史决定不授予当前操作权；不增加轮询、消息表或执行状态缓存。</p></details></section>
+<section class="section" data-board-event-id="BE-2026-11-04-skill-conversation:runtime"><h2>对话判断与真实执行 · 两类状态分开</h2><p>reply/clarify只持久化成对消息，不创建Harness任务；execute进入既有幂等队列。已接受任务的canonical用户事实幂等投影回快照，保留既有整会话历史回落规则。模型等待不持DB锁。</p><p><a href="events/2026-11-04-skill-capability-input-misinterpretation.json">原问题与回归</a> · <a href="events/2026-11-04-message-sender-distinction.json">消息来源优化</a> · <a href="../../../docs/superpowers/evidence/2026-11-04-skill-conversation-and-message-senders.json">完整验证证据</a></p></section>
 </main>
   <script src="assets/board-ui.js" defer></script>
 </body>
