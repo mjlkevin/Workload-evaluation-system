@@ -36,11 +36,14 @@ export default function MessageBubble({
   const showMetaBar = !message.loading && !message.error && Boolean(message.text)
   const metaAlign = isUser ? 'justify-end' : 'justify-start'
   return (
-    <article className="ai-msg-row min-w-0" style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
-      <div className="ai-msg-col" style={{ width: hasArtifacts ? 'min(100%, 1080px)' : undefined, maxWidth: hasArtifacts ? '100%' : (isUser ? '70%' : '76%') }}>
+    <article aria-label={isUser ? '你发送的消息' : 'AI 回复'} className={`ai-msg-row flex min-w-0 ${isUser ? 'justify-end' : 'justify-start'}`}>
+      <div className={`ai-msg-col ${hasArtifacts ? 'w-full max-w-full' : isUser ? 'max-w-[92%] sm:max-w-[78%]' : 'w-full max-w-full sm:max-w-[92%]'}`}>
+      <div className={`mb-1 flex items-center gap-2 text-xs font-medium text-ink-2 ${isUser ? 'justify-end' : 'justify-start'}`}>
+        <span aria-hidden="true" className={`flex h-5 min-w-5 items-center justify-center rounded-sm px-1 text-xs ${isUser ? 'bg-brand-soft text-brand-ink' : 'bg-ink text-surface'}`}>{isUser ? '●' : '✦'}</span>
+        <span>{isUser ? '你' : 'AI'}</span>
+      </div>
       <div
-        className={`ai-bubble-wrap break-words ${isUser ? 'text-right font-medium' : 'text-left font-normal'}${message.error ? ' border-l-2 border-err pl-2.5' : ''}`}
-        style={{ position: 'relative' }}
+        className={`ai-bubble-wrap relative min-w-0 break-words rounded-lg border px-4 py-3 text-left font-normal ${isUser ? 'whitespace-pre-wrap border-brand/10 bg-brand-soft text-ink' : 'border-line bg-surface text-ink'}${message.error ? ' border-l-2 border-l-err' : ''}`}
       >
         {/* ISS-2026-08-10-005：思考轨迹移到回答正文上方（对标业内：思考在上、回答在下）；
             2026-08-17 起合并进统一的 ThinkingTrace（原 thoughts 内联块 + ModelRunTrace）。 */}
@@ -58,7 +61,7 @@ export default function MessageBubble({
             toolActionState={toolActionState}
           />
         )}
-        {isUser && invocation && <span aria-label={`已调用 ${invocation.kind === 'skill' ? 'Skill' : '流程'} ${invocation.target.name}`} className="mb-2 inline-flex max-w-full items-center gap-2 rounded-md border border-line bg-brand-soft px-2 py-1 text-xs text-brand-ink">
+        {isUser && invocation && <span aria-label={`${message.skillContext ? '已选择' : '已调用'} ${invocation.kind === 'skill' ? 'Skill' : '流程'} ${invocation.target.name}`} className="mb-2 inline-flex max-w-full items-center gap-2 rounded-md border border-line bg-brand-soft px-2 py-1 text-xs text-brand-ink">
           <span>{invocation.kind === 'skill' ? 'Skill' : '流程'}</span><span className="min-w-0 break-words">{invocation.target.name}</span>
         </span>}
         {message.loading ? (

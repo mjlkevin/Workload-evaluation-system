@@ -46,3 +46,7 @@ export async function decideBusinessAction(runId, pending, decision) {
 export async function retryBusinessExecution(runId, { submissionKey, reason }) {
   return unwrap(await apiClient.post(`${runPath(runId)}/retry`, { submissionKey, reason }, options))
 }
+
+export async function sendSkillConversation(sessionId, { submissionKey, content, selection, sources = [] }) {
+  return unwrap(await apiClient.post('/ai-executions/conversation', { sessionId, submissionKey, content, selection, sources }, options))
+}

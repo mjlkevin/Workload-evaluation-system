@@ -46,7 +46,7 @@ export default function Composer({ composer, setComposer, sending, selectedFile,
     <div className="ai-composer">
       <div className="ai-composer__inner relative">
         {slash && <ComposerTaskPicker key={taskScope} query={slash.query} activeIndex={activeIndex} setActiveIndex={setActiveIndex} onSelect={selectTask} onItems={setItems} listId={listId} />}
-        {selectedTask && <div className="mb-2 flex min-w-0 flex-wrap items-center gap-2" aria-label="已选择业务任务">
+        {selectedTask && <div className="mb-2 flex min-w-0 flex-wrap items-center gap-2" aria-label="已选择能力">
           <span className="inline-flex max-w-full items-center gap-2 rounded-md border border-line bg-brand-soft px-2 py-1 text-sm text-brand-ink">
             <span className="shrink-0 text-xs">{selectedTask.kind === 'skill' ? 'Skill' : '流程'}</span><span className="min-w-0 break-words">{selectedTask.name}</span>
             <button type="button" disabled={sending} className="shrink-0 rounded-sm border-0 bg-transparent px-1 text-inherit hover:bg-bg-soft" aria-label={`移除 ${selectedTask.kind === 'skill' ? 'Skill' : '流程'} ${selectedTask.name}`} onClick={() => { onRemoveTask(); editorRef.current?.focus() }}>×</button>
@@ -89,7 +89,7 @@ export default function Composer({ composer, setComposer, sending, selectedFile,
             onClick={event => readCommand(event.target)}
             onBlur={event => { if (!event.relatedTarget?.closest('[aria-label="技能清单"]')) setSlash(null) }}
             onKeyDown={handleComposerKeyDown}
-            placeholder={selectedTask ? `给${selectedTask.name}的提示词…` : `${placeholder || "输入消息"} 输入 / 选择 Skill 或流程。`}
+            placeholder={selectedTask ? `向${selectedTask.name}提问或描述任务…` : `${placeholder || "输入消息"} 输入 / 选择 Skill 或流程。`}
             className="ai-composer__textarea"
           />
           <button className="ai-composer__send" type="button" onClick={onSend} disabled={sending || !!slash} aria-label="发送消息" title="发送消息">

@@ -68,7 +68,7 @@ export default function MessageList({ messages, paneRef, activeWorkflow, centerT
           if (message.type !== 'business') {
             const source = message.role === 'user' && normalizeProjectionSource(message.projectionSource)
             const invocation = source && business?.runs?.find(run => run.sessionId === sessionId && run.runId === source.runId)?.businessExecution
-            return <MessageBubble key={message.id || `${message.role}-${index}`} message={message} index={index} {...bubbleProps} invocation={invocation} />
+            return <MessageBubble key={message.id || `${message.role}-${index}`} message={message} index={index} {...bubbleProps} invocation={invocation || message.skillContext} />
           }
           const run = business?.runs?.find(item => item.runId === message.currentRunId)
           const first = !seenRoots.has(message.rootRunId)

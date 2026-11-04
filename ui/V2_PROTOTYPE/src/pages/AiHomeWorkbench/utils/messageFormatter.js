@@ -435,6 +435,13 @@ export function normalizeSuggestedActions(value) {
   return actions.length ? actions : undefined
 }
 
+// Public identity only; instructions, sources and decision internals never enter bubble props.
+export function normalizeSkillContext(value) {
+  const selection = value?.selection
+  if (!['reply', 'clarify'].includes(value?.action) || !['skill', 'workflow'].includes(selection?.kind)
+    || !['id', 'versionId', 'name'].every(key => typeof selection[key] === 'string' && selection[key])) return undefined
+  return { kind: selection.kind, target: { id: selection.id, versionId: selection.versionId, name: selection.name } }
+}
 // Only the persisted business-start identity is exposed; other metadata stays private.
 export function normalizeProjectionSource(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)
@@ -493,6 +500,7 @@ export function mapSessionMessages(session) {
         suggestedActions,
         intent,
         model,
+        ...(normalizeSkillContext(metadata.skillConversation) ? { skillContext: normalizeSkillContext(metadata.skillConversation) } : {}),
         ...(normalizeProjectionSource(metadata.projectionSource) ? { projectionSource: normalizeProjectionSource(metadata.projectionSource) } : {}),
       }
     })

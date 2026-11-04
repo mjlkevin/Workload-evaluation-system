@@ -7,7 +7,6 @@ import useChatMessages from './hooks/useChatMessages.js'
 import useHarnessRun from './hooks/useHarnessRun.js'
 import useBusinessExecution from './hooks/useBusinessExecution.js'
 import useComposerBusinessTask from './hooks/useComposerBusinessTask.js'
-import ComposerTaskParameters from './components/ComposerTaskParameters.jsx'
 import { buildBusinessConversationEntries, groupBusinessConversationEntries } from './utils/businessMessageTimeline.js'
 import useWorkbenchState from './hooks/useWorkbenchState.js'
 import ChatArea from './components/ChatArea/index.jsx'
@@ -32,14 +31,14 @@ export default function AiHomeWorkbench({ currentUser }) {
   // cancel 唯一入口仅由用户显式点击停止并经二次确认后触发。
   const backgroundRuns = useBackgroundRuns()
   const business = useBusinessExecution(workbench.activeSession?.sessionId)
-  const conversation = useMemo(() => groupBusinessConversationEntries(buildBusinessConversationEntries(
-    chat.messages, business.runs, { sessionId: workbench.activeSession?.sessionId || '' },
-  )), [chat.messages, business.runs, workbench.activeSession?.sessionId])
   const invocation = useComposerBusinessTask({ workbench, userId: currentUser?.id || currentUser?.userId, onStarted: () => {
     business.refresh()
     workbench.refreshUnifiedView?.()
     backgroundRuns.notifyRunsChanged?.()
   } })
+  const conversation = useMemo(() => groupBusinessConversationEntries(buildBusinessConversationEntries(
+    [...chat.messages, ...invocation.pendingMessages], business.runs, { sessionId: workbench.activeSession?.sessionId || '' },
+  )), [chat.messages, invocation.pendingMessages, business.runs, workbench.activeSession?.sessionId])
   const sessionRuns = useMemo(() => {
     const map = {}
     backgroundRuns.runs.forEach((run) => { if (run.sessionId) map[run.sessionId] = run })
@@ -190,7 +189,6 @@ export default function AiHomeWorkbench({ currentUser }) {
 
       <ChatArea preset={workbench.preset} workbench={{ ...workbench, backgroundRuns }} chat={{ ...chat, sendMessage: sendMessageWithRunsNotify }} harness={harness} conversation={conversation} business={business} invocation={invocation} />
 
-      <ComposerTaskParameters invocation={invocation} />
 
       {workbench.deleteTargetSession && (
         <ConfirmDialog

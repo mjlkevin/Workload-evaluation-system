@@ -114,3 +114,12 @@ describe('RP-056 MessageBubble 复制控件 + 时间戳', () => {
     expect(screen.queryByText('kimi-k2-turbo-preview')).not.toBeInTheDocument()
   })
 })
+
+test('消息来源有可见文字和语义名称，用户靠右浅色气泡，AI靠左', () => {
+ const {rerender} = render(<MessageBubble message={{id:'u',role:'user',text:'第一行\n第二行'}} />)
+ const user = screen.getByRole('article',{name:'你发送的消息'});expect(screen.getByText('你')).toBeVisible()
+ expect(user).toHaveClass('justify-end');expect(user.querySelector('.ai-bubble-wrap')).toHaveClass('bg-brand-soft','text-left')
+ expect(user.querySelector('.ai-bubble-wrap')).toHaveClass('whitespace-pre-wrap')
+ rerender(<MessageBubble message={{id:'a',role:'assistant',text:'模型回复'}} />)
+ const assistant=screen.getByRole('article',{name:'AI 回复'});expect(screen.getByText('AI')).toBeVisible();expect(assistant).toHaveClass('justify-start');expect(assistant.querySelector('.ai-bubble-wrap')).toHaveClass('bg-surface')
+})

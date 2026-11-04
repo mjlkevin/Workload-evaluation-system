@@ -9,8 +9,8 @@ it('真实工作台路由通过 / 选择标签，发送时携带提示词；选�
   let starts = 0, payload
   server.use(
     http.get('/api/v1/ai-executions/runs', () => HttpResponse.json({ data: { items: [] } })),
-    http.get('/api/v1/ai-executions/catalog', () => HttpResponse.json({ data: { items: [{ kind: 'skill', id: 'skill-a', name: '整理需求', inputSchema: { type: 'object', properties: {text:{type:'string'}}, required:['text'] } }] } })),
-    http.post('/api/v1/ai-sessions/:id/runs', async ({ request }) => { starts++; payload=await request.json(); return HttpResponse.json({ data: { runId: 'run-a' } }) }),
+    http.get('/api/v1/ai-executions/catalog', () => HttpResponse.json({ data: { items: [{ kind: 'skill', id: 'skill-a', versionId: 'v1', name: '整理需求', inputSchema: { type: 'object', properties: {text:{type:'string'}}, required:['text'] } }] } })),
+    http.post('/api/v1/ai-executions/conversation', async ({ request }) => { starts++; payload=await request.json(); return HttpResponse.json({ data: { action: 'execute', run: { runId: 'run-a' } } }) }),
   )
   render(<ToastProvider><MemoryRouter><HomePage /></MemoryRouter></ToastProvider>)
   const box=await screen.findByRole('textbox',{name:'AI 工作台输入'})
@@ -23,5 +23,5 @@ it('真实工作台路由通过 / 选择标签，发送时携带提示词；选�
   fireEvent.click(screen.getByRole('button',{name:'发送消息'}))
   await screen.findByRole('button',{name:'发送消息',enabled:true})
   await waitFor(()=>expect(starts).toBe(1))
-  expect(payload).toMatchObject({content:'请拆解销售需求',execution:{kind:'skill',skillId:'skill-a',input:{text:'请拆解销售需求'}}})
+  expect(payload).toMatchObject({content:'请拆解销售需求',selection:{kind:'skill',id:'skill-a',versionId:'v1'}})
 })

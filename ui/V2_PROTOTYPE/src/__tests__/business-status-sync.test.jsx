@@ -118,7 +118,7 @@ describe('业务执行与统一视图计数对账', () => {
     refreshUnifiedView = vi.fn()
     workbench = { activeSession: { sessionId: 'session-a' }, sessions: [], preset: { workflows: [] }, workspacePanelCollapsed: false, composer: '真实提示词', setComposer: vi.fn(), setSelectedFile: vi.fn() }
     businessApi.listExecutionCatalog.mockResolvedValue([{kind:"skill",id:"skill-a",name:"测试",inputSchema:{type:"object",properties:{}}}])
-    businessApi.startBusinessExecution.mockResolvedValue({runId:"business-1"})
+    businessApi.sendSkillConversation.mockResolvedValue({action:"execute",run:{runId:"business-1"}})
     businessApi.listBusinessRuns.mockImplementation(async id => serverRuns.filter(run => run.sessionId === id))
     runsApi.getRunSnapshot.mockImplementation(async id => ({ run: serverRuns.find(run => run.runId === id), businessExecution: { kind: 'workflow', target: { name: '业务流程' } } }))
     useWorkbenchState.mockImplementation(() => {

@@ -141,3 +141,13 @@ it('消息级别不重复显示执行操作；独立执行操作保留原重试�
   fireEvent.click(screen.getByRole('button', { name: '停止执行' })); expect(onStop).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: '确认停止' })); await waitFor(() => expect(onStop).toHaveBeenCalledWith('actual-run'))
 })
+
+it('系统整理的执行输入是中性折叠记录，不冒充用户的右侧消息', () => {
+ render(<BusinessExecutionMessage entry={record('input',{title:'任务输入',status:'recorded',content:{text:'整理后的执行参数'}})} run={run} />)
+ const article=screen.getByRole('article',{name:'执行参数'})
+ expect(article).not.toHaveClass('ml-auto','bg-brand-soft')
+ expect(screen.queryByText('整理后的执行参数')).not.toBeInTheDocument()
+ expect(screen.getByText('查看执行参数').closest('details')).not.toHaveAttribute('open')
+ expand('查看执行参数')
+ expect(screen.getByText('整理后的执行参数')).toBeInTheDocument()
+})

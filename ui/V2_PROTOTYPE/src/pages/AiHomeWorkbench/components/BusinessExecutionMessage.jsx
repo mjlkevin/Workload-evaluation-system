@@ -57,11 +57,13 @@ function ReadOnlyQuestion({ entry }) {
  */
 export default function BusinessExecutionMessage({ entry, run, busy = false, error = '', onInput, onDecision, resourceOptions = {} }) {
   const wait = ['question', 'confirmation'].includes(entry.kind) ? currentWait(entry, run) : null
-  const user = ['input', 'answer', 'decision'].includes(entry.kind)
+  const user = ['answer', 'decision'].includes(entry.kind)
+  const title = entry.kind === 'input' ? '执行参数' : entry.kind === 'coverage' ? '部分执行记录不可用' : entry.title
   const decision = entry.kind === 'decision' && typeof entry.content?.approved === 'boolean'
     ? entry.content.approved ? '已确认' : '已拒绝' : null
   const status = decision || statuses[entry.status] || entry.status
   const body = () => {
+    if (entry.kind === 'input') return <Collapsed title="查看执行参数"><BusinessValue value={entry.content} /></Collapsed>
     if (entry.kind === 'coverage') return <p className="m-0 text-sm text-ink-2">部分执行记录不可用；此处仅展示已保存的业务事实。</p>
     if (entry.kind === 'stage') return (entry.content !== undefined || entry.details?.length > 0) && (
       <Collapsed title="分析与工具明细">
@@ -82,10 +84,10 @@ export default function BusinessExecutionMessage({ entry, run, busy = false, err
     return <BusinessValue value={entry.content} />
   }
   return (
-    <article tabIndex={-1} id={businessEntryDomId(entry)} aria-label={entry.kind === 'coverage' ? '部分执行记录不可用' : entry.title}
+    <article tabIndex={-1} id={businessEntryDomId(entry)} aria-label={title}
       className={`grid min-w-0 gap-2 text-ink ${user ? 'ml-auto max-w-full rounded-lg bg-brand-soft p-3 sm:max-w-4/5' : entry.kind === 'stage' ? 'border-l-2 border-line pl-3' : 'rounded-md border border-line bg-surface p-4'}`}>
       <header className="flex flex-wrap items-center gap-2">
-        <h3 className="m-0 text-sm font-semibold">{entry.kind === 'coverage' ? '部分执行记录不可用' : entry.title}</h3>
+        <h3 className="m-0 text-sm font-semibold">{title}</h3>
         {status && <span className={`text-xs ${entry.status === 'failed' ? 'text-err-ink' : entry.status === 'rejected' ? 'text-warn-ink' : 'text-ink-2'}`}>{status}</span>}
       </header>
       {body()}
