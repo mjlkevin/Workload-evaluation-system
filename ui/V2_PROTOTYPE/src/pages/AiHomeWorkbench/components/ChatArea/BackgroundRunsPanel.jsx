@@ -1,13 +1,8 @@
 import { useState } from 'react'
+import { railFocus } from '../../../../components/AiWorkbench/RailIcon.jsx'
 
 const ACTIVE_STATUSES = new Set(['queued', 'running', 'recovering', 'waiting'])
 const VISIBLE_ROW_LIMIT = 2
-
-function statusDotClassName(status) {
-  if (status === 'completed') return 'bg-ok'
-  if (status === 'failed' || status === 'cancelled') return 'bg-err'
-  return 'bg-brand animate-pulse'
-}
 
 /**
  * 后台任务面板：取代原来"一行文字徽标 + 单条当前会话停止横条"。
@@ -27,15 +22,21 @@ export default function BackgroundRunsPanel({ runs, runCounts, onStopRun }) {
   const hiddenCount = activeRuns.length - visibleRuns.length
 
   return (
-    <div className="flex flex-col gap-1.5 rounded-[10px] border border-line bg-bg-2 px-3 py-1.5 text-xs text-ink-2">
-      <span role="status">{`后台任务 进行中 ${runCounts.active} · 已完成 ${runCounts.completed}`}</span>
+    <section aria-label="后台任务" className="col-span-2 flex max-h-40 shrink-0 flex-col gap-2 overflow-y-auto border-b border-line px-1 pb-3 text-xs text-ink-2">
+      <span role="status" className="sr-only">{`后台任务 进行中 ${runCounts.active} · 已完成 ${runCounts.completed}`}</span>
+      <div aria-hidden="true" className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
+        <span className="mr-auto font-medium">后台任务</span>
+        <span><b className={runCounts.active ? 'font-semibold text-brand tabular-nums' : 'font-medium tabular-nums'}>{runCounts.active}</b> 进行中</span>
+        <span className="text-line-2">/</span>
+        <span><b className="font-medium tabular-nums">{runCounts.completed}</b> 已完成</span>
+      </div>
       {visibleRuns.map((run, idx) => (
         <div
           key={run.runId}
-          className={`flex items-center gap-2 ${idx === 0 ? '' : 'border-t border-line pt-1.5'}`}
+          className={`flex shrink-0 flex-wrap items-center gap-2 ${idx === 0 ? '' : 'border-t border-line pt-2'}`}
         >
-          <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-full ${statusDotClassName(run.status)}`} />
-          <span className="min-w-0 flex-1 truncate">{run.title || run.runId}</span>
+          <span className="w-full truncate text-xs text-ink" title={run.title || run.runId}>{run.title || run.runId}</span>
+          <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-full ${run.status === 'waiting' ? 'bg-warn-ink' : 'bg-brand'}`} />
           {run.status === 'waiting' && (
             <span className="shrink-0 font-bold text-warn-ink" title="这个任务停在写操作确认上，不点不会自己往下走">
               <span aria-hidden="true">! </span>等你确认
@@ -43,8 +44,7 @@ export default function BackgroundRunsPanel({ runs, runCounts, onStopRun }) {
           )}
           <button
             type="button"
-            className="btn btn-out shrink-0"
-            style={{ height: 24, padding: '0 10px', fontSize: 11 }}
+            className={`ml-auto min-h-7 shrink-0 cursor-pointer rounded-sm border border-line bg-transparent px-2 text-[11px] text-ink-2 hover:border-err hover:text-err-ink ${railFocus}`}
             onClick={() => onStopRun(run)}
             aria-label={`停止后台任务：${run.title || run.runId}`}
           >
@@ -56,11 +56,11 @@ export default function BackgroundRunsPanel({ runs, runCounts, onStopRun }) {
         <button
           type="button"
           onClick={() => setExpanded(true)}
-          className="cursor-pointer self-start border-0 bg-transparent p-0 text-[11px] text-ink-3 underline"
+          className={`min-h-7 cursor-pointer self-start rounded-sm border-0 bg-transparent p-0 text-[11px] text-brand ${railFocus}`}
         >
           还有 {hiddenCount} 项
         </button>
       )}
-    </div>
+    </section>
   )
 }

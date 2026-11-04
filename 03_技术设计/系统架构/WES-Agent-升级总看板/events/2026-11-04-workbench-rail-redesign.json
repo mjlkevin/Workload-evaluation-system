@@ -1,0 +1,159 @@
+{
+  "id": "BE-2026-11-04-workbench-rail-redesign",
+  "date": "2026-11-04",
+  "type": "implementation",
+  "issueId": "ISS-2026-11-04-001",
+  "relatedRequirements": [
+    "RP-050",
+    "RP-032",
+    "RP-033"
+  ],
+  "dedup": "命中 ISS-2026-11-04-001 / RP-050，扩展左栏设计范围；关联 RP-032/033，不新增编号。",
+  "originalFeedback": "用UI skills root重新设计这个区域（ai-home-rail）",
+  "disposition": "requirement",
+  "priority": "P2",
+  "scope": "AI工作台左栏",
+  "summary": "用户授权一次性重设计左栏：新建入口、搜索与紧凑会话列表、辅助任务及可折叠模板。",
+  "status": "本地实现及专项/浏览器验证完成；全量失败保留，用户验收待回填",
+  "pages": [
+    "issues",
+    "requirements",
+    "plan",
+    "testing",
+    "monitoring",
+    "changes"
+  ],
+  "boundaries": [
+    "仅既有React组件与Tailwind tokens桥接，依据AGENTS.md已有架构裁决；不新增依赖。",
+    "任务状态、停止确认、会话回调、模板选择语义保持；不触发真实任务或更改业务数据。",
+    "代码只写唯一活动目录；3006当前旧预览根目录，验证时接回主目录前端，API3004保持。"
+  ],
+  "confirmedRoots": [
+    {
+      "problem": "卡片层级重复，主入口只有加号",
+      "contract": "用户截图批注与UI层级规则",
+      "runtime": "3006当前1281×984截图，aside内三个卡片",
+      "owner": "AiHomeWorkbench/index.jsx及SessionRail.jsx"
+    },
+    {
+      "problem": "会话管理仅右键且选择行嵌套停止按钮；缺少检索入口",
+      "contract": "原生按钮语义、键盘与本次重设计授权",
+      "runtime": "当前SessionRail行role=button内含停止button，只有contextmenu入口",
+      "owner": "SessionRail.jsx"
+    },
+    {
+      "problem": "模板和任务卡片占据纵向空间",
+      "contract": "RP-032/033可达性",
+      "runtime": "当前截图模板在侧栏底部，独立固定区块",
+      "owner": "WorkflowTemplates.jsx及BackgroundRunsPanel.jsx"
+    }
+  ],
+  "plan": [
+    "先补搜索、独立操作、模板折叠的失败测试。",
+    "实现统一侧栏、主入口、紧凑会话行和辅助区域。",
+    "定向、全Web、模块、构建、UI范围检查；1440与760浏览器检查。"
+  ],
+  "acceptance": [
+    "搜索只过滤会话，不切换当前会话；空结果可清除。",
+    "新建、选择、右键与更多、停止确认保持。",
+    "模板可折叠，当前任务语义保持；桌面和窄屏可达。"
+  ],
+  "implementationPerformed": true,
+  "uiSkills": {
+    "category": "visual",
+    "selected": [
+      "ibelick/baseline-ui"
+    ],
+    "commands": [
+      "npx ui-skills start",
+      "npx ui-skills categories",
+      "npx ui-skills list --category visual",
+      "npx ui-skills get baseline-ui"
+    ],
+    "registry": "远程初期多次fetch失败，最终CLI读取成功；执行前已读取同版本本地baseline-ui。",
+    "architecture": "使用AGENTS.md已批准的Tailwind tokens桥接，项目Skill中禁止新引入Tailwind的旧条款不适用；不新增依赖或修改全局样式。"
+  },
+  "verification": {
+    "red": "workbench-rail 3/3失败；菜单外部点击焦点专项1失败/3通过，失败原因正确。",
+    "focused": "最终5文件72/72通过，零跳过；/tmp/wes-rail-focused-final.log。",
+    "web": "最终105文件：103通过/2失败，1005/1024通过，19失败，零跳过；assessment-frozen-basis18与draft-roundtrip1。",
+    "baseline": "只用临时Vite load插件把本次4个旧生产文件读回HEAD，不改工作区；assessment-frozen-basis18/18同样失败；另3个初轮超时系统页面基线及当前隔离均通过。",
+    "draftRecheck": "最终draft-roundtrip单测2/2，连同新侧栏4/4，共6/6；全量失败日志保留。",
+    "buildWeb": "通过；/tmp/wes-rail-build-final.log",
+    "uiScope": "No new deterministic UI findings；/tmp/wes-rail-scope-final.log",
+    "modules": "最终安全测试库1233/1236通过，3失败，零跳过：late authority after cancel cannot prepare model；late post-prepare checker after cancel cannot complete model；resolveKek环境隔离。初轮6失败保留；本轮未改后端。",
+    "logs": [
+      "/tmp/wes-rail-red.log",
+      "/tmp/wes-rail-focus-red.log",
+      "/tmp/wes-rail-focused.log",
+      "/tmp/wes-rail-recheck.log",
+      "/tmp/wes-rail-web-final.log",
+      "/tmp/wes-rail-baseline.log",
+      "/tmp/wes-rail-draft-recheck.log",
+      "/tmp/wes-rail-modules-safe.log",
+      "/tmp/wes-rail-modules-final.log",
+      "/tmp/wes-rail-focused-final.log"
+    ]
+  },
+  "browserEvidence": {
+    "url": "http://127.0.0.1:3006/",
+    "account": "mjlkevin",
+    "desktop": {
+      "viewport": 1440,
+      "pageWidth": 1440,
+      "railWidth": 260,
+      "nestedButtons": 0
+    },
+    "narrow": {
+      "viewport": 760,
+      "pageWidth": 760,
+      "railWidth": 647,
+      "listHeight": 180,
+      "listContentHeight": 322,
+      "lastRowReachedByTab": true,
+      "listScrollTop": 142,
+      "allThreeTemplatesVisible": true
+    },
+    "lowHeight": "1440×700；模板可见、会话独立滚动",
+    "interactions": [
+      "MVP筛选1/5，清除恢复5；不切换活跃会话。",
+      "模板折叠隐藏入口，重新展开可见。",
+      "更多入口聚焦首项，Escape返回触发器。"
+    ],
+    "screenshots": [
+      "rail-1440.png",
+      "rail-760.png",
+      "rail-1440x700.png",
+      "rail-final.png"
+    ],
+    "path": "/Users/kevin/.codex/visualizations/2026/11/04/01a1a670-524f-7c90-9f7d-d83601fdcac1",
+    "viewportReset": true,
+    "newBusinessMutation": false
+  },
+  "preview": {
+    "port": 3006,
+    "root": "/Users/kevin/AI/Workload-evaluation-system/ui/V2_PROTOTYPE",
+    "api": "http://127.0.0.1:3004",
+    "config": "/tmp/wes-rail-preview/vite.config.mjs",
+    "backendRestarted": false
+  },
+  "review": "五轴自查：原回调与停止二次确认保持；原生选择不嵌套按钮；菜单键盘/指针焦点分开；搜索不变更选择；仅现有tokens与React，不新增业务写入。",
+  "integrationState": "唯一活动目录main的本地未提交改动；未推送。",
+  "additionalPages": [
+    "design"
+  ],
+  "evidence": [
+    {
+      "ref": "ui/V2_PROTOTYPE/src/components/AiWorkbench/SessionRail.jsx",
+      "result": "已实现",
+      "summary": "搜索、独立原生选择与操作、菜单焦点"
+    },
+    {
+      "ref": "ui/V2_PROTOTYPE/src/__tests__/workbench-rail.test.jsx",
+      "result": "RED/GREEN",
+      "summary": "搜索、独立操作、模板折叠、焦点"
+    }
+  ],
+  "boardValidation": "board-build生成21页；board-consistency-check 0错误0警告；board-event-check通过。",
+  "boardScope": "同步issues、requirements、design、plan、testing、monitoring、changes。沿用既有编号，需求数量与阶段不变；事件为过程资产，不新增独立文档KPI。"
+}

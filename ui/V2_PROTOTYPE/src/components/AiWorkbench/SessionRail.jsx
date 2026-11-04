@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useToast } from '../../hooks/useToast.jsx'
 import { useSessionViews } from '../../hooks/useSessionRuntimeStore.js'
+import RailIcon, { railFocus } from './RailIcon.jsx'
 
 // RP-047 Batch D（Step 5）：会话运行状态七态徽标（文本+图标+颜色三通道，不只依赖颜色）
 const RUN_STATUS_BADGE = {
@@ -43,20 +44,28 @@ function formatSessionTime(isoStr) {
   return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${time}`
 }
 
-export default function SessionRail({ sessions = [], activeSessionId, onSelect, onNew, onDelete, onRename, sessionRuns = {}, onStop }) {
+export default function SessionRail({ sessions = [], activeSessionId, onSelect, onDelete, onRename, sessionRuns = {}, onStop }) {
+  const [query, setQuery] = useState('')
   const [ctxMenu, setCtxMenu] = useState(null) // { sessionId, session, x, y }
   const [renameTarget, setRenameTarget] = useState(null) // session object or null
   const [renameValue, setRenameValue] = useState('')
   const [renameSubmitting, setRenameSubmitting] = useState(false)
   const menuRef = useRef(null)
+  const menuTriggerRef = useRef(null)
   const renameInputRef = useRef(null)
   const toast = useToast()
   const sessionViews = useSessionViews()
 
-  const closeMenu = useCallback(() => setCtxMenu(null), [])
+  const closeMenu = useCallback((restoreFocus = false) => {
+    setCtxMenu(null)
+    if (restoreFocus) menuTriggerRef.current?.focus()
+  }, [])
 
   useEffect(() => {
     if (!ctxMenu) return
+    menuRef.current?.querySelector('button')?.focus()
+    const onKeyDown = (e) => { if (e.key === 'Escape') closeMenu(true) }
+    window.addEventListener('keydown', onKeyDown)
     const handle = (e) => {
       if (menuRef.current && menuRef.current.contains(e.target)) return
       closeMenu()
@@ -68,6 +77,7 @@ export default function SessionRail({ sessions = [], activeSessionId, onSelect, 
     }, 0)
     return () => {
       clearTimeout(timer)
+      window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('click', handle)
       window.removeEventListener('contextmenu', handle)
       window.removeEventListener('scroll', handle, true)
@@ -77,6 +87,7 @@ export default function SessionRail({ sessions = [], activeSessionId, onSelect, 
   const handleContextMenu = (e, session) => {
     e.preventDefault()
     e.stopPropagation()
+    menuTriggerRef.current = e.currentTarget
     // 视口边界检测
     const menuW = 170
     const menuH = 130
@@ -84,6 +95,16 @@ export default function SessionRail({ sessions = [], activeSessionId, onSelect, 
     const y = Math.min(e.clientY, window.innerHeight - menuH - 8)
     setCtxMenu({ sessionId: session.sessionId, session, x, y })
   }
+
+  const openActions = (e, session) => {
+    e.stopPropagation()
+    const rect = e.currentTarget.getBoundingClientRect()
+    menuTriggerRef.current = e.currentTarget
+    setCtxMenu({ sessionId: session.sessionId, session, x: Math.max(8, Math.min(rect.right - 170, window.innerWidth - 178)), y: Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - 138)) })
+  }
+
+  const normalizedQuery = query.trim().toLocaleLowerCase()
+  const filteredSessions = sessions.filter((session) => (session.title || '未命名会话').toLocaleLowerCase().includes(normalizedQuery))
 
   const handleCopySessionId = async () => {
     if (!ctxMenu) return
@@ -164,89 +185,49 @@ export default function SessionRail({ sessions = [], activeSessionId, onSelect, 
   }
 
   return (
-    <section style={{ border: '1px solid var(--line)', borderRadius: 12, background: '#fff', boxShadow: 'var(--shadow-1)', overflow: 'hidden', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-      <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 8 }}>
-        <b style={{ fontSize: 13 }}>会话</b>
-        <button type="button" className="btn btn-out" onClick={onNew} style={{ marginLeft: 'auto', height: 28, minWidth: 34 }} aria-label="新建会话" title="新建会话">＋</button>
+    <section aria-label="会话" className="flex min-h-0 flex-1 flex-col gap-3 max-[1180px]:h-64">
+      <div className="relative flex shrink-0 items-center">
+        <span className="pointer-events-none absolute left-3 text-ink-2"><RailIcon name="search" /></span>
+        <input type="search" aria-label="搜索会话" placeholder="搜索会话" value={query} onChange={(e) => setQuery(e.target.value)}
+          className={`h-9 w-full min-w-0 rounded-md border border-line bg-bg py-0 pr-9 pl-9 font-sans text-xs text-ink placeholder:text-ink-2 [&::-webkit-search-cancel-button]:hidden ${railFocus}`} />
+        {query && <button type="button" aria-label="清除搜索" onClick={() => setQuery('')} className={`absolute right-1 flex size-7 cursor-pointer items-center justify-center rounded-sm border-0 bg-transparent text-ink-2 hover:bg-bg-2 ${railFocus}`}><RailIcon name="close" className="size-3.5" /></button>}
       </div>
-      <div className="ai-session-list" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 6, flex: 1, overflowY: 'auto', minHeight: 0 }}>
-        {sessions.length ? sessions.map((session) => {
+      <div className="flex shrink-0 items-center justify-between px-1 text-xs text-ink-2">
+        <h2 className="m-0 text-xs font-medium">会话</h2>
+        <span className="text-[11px] tabular-nums">{normalizedQuery ? `${filteredSessions.length} / ${sessions.length}` : sessions.length}</span>
+      </div>
+      <div className="ai-session-list flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto" style={{ flex: 1, overflowY: 'auto' }}>
+        {filteredSessions.map((session) => {
           const active = activeSessionId === session.sessionId
           const title = session.title || '未命名会话'
           // G4：会话有活跃 Run 时行内出现“停止”入口（唯一 cancel 路径的第一步）
           const run = sessionRuns[session.sessionId]
           const badge = getSessionBadge(sessionViews[session.sessionId])
           return (
-            <div
-              key={session.sessionId}
-              role="button"
-              tabIndex={0}
-              onClick={() => onSelect?.(session)}
-              onContextMenu={(e) => handleContextMenu(e, session)}
-              onKeyDown={(e) => { if (e.key === 'Enter') onSelect?.(session) }}
-              aria-pressed={active}
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'stretch',
-                width: '100%',
-                minWidth: 0,
-                textAlign: 'left',
-                border: active ? '1.5px solid var(--accent)' : '1px solid var(--line)',
-                background: active ? 'var(--accent-soft)' : '#fff',
-                borderRadius: 8,
-                padding: '10px 12px',
-                fontFamily: 'inherit',
-                cursor: 'pointer',
-                transition: 'border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease',
-                flexShrink: 0,
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 600, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.4 }}>{title}</span>
-                {run && (
-                  <button
-                    type="button"
-                    aria-label={`停止后台任务：${run.title || run.runId}`}
-                    title="停止后台任务"
-                    onClick={(e) => { e.stopPropagation(); onStop?.(session) }}
-                    style={{
-                      flexShrink: 0,
-                      height: 20,
-                      padding: '0 8px',
-                      border: '1px solid var(--err, #dc2626)',
-                      borderRadius: 6,
-                      background: 'var(--err-soft, #fef2f2)',
-                      color: 'var(--err, #dc2626)',
-                      fontSize: 10.5,
-                      fontWeight: 700,
-                      fontFamily: 'inherit',
-                      cursor: 'pointer',
-                      lineHeight: 1,
-                    }}
-                  >
-                    停止
-                  </button>
-                )}
+            <div key={session.sessionId} className={`group flex shrink-0 items-start rounded-md ${active ? 'bg-brand-soft' : 'hover:bg-bg-soft'}`}>
+              <button type="button" role="button" onClick={() => onSelect?.(session)} onContextMenu={(e) => handleContextMenu(e, session)} aria-pressed={active}
+                className={`flex min-w-0 flex-1 cursor-pointer items-start gap-2.5 rounded-md border-0 bg-transparent px-2.5 py-3 text-left font-sans ${active ? 'text-brand-ink' : 'text-ink'} ${railFocus}`}>
+                <RailIcon name="chat" className={`mt-0.5 size-3.5 ${active ? 'text-brand' : 'text-ink-2'}`} />
+                <span className="flex min-w-0 flex-1 flex-col gap-1">
+                  <span className="truncate text-xs font-semibold leading-4" title={title}>{title}</span>
+                  {(session.createdAt || badge) && (
+                    <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+                      {session.createdAt && <span className="text-[11px] leading-4 text-ink-2 tabular-nums">{formatSessionTime(session.createdAt)}</span>}
+                      {badge && <span className={badge.className}><span aria-hidden="true">{badge.icon}</span><span>{badge.label}</span></span>}
+                    </span>
+                  )}
+                </span>
+              </button>
+              <div className="flex shrink-0 flex-col items-center gap-0.5 pt-2 pr-1">
+                <button type="button" aria-label={`更多操作：${title}`} aria-expanded={ctxMenu?.sessionId === session.sessionId} onClick={(e) => openActions(e, session)}
+                  className={`flex size-7 cursor-pointer items-center justify-center rounded-sm border-0 bg-transparent text-ink-2 hover:bg-line ${railFocus}`}><RailIcon name="more" /></button>
+                {run && <button type="button" aria-label={`停止后台任务：${run.title || run.runId}`} title="停止后台任务" onClick={() => onStop?.(session)}
+                  className={`min-h-7 cursor-pointer rounded-sm border-0 bg-transparent px-1 text-[11px] text-err-ink hover:bg-err-soft ${railFocus}`}>停止</button>}
               </div>
-              {(session.createdAt || badge) && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3, minWidth: 0 }}>
-                  {session.createdAt && (
-                    <span style={{ fontSize: 10.5, color: 'var(--ink-3)', lineHeight: 1.3, letterSpacing: '0.01em' }}>
-                      {formatSessionTime(session.createdAt)}
-                    </span>
-                  )}
-                  {badge && (
-                    <span className={badge.className}>
-                      <span aria-hidden="true">{badge.icon}</span>
-                      <span>{badge.label}</span>
-                    </span>
-                  )}
-                </div>
-              )}
             </div>
           )
-        }) : <span style={{ fontSize: 12, color: 'var(--ink-3)', padding: '8px 4px' }}>暂无历史会话</span>}
+        })}
+        {!filteredSessions.length && <p className="m-0 px-2 py-5 text-center text-xs leading-6 text-ink-2">{sessions.length ? '没有匹配的会话' : '暂无历史会话'}</p>}
       </div>
 
       {/* 右键菜单通过 Portal 渲染到 body，避免被 overflow:hidden 裁剪 */}

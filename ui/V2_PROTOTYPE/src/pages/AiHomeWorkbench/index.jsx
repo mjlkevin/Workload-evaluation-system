@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import CompanyLookupDialog from '../../components/AiWorkbench/CompanyLookupDialog.jsx'
 import SessionRail from '../../components/AiWorkbench/SessionRail.jsx'
+import RailIcon, { railFocus } from '../../components/AiWorkbench/RailIcon.jsx'
 import { useBackgroundRuns } from '../../hooks/useBackgroundRuns.jsx'
 import { sessionRuntimeStore } from '../../hooks/useSessionRuntimeStore.js'
 import useChatMessages from './hooks/useChatMessages.js'
@@ -168,13 +169,15 @@ export default function AiHomeWorkbench({ currentUser }) {
   return (
     <div className="ai-home-workbench" data-testid="ai-home-workbench" style={{ display: 'grid', gap: 16, height: '100%', minHeight: 0, overflow: 'hidden', padding: '12px 16px' }}>
       <h1 className="sr-only">AI 工作台</h1>
-      <aside className="ai-home-rail" style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
+      <aside aria-label="会话与工作流" className="ai-home-rail flex min-h-0 min-w-0 flex-col gap-4 overflow-hidden rounded-lg border border-line bg-surface p-3 max-[1180px]:grid max-[1180px]:grid-cols-2 max-[1180px]:items-start max-[600px]:flex">
+        <button type="button" onClick={handleStartNewSession} className={`col-span-2 flex min-h-10 w-full shrink-0 cursor-pointer items-center justify-center gap-2 rounded-md border border-brand bg-brand px-3 font-sans text-sm font-semibold text-surface hover:bg-brand-ink ${railFocus}`}>
+          <RailIcon name="plus" />新建会话
+        </button>
         <BackgroundRunsPanel runs={backgroundRuns.runs} runCounts={runCounts} onStopRun={requestStopRun} />
         <SessionRail
           sessions={workbench.sessions}
           activeSessionId={workbench.activeSession?.sessionId}
           onSelect={workbench.selectSession}
-          onNew={handleStartNewSession}
           onDelete={workbench.requestDeleteSession}
           onRename={workbench.renameSession}
           sessionRuns={sessionRuns}
