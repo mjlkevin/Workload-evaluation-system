@@ -1,0 +1,173 @@
+{
+  "id": "BE-2026-11-04-session-3378-confirmation-display",
+  "date": "2026-11-04",
+  "type": "verification",
+  "scope": "ISS-2026-11-04-001 / RP-050 中央消息流确认展示",
+  "summary": "用户反馈会话33782966-44d4-476f-b38e-6af1a96856cc未显示等待确认，复用已有中央消息流Issue进行只读排查。",
+  "status": "fixed_manual_pending",
+  "pages": [
+    "issues",
+    "changes",
+    "index",
+    "defects",
+    "plan",
+    "testing",
+    "monitoring",
+    "requirements",
+    "sources"
+  ],
+  "issueId": "ISS-2026-11-04-001",
+  "requirementId": "RP-050",
+  "originalRequest": "为什么 33782966-44d4-476f-b38e-6af1a96856cc 的等待确认没有显示出来",
+  "sessionId": "33782966-44d4-476f-b38e-6af1a96856cc",
+  "triage": "defect",
+  "boundary": "产品变更限前端审批去重；任务数据只读，未批准、重发、复位或创建云任务。",
+  "observed": "数据库最新Run816b62eb-8180-40ed-8412-0dca83755e3e状态waiting；3006前端主目录，3004 API候选目录；界面映射待核对。",
+  "defectId": "DEF-2026-11-04-004",
+  "blocking": false,
+  "userDecision": "继续修复并验证；不替用户点击同意",
+  "rootCause": "useChatMessages.toolTrail以整个会话的工具名+callIndex作为去重兜底，不同Run的第2次sandbox_execute碰撞，错误隐藏当前待确认卡。",
+  "evidence": [
+    {
+      "ref": "harness_run_events:816b62eb-8180-40ed-8412-0dca83755e3e:220",
+      "result": "待确认记录完整、HTTP200，历史同工具同序号遮蔽"
+    },
+    {
+      "ref": "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/hooks/useChatMessages.js",
+      "result": "审批按精确actionId去重"
+    },
+    {
+      "ref": "/tmp/wes-3378-approval-final.log",
+      "result": "42通过，实际控件可用且确认请求0"
+    },
+    {
+      "ref": "/tmp/wes-3378-web-isolated.log",
+      "result": "干净提交基线1003通过"
+    }
+  ],
+  "fixScope": "仅调整有actionId审批的去重优先级；无审批旧槽位行为保留，不改权限/确认端点，不改其他界面重设计。",
+  "acceptance": "原会话第2次待确认显示；同一actionId已在消息气泡显示时不重复；不会自动确认或执行。",
+  "initialBlocking": true,
+  "implementation": {
+    "files": [
+      "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/hooks/useChatMessages.js",
+      "ui/V2_PROTOTYPE/src/__tests__/tool-approval-ui.test.jsx"
+    ],
+    "behavior": "存在approval.actionId时仅按精确actionId去重；未批准的其他Run不会被历史工具槽位遮住；同一审批在气泡显示时不再复制到托盘。",
+    "noBackendChange": true,
+    "noApprovalSubmittedByThisTask": true,
+    "committed": true,
+    "pushed": true,
+    "sourceCommit": "5a75f00218766282d57b068b4838a1c946241440"
+  },
+  "verification": {
+    "red": {
+      "tests": 26,
+      "pass": 25,
+      "fail": 1,
+      "log": "/tmp/wes-3378-approval-red.log"
+    },
+    "targeted": {
+      "tests": 42,
+      "pass": 42,
+      "fail": 0,
+      "log": "/tmp/wes-3378-approval-final.log",
+      "includes": "挂载真实RunToolTray并验证同意/拒绝按钮可用，确认端点调用数0；追问/文件卡回归"
+    },
+    "isolatedCommittedBaseline": {
+      "base": "a0e59fd",
+      "testFiles": 102,
+      "tests": 1003,
+      "pass": 1003,
+      "fail": 0,
+      "log": "/tmp/wes-3378-web-isolated.log",
+      "scope": "仅叠加本次两源文件；后续仅加强同一回归的DOM断言，再跑专项和隔离定向。"
+    },
+    "mixedWorkspaceWeb": {
+      "testFiles": 106,
+      "tests": 1030,
+      "pass": 1000,
+      "fail": 30,
+      "log": "/tmp/wes-3378-web-full.log",
+      "scope": "包含独立SKU/系统管理/界面WIP，全量未通过；未改旧断言或清理其他工作。"
+    },
+    "modules": {
+      "tests": 1236,
+      "pass": 1235,
+      "fail": 1,
+      "skipped": 0,
+      "log": "/tmp/wes-3378-modules.log",
+      "failure": "resolveKek未配置分支：主目录已加载config.credentialKek，测试仅删除进程变量，仍读取配置回退；未修改凭据或测试断言，断言中的敏感值已脱敏。",
+      "isolatedFailedFile": {
+        "tests": 11,
+        "pass": 11,
+        "fail": 0,
+        "log": "/tmp/wes-3378-credentials-isolated-driver.log"
+      }
+    },
+    "buildWeb": "主目录与隔离基线均通过",
+    "uiScope": "无新增确定性UI问题",
+    "peerReview": "两源文件限定复核无Critical/Important blocker"
+  },
+  "runtimeAfter": {
+    "run": "816b62eb-8180-40ed-8412-0dca83755e3e",
+    "confirmationSequence": 221,
+    "confirmationAt": "2026-11-04T12:39:44.335Z",
+    "finalStatus": "completed",
+    "eventSequence": 500,
+    "updatedAt": "2026-11-04T12:41:47.407Z",
+    "browserConfirmationPostCount": 0,
+    "visibleCurrentRunChips": 2,
+    "liveAwaitingAfterFix": "原确认在浏览器复验前由其他请求提交，不能把后续0按钮当成缺陷复现；未重放、重发、复位或代点。",
+    "generationSuccessClaimed": false
+  },
+  "manualAcceptance": "待新的实际待确认画面由用户验收；自动化已证明按钮显示与同一actionId不重复。",
+  "next": "用户刷新3006；当前这轮已结束等待。后续生成失败与公网策略属于其他既有任务，本次未扩展。",
+  "screenshots": [
+    "docs/superpowers/evidence/2026-11-04-wes-sandbox/3378-confirmation-missing.png",
+    "docs/superpowers/evidence/2026-11-04-wes-sandbox/3378-confirmation-after-state-change.png"
+  ],
+  "observedEvidence": {
+    "currentRun": "816b62eb-8180-40ed-8412-0dca83755e3e",
+    "status": "waiting",
+    "pendingSequence": 220,
+    "tool": "sandbox_execute",
+    "callIndex": 2,
+    "historicalRun": "c3c351df-ce67-4b26-80fa-53ebfb22be84",
+    "historicalMessage": "msg-13e8f37b-978d-4a66-a39c-392a9d72322f",
+    "historicalStatus": "completed",
+    "sameAction": false,
+    "httpToolEvents": 200,
+    "uiBeforeApprovalButtonCount": 0,
+    "screenshot": "docs/superpowers/evidence/2026-11-04-wes-sandbox/3378-confirmation-missing.png"
+  },
+  "boardVerification": {
+    "structural": "21页构建与一致性校验",
+    "defects": 43,
+    "buckets": {
+      "pending": 8,
+      "manual": 15,
+      "done": 20
+    },
+    "newRowVisual": "原台账截图显示存量长状态列挤压短列；新记录改放同页独立表格并显式列宽，不改原表与共享样式。结构校验通过，最终表格视觉待复核。",
+    "scope": "前一轮本地主目录包含其他WIP的治理台账快照",
+    "visualEvidence": "/tmp/wes-confirmation-defect-row-dist.png"
+  },
+  "publication": {
+    "userAuthorization": "提交、推送",
+    "remote": "https://github.com/mjlkevin/Workload-evaluation-system",
+    "branch": "main",
+    "verifiedSourceCommit": "5a75f00218766282d57b068b4838a1c946241440",
+    "verifiedBy": "git push与git ls-remote；后续仅提交此修复治理记录",
+    "ci": "未核实GitHub CI"
+  },
+  "publishedLedger": {
+    "defects": 33,
+    "buckets": {
+      "pending": 7,
+      "manual": 15,
+      "done": 11
+    },
+    "scope": "仅在已提交台账上追加本缺陷；其他未提交治理记录保留在主目录，不混入本次"
+  }
+}
