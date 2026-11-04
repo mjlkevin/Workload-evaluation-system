@@ -1,0 +1,36 @@
+{
+  "id": "BE-2026-11-04-wes-skills-github-push",
+  "date": "2026-11-04",
+  "type": "process_change",
+  "scope": "业务Skill与受控沙箱GitHub同步",
+  "summary": "用户明确授权推送后，已将本地合并版f536b41推送至GitHub main并读回确认；现有未提交工作继续保留。",
+  "status": "已推送",
+  "pages": [
+    "index",
+    "plan",
+    "monitoring",
+    "changes"
+  ],
+  "repository": "https://github.com/mjlkevin/Workload-evaluation-system",
+  "branch": "main",
+  "sourceCommit": "f536b41198a760f4db926d0670558e71bc07eb25",
+  "mergeCommit": "bb208c16237d0bd3492d2630ddc62c74647aeaa4",
+  "evidence": [
+    {
+      "ref": "git push origin f536b41198a760f4db926d0670558e71bc07eb25:refs/heads/main",
+      "result": "成功：6a30bec到f536b41"
+    },
+    {
+      "ref": "git ls-remote --heads origin main",
+      "result": "远端f536b41198a760f4db926d0670558e71bc07eb25"
+    },
+    {
+      "ref": "committed changes secret scan",
+      "result": "448个变更路径通过，未读取受保护运行状态文件"
+    }
+  ],
+  "verification": "沿用已合并版本的构建、定向与沙箱验证，本次无产品源码变化；不将本地测试等同GitHub CI通过。",
+  "ciStatus": "未核实",
+  "scopeBoundary": "尚未合入的SKU及后续公网策略工作不在本次源版本中；未提交运行配置或凭据。",
+  "next": "后续工作按独立变更继续；发布记录提交随后同步，不扩展产品代码范围。"
+}
