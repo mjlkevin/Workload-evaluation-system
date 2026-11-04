@@ -38,13 +38,13 @@ export default function MessageBubble({
   const metaAlign = isUser ? 'justify-end' : 'justify-start'
   return (
     <article aria-label={isUser ? '你发送的消息' : 'AI 回复'} className={`ai-msg-row flex min-w-0 ${isUser ? 'justify-end' : 'justify-start'}`}>
-      <div className={`ai-msg-col ${hasArtifacts ? 'w-full max-w-full' : isUser ? 'max-w-[92%] sm:max-w-[78%]' : 'w-full max-w-full sm:max-w-[92%]'}`}>
-      <div className={`mb-1 flex items-center gap-2 text-xs font-medium text-ink-2 ${isUser ? 'justify-end' : 'justify-start'}`}>
-        <span aria-hidden="true" className={`flex h-5 min-w-5 items-center justify-center rounded-sm px-1 text-xs ${isUser ? 'bg-brand-soft text-brand-ink' : 'bg-ink text-surface'}`}>{isUser ? '●' : '✦'}</span>
+      <div className={`ai-msg-col ${hasArtifacts ? 'w-full max-w-full' : isUser ? 'max-w-[92%] sm:max-w-[78%]' : 'w-full max-w-full'}`}>
+      <div className={`mb-2 flex items-center gap-2 text-xs font-semibold text-ink-2 ${isUser ? 'justify-end' : 'justify-start'}`}>
+        <span aria-hidden="true" className="flex size-6 shrink-0 items-center justify-center rounded-sm bg-brand-soft text-xs text-brand-ink">{isUser ? '●' : '✦'}</span>
         <span>{isUser ? '你' : 'AI'}</span>
       </div>
       <div
-        className={`ai-bubble-wrap relative min-w-0 break-words rounded-lg border px-4 py-3 text-left font-normal ${isUser ? 'whitespace-pre-wrap border-brand/10 bg-brand-soft text-ink' : 'border-line bg-surface text-ink'}${message.error ? ' border-l-2 border-l-err' : ''}`}
+        className={`ai-bubble-wrap relative min-w-0 break-words text-left font-normal text-ink ${isUser ? 'whitespace-pre-wrap rounded-lg bg-brand-soft px-4 py-3' : message.error ? 'rounded-md border-l-2 border-l-err bg-err-soft px-4 py-3' : 'bg-surface'}`}
       >
         {/* ISS-2026-08-10-005：思考轨迹移到回答正文上方（对标业内：思考在上、回答在下）；
             2026-08-17 起合并进统一的 ThinkingTrace（原 thoughts 内联块 + ModelRunTrace）。 */}
@@ -74,7 +74,7 @@ export default function MessageBubble({
           </div>
         ) : (
           isUser || message.error
-            ? <div style={{ fontSize: 13, lineHeight: 1.7 }}>{message.text}</div>
+            ? <div className="text-sm leading-7">{message.text}</div>
             : <RichAiMessage text={message.text} optionDisabled={sending} onOptionSelect={onOptionSelect} />
         )}
         {!isUser && !message.error && message.formBlock && (

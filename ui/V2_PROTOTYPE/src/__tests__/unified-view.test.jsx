@@ -5,7 +5,7 @@
  * 2) 统一视图数据正确注入状态；
  * 3) 统一视图失败时静默降级，不阻塞既有会话列表加载。
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, test } from 'vitest'
@@ -17,6 +17,9 @@ import { sessionRuntimeStore } from '../hooks/useSessionRuntimeStore.js'
 // 原第二宿主 HomeWorkspace 已随 ISS-2026-09-03-001（用户裁决：删除）移出代码库。
 import HomePage from '../pages/HomePage.jsx'
 import { server } from './mocks/server.js'
+
+// Session titles also appear in the conversation header; target the rail explicitly.
+const sessionRail = () => within(screen.getByRole('region', { name: '会话', exact: true }))
 
 const BASE = '/api/v1'
 const TEST_USER = { id: 'u3', username: 'arch', role: 'user', businessRole: 'pre_sales' }
@@ -114,8 +117,8 @@ describe('unified-view: O5 统一视图首屏接入', () => {
     await waitFor(() => expect(calls).toContain('unified-view'))
 
     // 会话列表正常渲染（来自既有 /ai-sessions 或统一视图数据）
-    expect(await screen.findByText('会话 A')).toBeInTheDocument()
-    expect(screen.getByText('会话 B')).toBeInTheDocument()
+    expect(await sessionRail().findByText('会话 A')).toBeInTheDocument()
+    expect(sessionRail().getByText('会话 B')).toBeInTheDocument()
   })
 
   test('unified-view: 统一视图返回 runs 与 artifacts 数据不阻塞渲染', async () => {
@@ -128,7 +131,7 @@ describe('unified-view: O5 统一视图首屏接入', () => {
     renderWorkbench()
 
     // 首屏渲染成功，不因为统一视图数据格式异常而白屏
-    expect(await screen.findByText('会话 A')).toBeInTheDocument()
+    expect(await sessionRail().findByText('会话 A')).toBeInTheDocument()
   })
 
   test('unified-view: 统一视图 503 失败时静默降级，会话列表仍正常加载', async () => {
@@ -136,8 +139,8 @@ describe('unified-view: O5 统一视图首屏接入', () => {
     renderWorkbench()
 
     // 统一视图失败不应阻塞既有 /ai-sessions 链路
-    expect(await screen.findByText('会话 A')).toBeInTheDocument()
-    expect(screen.getByText('会话 B')).toBeInTheDocument()
+    expect(await sessionRail().findByText('会话 A')).toBeInTheDocument()
+    expect(sessionRail().getByText('会话 B')).toBeInTheDocument()
   })
 
   test('unified-view: 统一视图数据隔离（仅返回当前用户数据）', async () => {
@@ -148,7 +151,7 @@ describe('unified-view: O5 统一视图首屏接入', () => {
     renderWorkbench()
 
     // 当前用户只能看到自己的会话
-    expect(await screen.findByText('u3 专属会话')).toBeInTheDocument()
+    expect(await sessionRail().findByText('u3 专属会话')).toBeInTheDocument()
   })
 
   // ISS-2026-08-09-003（离页返回旧缓存渲染）C3 回归：
@@ -419,7 +422,7 @@ describe('unified-view: O5 统一视图首屏接入', () => {
     )
 
     // 激活会话 A（统一视图含其进行中 run）
-    fireEvent.click(await screen.findByText('会话 A'))
+    fireEvent.click(await sessionRail().findByText('会话 A'))
 
     submitQuestion('停止按钮验证')
 

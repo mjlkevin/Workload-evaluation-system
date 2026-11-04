@@ -1,18 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { HoverBadge } from './MessageBits.jsx'
 import MessageList from './MessageList.jsx'
 import Composer from './Composer.jsx'
 import AiDegradationNotice from './AiDegradationNotice.jsx'
 import RunToolTray from './RunToolTray.jsx'
 import { apiClient } from '../../../../api/client.js'
-
-const panel = {
-  border: '1px solid var(--line)',
-  borderRadius: 12,
-  background: '#fff',
-  boxShadow: 'var(--shadow-1)',
-}
 
 /**
  * SP-2026-007 MS2-PATCH：拉取当前用户 draft 态记忆条数。
@@ -75,18 +67,22 @@ export default function ChatArea({ preset, workbench, chat, harness, conversatio
   ) || null
 
   return (
-    <section style={{ ...panel, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
-      <div style={{ minHeight: 48, padding: '12px 20px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <HoverBadge label="AI 工作台" tooltip={preset.systemPrompt} />
-        <HoverBadge label={preset.label} tooltip={<><b style={{ display: 'block', marginBottom: 4 }}>{preset.headline}</b>{preset.emptyHint}</>} />
-        {workbench.loadingSessions && <span className="tag" style={{ marginLeft: 'auto' }}>加载会话</span>}
+    <section aria-label="AI 对话工作区" className="ai-chat-area flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border border-line bg-surface max-[1180px]:h-[calc(100dvh-64px)] max-[1180px]:min-h-[560px]">
+      <header className="flex min-h-16 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-line px-4 py-3 sm:px-6">
+        <span aria-hidden="true" className="flex size-8 shrink-0 items-center justify-center rounded-md bg-brand-soft text-base text-brand">✦</span>
+        <div className="min-w-0 flex-1">
+          <h2 className="m-0 truncate text-sm font-semibold text-ink">{workbench.activeSession?.title || '新会话'}</h2>
+          <p className="m-0 mt-0.5 text-[11px] text-ink-2">AI 工作台</p>
+        </div>
+        <span className="shrink-0 rounded-sm bg-bg-2 px-2 py-1 text-[11px] font-medium text-ink-2">{preset.label}</span>
+        {workbench.loadingSessions && <span role="status" className="text-xs text-ink-2">加载会话</span>}
         {workbench.sessionsError && (
-          <div role="alert" style={{ marginLeft: 'auto', color: 'var(--err)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div role="alert" className="flex w-full items-center gap-2 text-xs text-err-ink">
             <span>{workbench.sessionsError}</span>
             <button type="button" className="btn btn-out" style={{ height: 28 }} onClick={workbench.clearSessionsError}>关闭</button>
           </div>
         )}
-      </div>
+      </header>
 
       <MessageList
         messages={conversation ?? chat.messages}
@@ -109,21 +105,10 @@ export default function ChatArea({ preset, workbench, chat, harness, conversatio
         <div
           role="status"
           aria-label="待确认记忆提示"
-          style={{
-            margin: '0 20px',
-            padding: '8px 12px',
-            border: '1px solid color-mix(in oklab, var(--warn) 40%, var(--line))',
-            borderRadius: 8,
-            background: 'var(--warn-soft)',
-            color: 'var(--ink-2)',
-            fontSize: 12,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-          }}
+          className="mx-4 flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-t border-line px-1 pt-2 text-[11px] text-ink-2 sm:mx-6"
         >
-          <span>本次会话产生了 {draftMemoryCount} 条待确认记忆</span>
-          <Link to="/system/memory?status=draft" style={{ marginLeft: 'auto', color: 'var(--brand)', fontWeight: 700 }}>
+          <span>{draftMemoryCount} 条待确认记忆</span>
+          <Link to="/system/memory?status=draft" className="ml-auto rounded-sm text-brand hover:underline focus-visible:outline-2 focus-visible:outline-brand">
             去确认 →
           </Link>
         </div>

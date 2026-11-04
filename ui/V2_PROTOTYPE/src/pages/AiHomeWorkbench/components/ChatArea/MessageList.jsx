@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import BusinessExecutionMessage from '../BusinessExecutionMessage.jsx'
 import { BusinessRunActions } from '../BusinessExecutionControls.jsx'
 import MessageBubble from './MessageBubble.jsx'
@@ -10,19 +10,25 @@ export default function MessageList({ messages, paneRef, activeWorkflow, centerT
   const localRef = useRef(null)
   const scrollRef = paneRef ?? localRef
   const following = useRef(true)
+  const [showLatest, setShowLatest] = useState(false)
   const summaryActivation = useRef(null)
   const previousSession = useRef(sessionId)
   useLayoutEffect(() => {
     const pane = scrollRef.current
     if (previousSession.current !== sessionId) following.current = true
     previousSession.current = sessionId
-    if (pane && following.current) pane.scrollTop = pane.scrollHeight
+    if (pane && following.current) {
+      pane.scrollTop = pane.scrollHeight
+      setShowLatest(false)
+    }
   }, [messages, sending, sessionId, scrollRef])
   const seenRoots = new Set()
   return (
+    <div className="relative flex min-h-0 flex-1 flex-col">
     <div ref={scrollRef} onScroll={event => {
       const pane = event.currentTarget
       following.current = pane.scrollHeight - pane.clientHeight - pane.scrollTop < 80
+      setShowLatest(!following.current)
     }} onClickCapture={event => {
       // Native summary activation emits click for both pointer and keyboard input.
       const summary = event.target instanceof Element ? event.target.closest('summary') : null
@@ -33,7 +39,8 @@ export default function MessageList({ messages, paneRef, activeWorkflow, centerT
       const pane = event.currentTarget
       // Opening lazy details grows after this event; pause before children mount.
       following.current = !event.target.open && pane.scrollHeight - pane.clientHeight - pane.scrollTop < 80
-    }} data-testid="ai-home-message-pane" style={{ flex: 1, minHeight: 0, padding: '24px 28px', overflowY: 'auto', background: 'var(--surface)' }}>
+    }} data-testid="ai-home-message-pane" className="min-h-0 flex-1 overflow-y-auto bg-surface px-4 py-6 sm:px-6 sm:py-8">
+      <div className="w-full min-w-0">
       {business?.error && <p role="alert" className="mb-3 rounded-md bg-err-soft p-3 text-sm text-err-ink">{business.error}</p>}
       {business?.loading && <p role="status" className="mb-3 text-xs text-ink-2">正在更新业务记录…</p>}
       {!messages.length && !business?.runs?.length && !business?.error && (
@@ -63,7 +70,7 @@ export default function MessageList({ messages, paneRef, activeWorkflow, centerT
         </div>
       )}
 
-      <div style={{ display: 'grid', gap: 14 }}>
+      <div className="grid min-w-0 gap-8">
         {messages.map((message, index) => {
           if (message.type !== 'business') {
             const source = message.role === 'user' && normalizeProjectionSource(message.projectionSource)
@@ -92,6 +99,16 @@ export default function MessageList({ messages, paneRef, activeWorkflow, centerT
         })}
         <SessionBusinessRecords session={session} messages={messages} bubbleProps={bubbleProps} onConfirmAction={onConfirmSessionAction} confirmingActionId={confirmingSessionActionId} />
       </div>
+      </div>
+    </div>
+    {showLatest && <button type="button" onClick={() => {
+      following.current = true
+      const pane = scrollRef.current
+      if (pane) pane.scrollTop = pane.scrollHeight
+      setShowLatest(false)
+    }} className="absolute bottom-3 left-1/2 flex min-h-9 -translate-x-1/2 cursor-pointer items-center gap-2 whitespace-nowrap rounded-full border border-line-2 bg-surface px-4 text-xs font-medium text-ink-2 shadow-sm hover:bg-bg-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
+      <span aria-hidden="true">↓</span>回到最新消息
+    </button>}
     </div>
   )
 }

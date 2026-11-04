@@ -25,6 +25,20 @@ export default function Composer({ composer, setComposer, sending, selectedFile,
     editorRef.current?.focus()
     requestAnimationFrame(() => { editorRef.current?.focus(); editorRef.current?.setSelectionRange(caret, caret) })
   }
+  function openTaskPicker() {
+    if (sending) return
+    const command = composer.match(/(^|\s)\/([^\s/]*)$/)
+    const spacer = composer && !/\s$/.test(composer) ? ' ' : ''
+    const start = composer.length + spacer.length
+    const caret = command ? composer.length : start + 1
+    if (!command) setComposer(`${composer}${spacer}/`)
+    setSlash(command
+      ? { start: composer.length - command[2].length - 1, end: composer.length, query: command[2] }
+      : { start, end: caret, query: '' })
+    setActiveIndex(0)
+    editorRef.current?.focus()
+    requestAnimationFrame(() => editorRef.current?.setSelectionRange(caret, caret))
+  }
   function handleComposerKeyDown(event) {
     if (event.nativeEvent?.isComposing || event.isComposing || event.keyCode === 229) return
     if (slash) {
@@ -43,7 +57,7 @@ export default function Composer({ composer, setComposer, sending, selectedFile,
   }
 
   return (
-    <div className="ai-composer">
+    <div className="ai-composer shrink-0">
       <div className="ai-composer__inner relative">
         {slash && <ComposerTaskPicker key={taskScope} query={slash.query} activeIndex={activeIndex} setActiveIndex={setActiveIndex} onSelect={selectTask} onItems={setItems} listId={listId} />}
         {selectedTask && <div className="mb-2 flex min-w-0 flex-wrap items-center gap-2" aria-label="已选择能力">
@@ -56,7 +70,7 @@ export default function Composer({ composer, setComposer, sending, selectedFile,
         {selectedFile && <AttachmentCard file={selectedFile} onRemove={onRemoveFile} />}
         {/* O8：Run 进行中显示停止按钮 */}
         {activeRun && sending && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', fontSize: 12, color: 'var(--ink-3)' }}>
+          <div className="flex items-center gap-2 py-1 text-xs text-ink-2">
             <span className="ai-composer__sending">···</span>
             <span>AI 正在回复</span>
             <button
@@ -71,32 +85,37 @@ export default function Composer({ composer, setComposer, sending, selectedFile,
             </button>
           </div>
         )}
+        <textarea
+          ref={editorRef}
+          rows="2"
+          disabled={sending}
+          aria-haspopup={onSelectTask ? "listbox" : undefined}
+          aria-controls={slash ? listId : undefined}
+          aria-activedescendant={slash && items.length ? `${listId}-${activeIndex}` : undefined}
+          aria-label="AI 工作台输入"
+          value={composer}
+          onChange={(event) => { setComposer(event.target.value); readCommand(event.target) }}
+          onClick={event => readCommand(event.target)}
+          onBlur={event => { if (!event.relatedTarget?.closest('[aria-label="技能清单"]')) setSlash(null) }}
+          onKeyDown={handleComposerKeyDown}
+          placeholder={selectedTask ? `向${selectedTask.name}提问或描述任务…` : placeholder || '输入问题，或描述你想完成的任务…'}
+          className="ai-composer__textarea"
+        />
         <div className="ai-composer__row">
           <input ref={fileInputRef} type="file" accept={selectedTask ? ".xlsx,.txt,.md" : ".xlsx,.xls,.pdf,.docx,.txt"} disabled={sending} style={{ display: 'none' }} onChange={(event) => onAttachFile(event.target.files?.[0] || null)} />
           <button className="ai-composer__attach" type="button" onClick={onChooseFile} disabled={sending} aria-label={selectedFile ? '替换附件' : '附加文件'} title={selectedFile ? '替换附件' : '附加文件'}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>
           </button>
-          <textarea
-            ref={editorRef}
-            rows="3"
-            disabled={sending}
-            aria-haspopup={onSelectTask ? "listbox" : undefined}
-            aria-controls={slash ? listId : undefined}
-            aria-activedescendant={slash && items.length ? `${listId}-${activeIndex}` : undefined}
-            aria-label="AI 工作台输入"
-            value={composer}
-            onChange={(event) => { setComposer(event.target.value); readCommand(event.target) }}
-            onClick={event => readCommand(event.target)}
-            onBlur={event => { if (!event.relatedTarget?.closest('[aria-label="技能清单"]')) setSlash(null) }}
-            onKeyDown={handleComposerKeyDown}
-            placeholder={selectedTask ? `向${selectedTask.name}提问或描述任务…` : `${placeholder || "输入消息"} 输入 / 选择 Skill 或流程。`}
-            className="ai-composer__textarea"
-          />
-          <button className="ai-composer__send" type="button" onClick={onSend} disabled={sending || !!slash} aria-label="发送消息" title="发送消息">
+          {onSelectTask && <button type="button" disabled={sending} aria-label="选择 Skill 或流程" aria-haspopup="listbox" aria-expanded={Boolean(slash)} onClick={openTaskPicker}
+            className="flex min-h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-sm border-0 bg-transparent px-2 text-xs text-ink-2 hover:bg-bg-soft disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-brand">
+            <span aria-hidden="true" className="font-mono text-sm">/</span>Skill / 流程
+          </button>}
+          <span className="ml-auto hidden text-[11px] text-ink-2 sm:block">Enter 发送 · Shift+Enter 换行</span>
+          <button className="ai-composer__send ml-auto sm:ml-0" type="button" onClick={onSend} disabled={sending || !!slash} aria-label="发送消息" title="发送消息">
             {sending && !activeRun ? (
               <span className="ai-composer__sending">···</span>
             ) : (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
+              <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5m-6 6 6-6 6 6" /></svg>
             )}
           </button>
         </div>

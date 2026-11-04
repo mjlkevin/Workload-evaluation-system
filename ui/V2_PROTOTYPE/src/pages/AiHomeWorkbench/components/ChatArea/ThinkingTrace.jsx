@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import ToolCallChip from './ToolCallChip.jsx'
 import { TOOL_CALL_STATUS } from '../../utils/messageFormatter.js'
 
@@ -25,6 +25,7 @@ export default function ThinkingTrace({
   // 保证 started→running 阶段免点击即可见（批次 0.5 ③）。用户一旦点过开关，
   // 其选择优先于自动展开。
   const [toolsExpanded, setToolsExpanded] = useState(null)
+  const thoughtRegionId = useId()
 
   const thoughtList = Array.isArray(thoughts) ? thoughts : []
   const hasThoughts = thoughtList.length > 0
@@ -55,13 +56,15 @@ export default function ThinkingTrace({
           <button
             type="button"
             onClick={() => onToggleThought?.(messageId, idx)}
-            className="flex cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-xs text-ink-3"
+            aria-expanded={!thought.collapsed}
+            aria-controls={thought.collapsed ? undefined : `${thoughtRegionId}-${idx}`}
+            className="flex min-h-7 cursor-pointer items-center gap-1.5 rounded-sm border-0 bg-transparent p-0 text-xs text-ink-2 focus-visible:outline-2 focus-visible:outline-brand"
           >
-            <span>{thought.collapsed ? '▶' : '▼'}</span>
+            <span aria-hidden="true">{thought.collapsed ? '▸' : '▾'}</span>
             <span>{thought.collapsed ? '已思考' : (streaming ? '思考中…' : '思考过程')}</span>
           </button>
           {!thought.collapsed && (
-            <div className="mt-1 whitespace-pre-wrap rounded-md bg-accent-soft px-2.5 py-2 text-xs leading-relaxed text-ink-2">
+            <div id={`${thoughtRegionId}-${idx}`} className="mt-1 whitespace-pre-wrap rounded-sm border-l-2 border-line-2 bg-bg px-3 py-2 text-xs leading-6 text-ink-2">
               {thought.text}
             </div>
           )}

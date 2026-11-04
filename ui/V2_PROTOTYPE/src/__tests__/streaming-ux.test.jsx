@@ -6,7 +6,7 @@
  * 3) 停止按钮存在且调用 cancel；
  * 4) 事件乱序/重复幂等处理（基于 sequence）。
  */
-import { act, render, renderHook, screen, waitFor } from '@testing-library/react'
+import { act, render, renderHook, screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, afterEach, describe, expect, test, vi } from 'vitest'
@@ -19,6 +19,9 @@ import HomePage from '../pages/HomePage.jsx'
 import useChatMessages from '../pages/AiHomeWorkbench/hooks/useChatMessages.js'
 import MessageBubble from '../pages/AiHomeWorkbench/components/ChatArea/MessageBubble.jsx'
 import { server } from './mocks/server.js'
+
+// Session titles also appear in the conversation header; target the rail explicitly.
+const sessionRail = () => within(screen.getByRole('region', { name: '会话', exact: true }))
 
 /**
  * ISS-2026-08-10-005（思考块空窗丢弃）：hook 级测试直接捕获 useRunEventStream
@@ -163,7 +166,7 @@ describe('streaming-ux: O8 SSE 流式 UX', () => {
     renderWorkbench()
 
     // 首屏加载后会话列表渲染
-    expect(await screen.findByText('会话 A')).toBeInTheDocument()
+    expect(await sessionRail().findByText('会话 A')).toBeInTheDocument()
   })
 
   test('streaming-ux: thought 事件默认可折叠', async () => {
@@ -175,7 +178,7 @@ describe('streaming-ux: O8 SSE 流式 UX', () => {
     })
     renderWorkbench()
 
-    expect(await screen.findByText('会话 A')).toBeInTheDocument()
+    expect(await sessionRail().findByText('会话 A')).toBeInTheDocument()
   })
 
   test('streaming-ux: 同一 sequence 重复投递幂等', async () => {
@@ -187,13 +190,13 @@ describe('streaming-ux: O8 SSE 流式 UX', () => {
     })
     renderWorkbench()
 
-    expect(await screen.findByText('会话 A')).toBeInTheDocument()
+    expect(await sessionRail().findByText('会话 A')).toBeInTheDocument()
 
     // 同一 sequence 再次投递（模拟重连回放）
     pushFrame({ sequence: 1, eventType: 'text.delta', payload: { delta: '重复' }, createdAt: '2026-08-07T00:00:02.000Z' })
 
     // 幂等：不抛错、不白屏
-    await waitFor(() => expect(screen.getByText('会话 A')).toBeInTheDocument())
+    await waitFor(() => expect(sessionRail().getByText('会话 A')).toBeInTheDocument())
   })
 
   test('streaming-ux: 流式事件不阻塞页面渲染', async () => {
@@ -204,7 +207,7 @@ describe('streaming-ux: O8 SSE 流式 UX', () => {
     renderWorkbench()
 
     // 页面正常渲染，不受 SSE 连接影响
-    expect(await screen.findByText('会话 A')).toBeInTheDocument()
+    expect(await sessionRail().findByText('会话 A')).toBeInTheDocument()
   })
 })
 

@@ -4,7 +4,7 @@
  * 1) draftBeforeLogin 保留最后一条用户消息；
  * 2) copyDraft 可取回该草稿。
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
@@ -14,6 +14,9 @@ import { ToastProvider } from '../hooks/useToast.jsx'
 // 原第二宿主 HomeWorkspace 已随 ISS-2026-09-03-001（用户裁决：删除）移出代码库。
 import HomePage from '../pages/HomePage.jsx'
 import { server } from './mocks/server.js'
+
+// Session titles also appear in the conversation header; target the rail explicitly.
+const sessionRail = () => within(screen.getByRole('region', { name: '会话', exact: true }))
 
 const BASE = '/api/v1'
 
@@ -85,7 +88,7 @@ describe('draft-roundtrip: E1 草稿往返', () => {
     setupDraftScenario({ status: 401 })
     renderWorkbench()
 
-    await screen.findByText('会话 A', {}, { timeout: 3000 })
+    await sessionRail().findByText('会话 A', {}, { timeout: 3000 })
     await sendFromComposer('我的问题')
 
     fireEvent.click(await screen.findByRole('button', { name: '复制草稿' }, { timeout: 3000 }))
@@ -97,7 +100,7 @@ describe('draft-roundtrip: E1 草稿往返', () => {
     setupDraftScenario({ status: 500 })
     renderWorkbench()
 
-    await screen.findByText('会话 A', {}, { timeout: 3000 })
+    await sessionRail().findByText('会话 A', {}, { timeout: 3000 })
     await sendFromComposer('我的网络问题')
 
     await screen.findByText(/AI 对话暂未完成/, {}, { timeout: 3000 })

@@ -58,8 +58,8 @@ input, button, select, textarea { font-family: inherit; }
 }
 
 .ai-message-rich {
-  font-size: 13px;
-  line-height: 1.75;
+  font-size: 14px;
+  line-height: 1.85;
   color: var(--ink);
 }
 
@@ -85,7 +85,7 @@ input, button, select, textarea { font-family: inherit; }
 }
 
 .ai-message-rich strong {
-  font-weight: 800;
+  font-weight: 600;
   color: var(--ink);
 }
 
@@ -819,30 +819,30 @@ input, button, select, textarea { font-family: inherit; }
 
 /* ── AI Workbench: Composer ── */
 .ai-composer {
-  padding: 14px 20px 18px;
-  border-top: 1px solid var(--line);
-  background: var(--bg-soft, #f8f9fb);
+  /* Leave the local send action clear of Shell's floating background-task badge. */
+  padding: 12px 20px 28px;
+  background: var(--surface);
 }
 .ai-composer__inner {
   display: grid;
   gap: 8px;
   border: 1px solid var(--line-2);
-  border-radius: 14px;
-  padding: 10px 12px;
-  background: var(--bg-soft);
+  border-radius: var(--r-lg);
+  padding: 12px 14px;
+  background: var(--surface);
   box-shadow: none;
   transition: border-color 0.15s ease-out, box-shadow 0.15s ease-out;
 }
 .ai-composer__inner:focus-within {
   border-color: var(--brand);
   box-shadow: var(--shadow-focus);
-  background: #fff;
+  background: var(--surface);
 }
 .ai-composer__row {
   display: flex;
   align-items: flex-end;
   gap: 8px;
-  min-height: 48px;
+  min-height: 36px;
   /* ISS-2026-09-04-001：本行是 .ai-composer__inner（display:grid）的网格项，
      默认 min-width:auto 会把它钉死在自身 min-content（261px）上不再收窄。
      360 档实测：父容器 222px、本行 261px，发送按钮右边界 375 > 视口 360，
@@ -858,7 +858,7 @@ input, button, select, textarea { font-family: inherit; }
   border: none;
   border-radius: 10px;
   background: transparent;
-  color: var(--ink-3);
+  color: var(--ink-2);
   cursor: pointer;
   transition: background 0.12s ease-out, color 0.12s ease-out;
   flex-shrink: 0;
@@ -868,22 +868,24 @@ input, button, select, textarea { font-family: inherit; }
   color: var(--ink-2);
 }
 .ai-composer__textarea {
-  flex: 1;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   border: 0;
   outline: none;
   resize: vertical;
-  min-height: 48px;
+  min-height: 64px;
   max-height: 180px;
-  padding: 8px 4px;
+  padding: 2px 0;
   font-family: inherit;
-  font-size: 13.5px;
-  line-height: 1.5;
+  font-size: 14px;
+  line-height: 1.7;
   overflow-y: auto;
   background: transparent;
   color: var(--ink);
 }
 .ai-composer__textarea::placeholder {
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 .ai-composer__send {
   display: grid;
@@ -893,17 +895,16 @@ input, button, select, textarea { font-family: inherit; }
   border: none;
   border-radius: 10px;
   background: var(--brand);
-  color: #fff;
+  color: var(--surface);
   cursor: pointer;
   flex-shrink: 0;
   transition: transform 0.1s ease-out, opacity 0.12s ease-out, background 0.12s ease-out;
 }
 .ai-composer__send:hover:not(:disabled) {
-  transform: scale(1.06);
   background: var(--brand-ink);
 }
 .ai-composer__send:active:not(:disabled) {
-  transform: scale(0.95);
+  background: var(--brand-ink);
 }
 .ai-composer__send:disabled {
   opacity: 0.45;

@@ -6,7 +6,7 @@
  * 3) A 的迟到响应不写入 B 视图、不抢回当前渲染源、B 状态不被清空；
  * 4) 切回 A 后 A 的最终消息仍可见（状态按会话键保留）。
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { act } from 'react'
 import { MemoryRouter } from 'react-router-dom'
@@ -18,6 +18,9 @@ import { sessionRuntimeStore } from '../hooks/useSessionRuntimeStore.js'
 // 原第二宿主 HomeWorkspace 已随 ISS-2026-09-03-001（用户裁决：删除）移出代码库。
 import HomePage from '../pages/HomePage.jsx'
 import { server } from './mocks/server.js'
+
+// Session titles also appear in the conversation header; target the rail explicitly.
+const sessionRail = () => within(screen.getByRole('region', { name: '会话', exact: true }))
 
 const BASE = '/api/v1'
 
@@ -171,7 +174,7 @@ function renderWorkbench() {
 }
 
 function clickSessionCard(title) {
-  fireEvent.click(screen.getByText(title).closest('[role="button"]'))
+  fireEvent.click(sessionRail().getByText(title).closest('[role="button"]'))
 }
 
 async function sendFromComposer(text) {
@@ -241,8 +244,8 @@ describe('session-isolation: G1 会话隔离', () => {
     // A 的最终消息不写入当前（B）视图
     expect(screen.queryByText('模型回复：A-进行中的问题 A')).not.toBeInTheDocument()
     // 渲染源未被抢回：当前激活仍是会话 B
-    expect(screen.getByText('会话 B').closest('[role="button"]')).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByText('会话 A').closest('[role="button"]')).toHaveAttribute('aria-pressed', 'false')
+    expect(sessionRail().getByText('会话 B').closest('[role="button"]')).toHaveAttribute('aria-pressed', 'true')
+    expect(sessionRail().getByText('会话 A').closest('[role="button"]')).toHaveAttribute('aria-pressed', 'false')
     // B 的已有状态未被清空
     expect(screen.getByText('B 的历史回复')).toBeInTheDocument()
     expect(screen.getByText('问题 B')).toBeInTheDocument()

@@ -1,0 +1,227 @@
+{
+  "id": "BE-2026-11-04-workbench-chat-ui",
+  "date": "2026-11-04",
+  "type": "implementation",
+  "issueId": "ISS-2026-11-04-001",
+  "relatedRequirements": [
+    "RP-050",
+    "RP-056"
+  ],
+  "dedup": "命中 ISS-2026-11-04-001 / RP-050，扩展中央对话区；RP-056关联消息元数据，不新增编号。",
+  "originalFeedback": "用UI Skills root 把AI工作台的UI也优化一下（中央ChatArea）",
+  "disposition": "requirement",
+  "priority": "P2",
+  "scope": "AI工作台中央对话区",
+  "summary": "中央阅读层级、输入与辅助提示、历史回看可达性优化。",
+  "status": "本地实现及专项/浏览器布局验证完成；全量失败保留，用户验收待回填",
+  "pages": [
+    "issues",
+    "requirements",
+    "plan",
+    "testing",
+    "monitoring",
+    "changes"
+  ],
+  "additionalPages": [
+    "design"
+  ],
+  "confirmedRoots": [
+    {
+      "problem": "头部双徽标和回复卡片的层级重复，正文偏小；思考记录用暖色与确认竞争。",
+      "contract": "本次截图批注及既有中央消息流约定；原文与确认保留。",
+      "runtime": "3006当前登录页面截图和ChatArea→MessageList→MessageBubble/ThinkingTrace路径。",
+      "owner": "ChatArea/index.jsx、MessageBubble.jsx、ThinkingTrace.jsx及原index.css正文规则。"
+    },
+    {
+      "problem": "输入框与附件/发送同排，长占位说明和黄色记忆提示竞争。",
+      "contract": "既有Enter/Shift+Enter、IME、附件与Slash调用契约；控件说明保持简洁。",
+      "runtime": "截图底部输入与记忆提示；Composer真实props回调。",
+      "owner": "Composer.jsx、ChatArea/index.jsx与既有composer样式。"
+    },
+    {
+      "problem": "历史回看暂停跟随后，缺少回到最新消息的显式入口。",
+      "contract": "既有following滚动策略及用户工作台优化授权。",
+      "runtime": "MessageList的onScroll只更新following ref；无恢复入口。",
+      "owner": "MessageList.jsx"
+    }
+  ],
+  "plan": [
+    "先补能力按钮和回到最新消息失败测试。",
+    "原组件内调整层级、输入布局与中性思考记录；保持全部业务回调与左栏。",
+    "专项、全Web、模块安全测试库与构建验证；1440/760及低高度浏览器取证。"
+  ],
+  "acceptance": [
+    "能力选择按钮只打开原Slash目录；不发送消息且不丢草稿。",
+    "滚动历史后显示回到最新消息；新消息不打断阅读，点击后恢复跟随。",
+    "输入、附件、发送、IME、复制、确认/拒绝和折叠记录继续可用。",
+    "用户与AI来源文字和左右对齐保留；待确认操作不隐藏。"
+  ],
+  "boundaries": [
+    "仅既有React与已批准Tailwind tokens桥接；不新增依赖，不改API/状态持久化。",
+    "不重跑用户任务，不批准或拒绝真实工具，不新增业务数据。",
+    "只在唯一活动目录修改；保留上一轮左栏与其他dirty改动。"
+  ],
+  "implementationPerformed": true,
+  "uiSkills": {
+    "category": "craft",
+    "selected": [
+      "ibelick/baseline-ui"
+    ],
+    "commands": [
+      "npx ui-skills start",
+      "npx ui-skills list --category visual",
+      "npx ui-skills list --category craft",
+      "npx ui-skills get baseline-ui"
+    ],
+    "network": "初次visual目录请求terminated；craft目录与baseline-ui读取成功。",
+    "architecture": "遵循AGENTS.md已批准的Tailwind tokens桥接；不引入依赖或第二组件系统。"
+  },
+  "verification": {
+    "red": "新增3项：能力按钮与历史跳转全部按预期失败；重复打开能力入口新增反例1失败/3通过。",
+    "focused": "最终13文件146/146通过，零跳过；其中对话区12文件131项，AiToolInventory隔离15项。",
+    "web": "106文件104通过/2失败，1008/1027通过，19失败、零跳过。assessment-frozen-basis18和AiToolInventory1；后者隔离15/15通过。最终目录重复打开修正在146专项中覆盖。",
+    "baseline": "assessment-frozen-basis18失败在本会话上一轮已有HEAD覆盖基线复核（/tmp/wes-rail-baseline.log）；本轮未修改评估源码或断言。",
+    "selectorUpdate": "首轮15项因会话标题同时出现在新头部和左栏而定位冲突；5个既有测试文件改为按会话region限定原查询，业务断言、时限和请求校验保持；130项先通过。",
+    "buildWeb": "通过；/tmp/wes-chat-ui-build-final.log",
+    "uiScope": "No new deterministic UI findings；/tmp/wes-chat-ui-scope-final.log",
+    "modules": "安全测试库1232/1236通过，4失败，零跳过：prepare超时、两项取消后迟到模型动作、resolveKek环境隔离。未改后端源码、断言或测试时限。",
+    "logs": [
+      "/tmp/wes-chat-ui-red.log",
+      "/tmp/wes-chat-ui-picker-red.log",
+      "/tmp/wes-chat-ui-focused.log",
+      "/tmp/wes-chat-ui-focused-final.log",
+      "/tmp/wes-chat-ui-verified.log",
+      "/tmp/wes-chat-ui-web.log",
+      "/tmp/wes-chat-ui-web-final.log",
+      "/tmp/wes-chat-ui-modules.log"
+    ],
+    "moduleFailures": [
+      "total deadline races ignored signals during prepare and suppresses late actions",
+      "late authority after cancel cannot prepare model",
+      "late post-prepare checker after cancel cannot complete model",
+      "resolveKek: 环境变量未配置时返回 null 且 dev 环境输出警告"
+    ]
+  },
+  "browserEvidence": {
+    "url": "http://127.0.0.1:3006/",
+    "account": "mjlkevin",
+    "desktop": {
+      "viewport": 1440,
+      "pageWidth": 1440,
+      "paneWidth": 922,
+      "paneHeight": 648.8125,
+      "bodyFont": "14px",
+      "sendBottom": 930,
+      "backgroundBadgeTop": 933.90625,
+      "sendClear": true
+    },
+    "narrow": {
+      "viewport": 760,
+      "pageWidth": 760,
+      "paneWidth": 632,
+      "paneContentWidth": 632,
+      "paneHeight": 651,
+      "areaHeight": 918,
+      "editorWidth": 577,
+      "sendRight": 693,
+      "layout": "聊天面板限高；外层可滚动到输入区。"
+    },
+    "lowHeight": {
+      "viewport": 1440,
+      "height": 700,
+      "paneHeight": 365,
+      "sendBottom": 646,
+      "sendClear": true
+    },
+    "interactions": [
+      "历史回看显示回到最新消息；点击后scrollRemaining=0。",
+      "能力按钮通过原目录显示7个授权选项；Escape关闭并恢复测试前草稿，未选能力或发送消息。"
+    ],
+    "screenshots": [
+      "chat-1440.png",
+      "chat-760.png",
+      "chat-1440x700.png",
+      "chat-final.png"
+    ],
+    "path": "/Users/kevin/.codex/visualizations/2026/11/04/01a1a670-524f-7c90-9f7d-d83601fdcac1",
+    "viewportReset": true,
+    "newBusinessMutation": false
+  },
+  "review": "五轴自查：输入/Slash/IME/附件/复制与确认回调保持；局部正文CSS只供MessageBubble使用；历史跳转仅本地滚动，跟随状态按会话恢复；菜单重复打开复用末尾命令；未改后端、状态源或左栏。",
+  "integrationState": "唯一活动目录main的本地未提交改动；未推送。",
+  "evidence": [
+    {
+      "ref": "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/ChatArea/index.jsx",
+      "summary": "头部、记忆提示与聊天面板布局"
+    },
+    {
+      "ref": "ui/V2_PROTOTYPE/src/__tests__/chat-area-ui.test.jsx",
+      "result": "RED/GREEN",
+      "summary": "能力入口、草稿保护、历史跟随与会话切换"
+    }
+  ],
+  "boardScope": "更新issues、requirements、design、plan、testing、monitoring、changes；复用既有编号，阶段与需求数量不变。README及实现对齐说明追加本轮事实；不改变全局KPI或架构状态。",
+  "boardValidation": "board-build生成21页；board-consistency-check 0错误0警告；board-event-check通过。",
+  "widthFeedback": {
+    "original": "为什么两侧有这么宽的空白空间",
+    "dedup": "命中 ISS-2026-11-04-001 / RP-050 中央对话区范围，不新增编号",
+    "disposition": "requirement",
+    "status": "本地实现与专项/浏览器验证完成，用户验收待回填",
+    "surface": "中央消息流宽度",
+    "root": {
+      "contract": "用户1543×945批注要求减少两侧过宽空白",
+      "runtime": "1543视口pane1025px，正文maxWidth768px，两侧121/136px",
+      "owner": "ChatArea/MessageList.jsx 第一层内容容器mx-auto/max-w-3xl"
+    },
+    "plan": "取消消息流768px居中上限，保留桌面24px/窄屏16px内边距；保持刚压紧的576px文件卡与现有操作逻辑。",
+    "acceptance": "1543/1440宽消息正文填满扣除边距的可用区域，窄屏无横向溢出；历史滚动与跳转不变。",
+    "implementation": "仅移除MessageList正文容器的mx-auto与max-w-3xl，保留外层24px边距；刚压紧的产物卡最大576px不变。",
+    "verification": {
+      "tests": "3文件27/27通过，零跳过",
+      "build": "通过",
+      "scope": "No new deterministic UI findings",
+      "behaviorChanged": false,
+      "newTests": "仅宽度样式调整，复用历史跟随/跳转和业务记录测试，不增加类名镜像断言。",
+      "desktop1543": {
+        "pane": 1025,
+        "beforeContent": 768,
+        "afterContent": 962,
+        "beforeLeft": 121,
+        "beforeRight": 136,
+        "afterLeft": 24,
+        "afterRight": 39,
+        "scrollbar": 15
+      },
+      "desktop1440": {
+        "pane": 922,
+        "content": 859,
+        "left": 24,
+        "right": 39,
+        "clientWidth": 907,
+        "scrollWidth": 907
+      },
+      "narrow760": {
+        "pane": 647,
+        "content": 584,
+        "left": 24,
+        "right": 39,
+        "clientWidth": 632,
+        "scrollWidth": 632
+      },
+      "viewportReset": true,
+      "screenshots": [
+        "message-width-1543.png",
+        "message-width-760.png"
+      ],
+      "path": "/Users/kevin/.codex/visualizations/2026/11/04/01a1a670-524f-7c90-9f7d-d83601fdcac1",
+      "logs": [
+        "/tmp/wes-message-width-tests.log",
+        "/tmp/wes-message-width-build.log",
+        "/tmp/wes-message-width-scope.log",
+        "/tmp/wes-message-width-db/test:modules.log"
+      ],
+      "modules": "隔离模块1242/1244通过、2失败、零跳过：late post-prepare checker after cancel cannot complete model 与 resolveKek缺省警告断言；均已在上一轮出现，本次仅改一处消息宽度样式。",
+      "board": "21页构建及一致性通过，0错误0警告，事件校验通过。"
+    }
+  }
+}

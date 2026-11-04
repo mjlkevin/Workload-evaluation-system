@@ -10,6 +10,9 @@ import { ToastProvider } from '../hooks/useToast.jsx'
 import HomePage from '../pages/HomePage.jsx'
 import { server } from './mocks/server.js'
 
+// Session titles also appear in the conversation header; target the rail explicitly.
+const sessionRail = () => within(screen.getByRole('region', { name: '会话', exact: true }))
+
 const BASE = '/api/v1'
 
 function doubleClickInlineField(button) {
@@ -27,7 +30,7 @@ function renderAiWorkbench() {
 }
 
 function requestSessionDelete(title) {
-  const sessionCard = screen.getByText(title).closest('[role="button"]')
+  const sessionCard = sessionRail().getByText(title).closest('[role="button"]')
   fireEvent.contextMenu(sessionCard, { clientX: 40, clientY: 40 })
   fireEvent.click(screen.getByRole('button', { name: '删除会话' }))
 }
@@ -737,7 +740,7 @@ describe('AiHomeWorkbench', () => {
     )
     renderAiWorkbench()
 
-    expect(await screen.findByText('待删除会话')).toBeInTheDocument()
+    expect(await sessionRail().findByText('待删除会话')).toBeInTheDocument()
     requestSessionDelete('待删除会话')
     expect(screen.getByRole('dialog', { name: '删除会话' })).toBeInTheDocument()
     expect(screen.getByText('确定要彻底删除这个 AI 会话吗？')).toBeInTheDocument()
@@ -745,11 +748,11 @@ describe('AiHomeWorkbench', () => {
     fireEvent.click(screen.getByRole('button', { name: '取消' }))
     expect(deleteCalled).toBe(0)
     expect(screen.queryByRole('dialog', { name: '删除会话' })).not.toBeInTheDocument()
-    expect(screen.getByText('待删除会话')).toBeInTheDocument()
+    expect(sessionRail().getByText('待删除会话')).toBeInTheDocument()
 
     requestSessionDelete('待删除会话')
     fireEvent.click(screen.getByRole('button', { name: '确认删除' }))
-    await waitFor(() => expect(screen.queryByText('待删除会话')).not.toBeInTheDocument())
+    await waitFor(() => expect(sessionRail().queryByText('待删除会话')).not.toBeInTheDocument())
     expect(deleteCalled).toBe(1)
     expect(screen.getByText('暂无历史会话')).toBeInTheDocument()
   })
@@ -800,7 +803,7 @@ describe('AiHomeWorkbench', () => {
 
     renderAiWorkbench()
 
-    expect(await screen.findByText('XX制造 WMS 粗评')).toBeInTheDocument()
+    expect(await sessionRail().findByText('XX制造 WMS 粗评')).toBeInTheDocument()
     expect(screen.getByText('粗评报告')).toBeInTheDocument()
     expect(screen.getByText('创建项目评估方案')).toBeInTheDocument()
 
@@ -928,7 +931,7 @@ describe('AiHomeWorkbench', () => {
     )
     renderAiWorkbench()
 
-    expect(await screen.findByText('待删除会话')).toBeInTheDocument()
+    expect(await sessionRail().findByText('待删除会话')).toBeInTheDocument()
     requestSessionDelete('待删除会话')
     expect(screen.getByRole('dialog', { name: '删除会话' })).toBeInTheDocument()
     expect(screen.getByText('确定要彻底删除这个 AI 会话吗？')).toBeInTheDocument()
@@ -936,11 +939,11 @@ describe('AiHomeWorkbench', () => {
     fireEvent.click(screen.getByRole('button', { name: '取消' }))
     expect(deleteCalled).toBe(0)
     expect(screen.queryByRole('dialog', { name: '删除会话' })).not.toBeInTheDocument()
-    expect(screen.getByText('待删除会话')).toBeInTheDocument()
+    expect(sessionRail().getByText('待删除会话')).toBeInTheDocument()
 
     requestSessionDelete('待删除会话')
     fireEvent.click(screen.getByRole('button', { name: '确认删除' }))
-    await waitFor(() => expect(screen.queryByText('待删除会话')).not.toBeInTheDocument())
+    await waitFor(() => expect(sessionRail().queryByText('待删除会话')).not.toBeInTheDocument())
     expect(deleteCalled).toBe(1)
     expect(screen.getByText('暂无历史会话')).toBeInTheDocument()
   })
