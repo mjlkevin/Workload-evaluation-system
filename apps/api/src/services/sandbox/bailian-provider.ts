@@ -228,7 +228,7 @@ export function createBailianSandboxProvider(connection: SandboxConnection, apiK
       await verifyTemplate();
       let sandbox: RemoteSandbox | undefined;
       try {
-        sandbox = await sdk.create(config.templateCode, { ...options, timeoutMs: Math.min(Math.floor(ttlSeconds), 900) * 1000, envs: {}, metadata: { wesManaged: 'true', wesConnectionId: config.id, wesJobId: jobId, wesTemplateRevision: config.templateRevision }, allowInternetAccess: false });
+        sandbox = await sdk.create(config.templateCode, { ...options, timeoutMs: Math.min(Math.floor(ttlSeconds), 900) * 1000, envs: {}, metadata: { wesManaged: 'true', wesConnectionId: config.id, wesJobId: jobId, wesTemplateRevision: config.templateRevision }, allowInternetAccess: false, network: { allowOut: [], denyOut: ['0.0.0.0/0', '::/0'], allowPublicTraffic: false } });
         const result = await sandbox.commands.run(helperCommand(BOOTSTRAP), { user: 'root', timeoutMs: 15000, envs: { WES_ROOT: `/tmp/wes-job-${jobId}` } });
         if (result.exitCode !== 0) throw new Error();
         return wrap(sandbox, jobId);

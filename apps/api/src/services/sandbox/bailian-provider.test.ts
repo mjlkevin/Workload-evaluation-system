@@ -42,6 +42,8 @@ test('SDK uses real bearer auth, pinned template, no secret environment and TTL 
   assert.equal(args[1].apiKey, 'e2b_123456'); assert.deepEqual(args[1].apiHeaders, { Authorization: 'Bearer private-key' });
   assert.deepEqual(args[1].envs, {}); assert.equal(JSON.stringify(args[1].metadata).includes('private-key'), false);
   assert.equal(args[1].metadata.wesManaged, 'true'); assert.equal(args[1].metadata.wesJobId, jobId);
+  assert.equal(args[1].allowInternetAccess, false);
+  assert.deepEqual(args[1].network, { allowOut: [], denyOut: ['0.0.0.0/0', '::/0'], allowPublicTraffic: false });
 });
 
 test('model code is uploaded as bytes and only fixed entrypoints execute in a private job cwd', async () => {
