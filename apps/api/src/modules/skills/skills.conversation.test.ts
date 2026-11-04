@@ -12,6 +12,7 @@ function fixture(output: unknown = { action: 'reply', message: '我可以将原�
   capability: { instructions: '保留查询和导出，至少两项', references: [] }, history: [], sources: [], materials: [], revision: 'rev1' };
  const service = createSkillConversationService({
   repository: { projectExecutionUser: async () => {}, read: async () => { reads++; return { ...context, revision: changed && reads > 1 ? 'rev2' : 'rev1' }; }, saveReply: async (...args: any[]) => { saves.push(args); return args[5]; } },
+  sandboxSubmit: async (...args: any[]) => { calls.push({ kind: 'sandbox', args }); return { status: 202, data: { runId: 'sandbox-run', sessionId: 'session', status: 'queued', eventCursor: 0 } }; },
   queue: { findRunForSubmissionKey: async () => existing },
   invocation: { submitInvocation: async (...args: any[]) => { runs.push(args); return { status: 202, data: { runId: 'run-1', sessionId: 'session', status: 'queued', eventCursor: 0 } }; } },
   model: { loadSettings: async () => settings, loadCredential: async () => 'test-placeholder', provider: { chatCompletion: async req => { calls.push(req); return { content: JSON.stringify(output), rawContent: '', attempts: 1, model: 'model', provider: 'fixture', usage: { completionTokens: 40, promptTokens: 30, totalTokens: 70 } }; } } },
@@ -54,4 +55,15 @@ for (const patch of [{ history: [] }, { instructions: 'forged' }, { selection: {
 test('相同已落库答复重放不再调用模型', async () => {
  const f = fixture(); f.context.existing = { action: 'clarify', message: '请给原文' };
  assert.equal((await f.service.respond(user, 'session', request)).action, 'clarify'); assert.equal(f.calls.length, 0);
+});
+
+test('explicit file task uses production sandbox plan without coercing Skill business input schema', async () => {
+ const f=fixture({action:'execute',message:'准备生成文件',input:{},plan:'sandbox'});
+ const out=await f.service.respond(user,'session',{...request,content:'请将已有结果生成Word文件'});
+ assert.equal(out.action,'execute');assert.equal(f.runs.length,0);assert.equal(f.calls.at(-1).kind,'sandbox');
+});
+test('combined analysis and document task preserves Skill input and persists document continuation', async () => {
+ const f=fixture({action:'execute',message:'先分析再生成文件',input:{text:'仓库管理员查询入库单'},plan:'skill_then_sandbox'});
+ await f.service.respond(user,'session',{...request,content:'请拆解需求并生成Excel'});
+ assert.equal(f.runs[0][3].sandboxFollowUp.content,'请拆解需求并生成Excel');
 });

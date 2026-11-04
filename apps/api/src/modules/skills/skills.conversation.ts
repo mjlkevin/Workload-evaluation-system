@@ -1,3 +1,4 @@
+import { submitSandboxConversation } from '../harness/sandbox/sandbox.conversation';
 import { performance } from 'node:perf_hooks';
 import type { AuthUser } from '../../types';
 import type { AiRunsSubmitResult } from '../harness/harness-runtime.usecase';
@@ -25,6 +26,7 @@ export interface SkillConversationRepository {
 }
 type Options = { repository?: SkillConversationRepository; model?: WorkbenchModelPorts;
  queue?: Pick<ReturnType<typeof createHarnessRuntimeRepository>, 'findRunForSubmissionKey'>;
+ sandboxSubmit?: typeof submitSandboxConversation;
  invocation?: Pick<ReturnType<typeof createSkillInvocationService>, 'submitInvocation'> };
 const invalid = () => new SkillError('SKILL_CONVERSATION_INVALID', '对话输入或模型结果无效，请重试', 422);
 const unavailable = () => new SkillError('SKILL_CONVERSATION_UNAVAILABLE', '技能对话暂不可用，请稍后重试', 503);
@@ -35,6 +37,7 @@ const instructions = `你是业务工作台助手。选择 Skill 或流程只是
 用户提出与能力相符的明确任务且材料和必填信息充分时，action=execute，并根据当前输入和历史补充生成符合inputSchema的input；不补充原文未提及的业务动作，不猜测业务数据。仅提供材料但未要求做任务时不能自动执行。
 缺少需求原文、任务目标或必填参数，或用户意图含糊时，action=clarify，在message中用自然语言问最少必要问题，不生成业务结果。可用模板清单只说明可选值，未指定时先询问。
 追问后的补充须结合前面明确的任务理解，不能要求用户重复所有信息。不能把选择标签、询问能力或询问执行结果当作执行授权。不得声称已执行、已写入或已生成结果。execute仅表示申请启动，写操作继续等待系统独立确认。
+若用户要求生成HTML、Word、Excel文件，plan=sandbox表示直接处理已有材料或已有结果；plan=skill_then_sandbox表示先用所选能力完成分析再生成文件，input必须仍符合原Skill inputSchema；普通能力执行plan=skill。plan仅在action=execute时可给出。不要把询问“能不能生成文件”误当成明确执行任务。
 只输出以下决策JSON：reply/clarify为{action,message}；execute为{action:"execute",message,input}。message是给用户的自然语言。不得调用工具。`;
 function parse(body: unknown, sessionId: string): ConversationRequest {
  try {
@@ -83,7 +86,7 @@ export function createSkillConversationService(options: Options = {}) {
     let response;
     try {
      const complete = await prepareWorkbenchModel(options.model ?? {}, guard, unavailable); guard();
-     response = await complete({ instructions, input, outputSchema: { type: 'object', properties: { action: { enum: ['reply','clarify','execute'] }, message: { type: 'string' }, input: {} }, required: ['action','message'], additionalProperties: false },
+     response = await complete({ instructions, input, outputSchema: { type: 'object', properties: { action: { enum: ['reply','clarify','execute'] }, message: { type: 'string' }, input: {}, plan: { enum: ['skill','sandbox','skill_then_sandbox'] } }, required: ['action','message'], additionalProperties: false },
       model: { scenario: 'generation', temperature: 0, maxTokens: 4096, timeoutMs: Math.max(1,Math.floor(deadline-performance.now())) }, tools: [], toolResults: [], signal: controller.signal });
     } catch { guard(); throw unavailable(); }
     guard();
@@ -91,7 +94,7 @@ export function createSkillConversationService(options: Options = {}) {
     if (response.toolCalls?.length || !Number.isSafeInteger(response.usage?.outputTokens) || response.usage.outputTokens < 1 || response.usage.outputTokens > 4096
      || !output || typeof output !== 'object' || Array.isArray(output) || !['reply','clarify','execute'].includes(output.action)
      || typeof output.message !== 'string' || !output.message.trim() || output.message.length > 16000
-     || Object.keys(output).sort().join(',') !== (output.action === 'execute' ? 'action,input,message' : 'action,message')) throw invalid();
+     || Object.keys(output).filter(k=>k!=='plan').sort().join(',') !== (output.action === 'execute' ? 'action,input,message' : 'action,message') || (output.plan !== undefined && (output.action !== 'execute' || !['skill','sandbox','skill_then_sandbox'].includes(output.plan)))) throw invalid();
     const fresh = await repository.read(user, sessionId, request, fingerprint); guard();
     if (fresh.existing) return fresh.existing;
     if (fresh.revision !== context.revision) throw changed();
@@ -99,6 +102,12 @@ export function createSkillConversationService(options: Options = {}) {
      const reply: ConversationReply = { action: output.action, message: output.message.trim() };
      if (timer) { clearTimeout(timer); timer = undefined; }
      return repository.saveReply(user, sessionId, request, fingerprint, fresh, reply, response.model);
+    }
+    if (output.plan === 'sandbox') {
+     if (timer) { clearTimeout(timer); timer=undefined; }
+     const result=await (options.sandboxSubmit ?? submitSandboxConversation)(user,sessionId,request,fingerprint,fresh);
+     await repository.projectExecutionUser(user,sessionId,result.data.runId);
+     return {action:'execute' as const,run:result.data};
     }
     const validate = compileSkillPayloadSchema(fresh.target.inputSchema, 'inputSchema');
     if (!validate(output.input)) throw new SkillError('SKILL_CONVERSATION_INPUT_INVALID', '模型生成的任务输入不完整或无效，请补充具体需求后重试', 422);
@@ -109,7 +118,7 @@ export function createSkillConversationService(options: Options = {}) {
     // Admission owns its durable outcome once mutation starts; never time it out after acceptance.
     if (timer) { clearTimeout(timer); timer = undefined; }
     try {
-     const result = await invocation.submitInvocation(user, sessionId, { submissionKey: key, content: request.content, execution }, { conversationFingerprint: fingerprint, expectedVersionId: request.selection.versionId });
+     const result = await invocation.submitInvocation(user, sessionId, { submissionKey: key, content: request.content, execution }, { conversationFingerprint: fingerprint, expectedVersionId: request.selection.versionId, ...(output.plan === 'skill_then_sandbox' ? { sandboxFollowUp: { content: request.content, selection: request.selection } } : {}) });
      await repository.projectExecutionUser(user, sessionId, result.data.runId);
      return { action: 'execute' as const, run: result.data };
     } catch (error) { const existing = await replay(true); if (existing) return existing; throw error; }
