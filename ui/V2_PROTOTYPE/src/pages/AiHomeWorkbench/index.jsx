@@ -6,7 +6,8 @@ import { sessionRuntimeStore } from '../../hooks/useSessionRuntimeStore.js'
 import useChatMessages from './hooks/useChatMessages.js'
 import useHarnessRun from './hooks/useHarnessRun.js'
 import useBusinessExecution from './hooks/useBusinessExecution.js'
-import SkillInvocationDialog from './components/SkillInvocationDialog.jsx'
+import useComposerBusinessTask from './hooks/useComposerBusinessTask.js'
+import ComposerTaskParameters from './components/ComposerTaskParameters.jsx'
 import BusinessExecutionSummary from './components/BusinessExecutionSummary.jsx'
 import { buildBusinessConversationEntries, groupBusinessConversationEntries } from './utils/businessMessageTimeline.js'
 import useWorkbenchState from './hooks/useWorkbenchState.js'
@@ -39,8 +40,11 @@ export default function AiHomeWorkbench({ currentUser }) {
   const hasBusinessExecution = business.runs.length > 0 || !!workbench.unifiedView?.runs?.some(
     run => run.sessionId === workbench.activeSession?.sessionId && run.hasBusinessExecution,
   )
-  const [invocationOpen, setInvocationOpen] = useState(false)
-  const ensureBusinessSession = async (name) => workbench.activeSession || workbench.createSession({ title: name, workflowKey: 'free_chat', status: 'temporary_chat' })
+  const invocation = useComposerBusinessTask({ workbench, userId: currentUser?.id || currentUser?.userId, onStarted: () => {
+    business.refresh()
+    workbench.refreshUnifiedView?.()
+    backgroundRuns.notifyRunsChanged?.()
+  } })
   const sessionRuns = useMemo(() => {
     const map = {}
     backgroundRuns.runs.forEach((run) => { if (run.sessionId) map[run.sessionId] = run })
@@ -189,7 +193,7 @@ export default function AiHomeWorkbench({ currentUser }) {
         />
       </aside>
 
-      <ChatArea preset={workbench.preset} workbench={{ ...workbench, backgroundRuns }} chat={{ ...chat, sendMessage: sendMessageWithRunsNotify }} harness={harness} conversation={conversation} business={business} onChooseBusinessTask={() => setInvocationOpen(true)} />
+      <ChatArea preset={workbench.preset} workbench={{ ...workbench, backgroundRuns }} chat={{ ...chat, sendMessage: sendMessageWithRunsNotify }} harness={harness} conversation={conversation} business={business} invocation={invocation} />
 
       <WorkspacePanel
         collapsed={workbench.workspacePanelCollapsed}
@@ -204,17 +208,7 @@ export default function AiHomeWorkbench({ currentUser }) {
       >
         {hasBusinessExecution && <BusinessExecutionSummary entries={conversation} runs={business.runs} />}
       </WorkspacePanel>
-      <SkillInvocationDialog
-        open={invocationOpen}
-        onClose={() => setInvocationOpen(false)}
-        ensureSession={ensureBusinessSession}
-        session={workbench.activeSession}
-        onStarted={() => {
-          business.refresh()
-          workbench.refreshUnifiedView?.()
-          backgroundRuns.notifyRunsChanged?.()
-        }}
-      />
+      <ComposerTaskParameters invocation={invocation} />
 
       {workbench.deleteTargetSession && (
         <ConfirmDialog

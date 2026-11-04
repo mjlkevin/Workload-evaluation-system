@@ -12,6 +12,7 @@ import { CopyMessageButton, MessageModelName, MessageTimestamp } from './Message
 export default function MessageBubble({
   message,
   index,
+  invocation,
   sending,
   confirmingActionId,
   onOptionSelect,
@@ -57,6 +58,9 @@ export default function MessageBubble({
             toolActionState={toolActionState}
           />
         )}
+        {isUser && invocation && <span aria-label={`已调用 ${invocation.kind === 'skill' ? 'Skill' : '流程'} ${invocation.target.name}`} className="mb-2 inline-flex max-w-full items-center gap-2 rounded-md border border-line bg-brand-soft px-2 py-1 text-xs text-brand-ink">
+          <span>{invocation.kind === 'skill' ? 'Skill' : '流程'}</span><span className="min-w-0 break-words">{invocation.target.name}</span>
+        </span>}
         {message.loading ? (
           <div>
             <div style={{ fontSize: 13, fontWeight: 800, lineHeight: 1.7 }}>{message.text}</div>

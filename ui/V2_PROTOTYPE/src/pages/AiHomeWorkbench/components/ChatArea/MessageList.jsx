@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef } from 'react'
 import BusinessExecutionMessage from '../BusinessExecutionMessage.jsx'
 import { BusinessRunActions } from '../BusinessExecutionControls.jsx'
 import MessageBubble from './MessageBubble.jsx'
+import { normalizeProjectionSource } from '../../utils/messageFormatter.js'
 import { RoleBadge } from './MessageBits.jsx'
 
 export default function MessageList({ messages, paneRef, activeWorkflow, centerTitle, centerHint, outputState, onChooseFile, bubbleProps, sessionId, sending, business }) {
@@ -63,7 +64,11 @@ export default function MessageList({ messages, paneRef, activeWorkflow, centerT
 
       <div style={{ display: 'grid', gap: 14 }}>
         {messages.map((message, index) => {
-          if (message.type !== 'business') return <MessageBubble key={message.id || `${message.role}-${index}`} message={message} index={index} {...bubbleProps} />
+          if (message.type !== 'business') {
+            const source = message.role === 'user' && normalizeProjectionSource(message.projectionSource)
+            const invocation = source && business?.runs?.find(run => run.sessionId === sessionId && run.runId === source.runId)?.businessExecution
+            return <MessageBubble key={message.id || `${message.role}-${index}`} message={message} index={index} {...bubbleProps} invocation={invocation} />
+          }
           const run = business?.runs?.find(item => item.runId === message.currentRunId)
           const first = !seenRoots.has(message.rootRunId)
           seenRoots.add(message.rootRunId)

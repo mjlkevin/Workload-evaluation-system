@@ -17,10 +17,10 @@ vi.mock('../components/AiWorkbench/SessionRail.jsx', () => ({ default: () => nul
 vi.mock('../pages/AiHomeWorkbench/components/ChatArea/WorkflowTemplates.jsx', () => ({ default: () => null }))
 vi.mock('../pages/AiHomeWorkbench/components/WorkspacePanel/index.jsx', () => ({ default: ({ children }) => children }))
 vi.mock('../pages/AiHomeWorkbench/components/SkillInvocationDialog.jsx', () => ({ default: ({ open, onStarted }) => open && <button onClick={onStarted}>模拟服务端启动成功</button> }))
-vi.mock('../pages/AiHomeWorkbench/components/ChatArea/index.jsx', () => ({ default: ({ business, onChooseBusinessTask }) => {
+vi.mock('../pages/AiHomeWorkbench/components/ChatArea/index.jsx', () => ({ default: ({ business, invocation }) => {
   const { runs, refresh: onRefresh, submitInput: onInput, decide: onDecision, retry: onRetry, stop: onStop } = business
   return <>
-  <button onClick={onChooseBusinessTask}>选择业务任务</button>
+  <button onClick={() => invocation.selectTask({kind:"skill",id:"skill-a",name:"测试",inputSchema:{type:"object",properties:{}}})}>选择测试任务</button><button onClick={invocation.send}>发送测试任务</button>
   <output data-testid="business-status">{runs.map(run => run.status).join(',')}</output>
   <button onClick={onRefresh}>刷新业务状态</button>
   <button onClick={() => onInput('business-1', {}, {})}>业务输入</button>
@@ -116,7 +116,9 @@ describe('业务执行与统一视图计数对账', () => {
   beforeEach(() => {
     serverRuns = []
     refreshUnifiedView = vi.fn()
-    workbench = { activeSession: { sessionId: 'session-a' }, sessions: [], preset: { workflows: [] }, workspacePanelCollapsed: false }
+    workbench = { activeSession: { sessionId: 'session-a' }, sessions: [], preset: { workflows: [] }, workspacePanelCollapsed: false, composer: '真实提示词', setComposer: vi.fn(), setSelectedFile: vi.fn() }
+    businessApi.listExecutionCatalog.mockResolvedValue([{kind:"skill",id:"skill-a",name:"测试",inputSchema:{type:"object",properties:{}}}])
+    businessApi.startBusinessExecution.mockResolvedValue({runId:"business-1"})
     businessApi.listBusinessRuns.mockImplementation(async id => serverRuns.filter(run => run.sessionId === id))
     runsApi.getRunSnapshot.mockImplementation(async id => ({ run: serverRuns.find(run => run.runId === id), businessExecution: { kind: 'workflow', target: { name: '业务流程' } } }))
     useWorkbenchState.mockImplementation(() => {
@@ -131,8 +133,8 @@ describe('业务执行与统一视图计数对账', () => {
     render(<AiHomeWorkbench />)
     serverRuns = [activeRun]
     businessApi.listBusinessRuns.mockResolvedValue([])
-    fireEvent.click(screen.getByRole('button', { name: '选择业务任务' }))
-    fireEvent.click(screen.getByRole('button', { name: '模拟服务端启动成功' }))
+    fireEvent.click(screen.getByRole('button', { name: '选择测试任务' }))
+    fireEvent.click(screen.getByRole('button', { name: '发送测试任务' }))
     expect(await screen.findByText('后台任务 进行中 1 · 已完成 0')).toBeInTheDocument()
     expect(refreshUnifiedView).toHaveBeenCalled()
     expect(workbench.toggleWorkspacePanel).not.toHaveBeenCalled()

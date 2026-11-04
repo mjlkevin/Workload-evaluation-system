@@ -163,3 +163,10 @@ it('初始默认展开的输入范围不关闭跟随：未溢出的会话无滚�
   host.rerender(<MemoryRouter><AiHomeWorkbench /></MemoryRouter>)
   expect(pane.scrollTop).toBe(1200)
 })
+it('已发送提示词显示服务端绑定的Skill标签；刷新回放不依赖本地选择', () => {
+  const run=snapshot(); run.businessExecution.kind='skill'
+  chat.messages=[{id:'sent',role:'user',text:'请处理这份需求',projectionSource:{runId:run.runId,eventType:'user_message',deduplicationKey:`${run.runId}:user:1`}}]
+  business.runs=[run];mount()
+  const message=screen.getByText('请处理这份需求').closest('article')
+  expect(within(message).getByLabelText('已调用 Skill 实际业务任务')).toBeInTheDocument()
+})
