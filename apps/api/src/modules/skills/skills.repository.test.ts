@@ -8,7 +8,8 @@ import { skillRevisions, skillVersions, skillReleaseEvents, skillEvaluations, sk
 import { createSkillsPgRepository } from './skills-pg.repository';
 import { SkillError, type SkillDefinition } from './skills.types';
 
-assert.equal(new URL(process.env.TEST_DATABASE_URL!).pathname, '/workload_eval_test');
+// Match the global test setup guard while allowing isolated *_test databases.
+assert.ok(new URL(process.env.TEST_DATABASE_URL!).pathname.endsWith('_test'), 'repository tests require an explicit *_test database');
 const repo = createSkillsPgRepository(testDb);
 const actor = { id: 'skills-repo-test', username: '仓储测试' };
 const definition: SkillDefinition = {
@@ -24,7 +25,7 @@ function code(expected: string) {
   return (error: unknown) => error instanceof SkillError && error.code === expected;
 }
 after(async () => {
-  assert.equal(new URL(process.env.TEST_DATABASE_URL!).pathname, '/workload_eval_test');
+  assert.ok(new URL(process.env.TEST_DATABASE_URL!).pathname.endsWith('_test'), 'repository cleanup requires an explicit *_test database');
   try { await testDb.execute(sql`TRUNCATE TABLE execution_emergency_audits, workflow_skill_dependencies, workflow_revisions, workflow_versions, workflow_definitions, skill_release_events, skill_release_reviews, skill_evaluations, skill_revisions, skill_versions, skill_definitions`); }
   finally { await testPool.end(); }
 });
