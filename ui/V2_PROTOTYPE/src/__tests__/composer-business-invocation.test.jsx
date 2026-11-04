@@ -84,3 +84,60 @@ it.each(['success','failure'])('迟到%s不清除或覆盖用户新写的草稿'
  await act(async()=>{if(outcome==='success')resolve({action:'reply',message:'回答'});else reject(new Error('network'));await sending})
  expect(h.result.current.composer).toBe('下一条草稿')
 })
+
+function mountControlledAttachment() {
+ return renderHook(() => {
+  const [composer,setComposer]=useState(wb.composer)
+  const [selectedFile,setSelectedFile]=useState(wb.selectedFile)
+  const invocation=useComposerBusinessTask({workbench:{...wb,composer,setComposer,selectedFile,setSelectedFile},onStarted,userId:'u1'})
+  return {...invocation,composer,setComposer,selectedFile,setSelectedFile}
+ })
+}
+function prepareAttachment() {
+ wb.selectedFile=new File(['原始需求材料'],'需求.md',{type:'text/markdown'})
+ api.uploadExecutionSource.mockResolvedValue({attachmentId:'file-1',sourceAvailable:true})
+ return wb.selectedFile
+}
+it('附件随用户消息入流立即离开编辑区，等待模型期间气泡保留文件信息',async()=>{
+ const file=prepareAttachment();let resolve
+ api.sendSkillConversation.mockImplementation(()=>new Promise(done=>{resolve=done}))
+ const h=mountControlledAttachment();act(()=>h.result.current.selectTask(task));let sending
+ act(()=>{sending=h.result.current.send()});await waitFor(()=>expect(resolve).toBeTypeOf('function'))
+ expect(h.result.current.selectedFile).toBeNull()
+ expect(h.result.current.pendingMessages[0].file).toEqual({name:file.name,size:file.size,type:file.type})
+ await act(async()=>{resolve({action:'execute',run:{runId:'new-run'}});await sending})
+ expect(h.result.current.selectedFile).toBeNull()
+})
+it('发送失败恢复同一File，重试复用已上传材料与提交键',async()=>{
+ const file=prepareAttachment();let reject
+ api.sendSkillConversation.mockImplementationOnce(()=>new Promise((_,fail)=>{reject=fail}))
+ const h=mountControlledAttachment();act(()=>h.result.current.selectTask(task));let sending
+ act(()=>{sending=h.result.current.send()});await waitFor(()=>expect(reject).toBeTypeOf('function'))
+ expect(h.result.current.selectedFile).toBeNull()
+ await act(async()=>{reject(new Error('network'));await sending})
+ expect(h.result.current.selectedFile).toBe(file);expect(h.result.current.composer).toBe('原始提示词')
+ const key=api.sendSkillConversation.mock.calls[0][1].submissionKey
+ await act(()=>h.result.current.send())
+ expect(api.uploadExecutionSource).toHaveBeenCalledTimes(1)
+ expect(api.sendSkillConversation.mock.calls[1][1]).toMatchObject({submissionKey:key,sources:[{kind:'file',id:'file-1'}]})
+})
+it.each(['success','failure'])('迟到%s不清除或覆盖新选择的附件',async outcome=>{
+ prepareAttachment();let resolve,reject
+ api.sendSkillConversation.mockImplementation(()=>new Promise((done,fail)=>{resolve=done;reject=fail}))
+ const h=mountControlledAttachment();act(()=>h.result.current.selectTask(task));let sending
+ act(()=>{sending=h.result.current.send()});await waitFor(()=>expect(resolve).toBeTypeOf('function'))
+ const next=new File(['下一份'],'新材料.md');act(()=>h.result.current.setSelectedFile(next))
+ await act(async()=>{if(outcome==='success')resolve({action:'reply',message:'回答'});else reject(new Error('network'));await sending})
+ expect(h.result.current.selectedFile).toBe(next)
+})
+it('请求发出后A→B→A的迟到失败不恢复旧附件或旧正文',async()=>{
+ prepareAttachment();let reject
+ api.sendSkillConversation.mockImplementation(()=>new Promise((_,fail)=>{reject=fail}))
+ const h=mountControlledAttachment();act(()=>h.result.current.selectTask(task));let sending
+ act(()=>{sending=h.result.current.send()});await waitFor(()=>expect(reject).toBeTypeOf('function'))
+ wb={...wb,activeSession:{sessionId:'b'}};h.rerender()
+ wb={...wb,activeSession:{sessionId:'a'}};h.rerender()
+ await act(async()=>{reject(new Error('old request'));await sending})
+ expect(h.result.current.selectedFile).toBeNull();expect(h.result.current.composer).toBe('')
+ expect(h.result.current.error).toBe('');expect(h.result.current.busy).toBe(false)
+})

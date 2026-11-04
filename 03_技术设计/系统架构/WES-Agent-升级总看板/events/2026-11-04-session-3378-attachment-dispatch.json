@@ -1,0 +1,188 @@
+{
+  "id": "BE-2026-11-04-session-3378-attachment-dispatch",
+  "date": "2026-11-04",
+  "type": "diagnosis",
+  "status": "browser_verified_user_acceptance_pending",
+  "scope": "AI工作台带Skill附件发送",
+  "summary": "补充附件发送残留及用户反馈执行停滞的证据，复用已有Issue。",
+  "pages": [
+    "issues",
+    "defects",
+    "plan",
+    "testing",
+    "monitoring",
+    "changes"
+  ],
+  "issueId": "ISS-2026-11-04-003",
+  "defectId": "DEF-2026-11-04-002",
+  "relatedIssueId": "ISS-2026-11-04-001",
+  "sessionId": "33782966-44d4-476f-b38e-6af1a96856cc",
+  "originalRequest": "两个问题，上传附件，发送消息。还是存在消息框残留的问题。其次，发送之后跑不下去",
+  "dedup": "附件残留命中ISS-2026-11-04-003，扩展同一清空时机缺陷；运行展示补证据到ISS-2026-11-04-001，未重复建项。",
+  "observed": {
+    "uploadedAt": "2026-11-04T14:18:00.145Z",
+    "conversationResponse": {
+      "status": 200,
+      "durationMs": 39954
+    },
+    "runId": "9f21a119-7dd9-46d2-a166-0b112c5b995d",
+    "runCreatedAt": "2026-11-04T14:18:40.080Z",
+    "runCompletedAt": "2026-11-04T14:19:17.078Z",
+    "requirementsCount": 15,
+    "assistantMessageCountThisRun": 0,
+    "businessOutputPersisted": true,
+    "browser": "复验页需登录，待用户登录；不能将业务结果不写assistant/message判为结果丢失。"
+  },
+  "rootCause": "带标签发送仅立即清空正文；附件在await sendSkillConversation后才清空，等待模型期间误显示将随下一条发送。",
+  "design": "发送前捕获原File；消息入流时清空附件并显示在用户气泡，失败仅同scope且无新附件时恢复，重试复用source和submissionKey。执行停滞暂不改后端，先核实业务投影和实际页面。",
+  "acceptance": [
+    "模型未返回时输入框无已发正文/附件，用户气泡保留原文与附件。",
+    "失败恢复附件与原文，不覆盖新草稿/其他会话；重试不重复上传。",
+    "后台完成后的真实业务结果可见且没有永久理解占位。"
+  ],
+  "implementation": {
+    "files": [
+      "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/hooks/useComposerBusinessTask.js",
+      "ui/V2_PROTOTYPE/src/__tests__/composer-business-invocation.test.jsx"
+    ],
+    "behavior": "附件随pending用户消息入流即清空；失败在相同scope且无新File时恢复原File；成功不再迟到清空；保持source与submissionKey重试复用。",
+    "committed": false,
+    "pushed": false
+  },
+  "verification": {
+    "red": {
+      "pass": 14,
+      "fail": 2,
+      "log": "/tmp/wes-3378-attachment-red.log"
+    },
+    "targeted": {
+      "pass": 41,
+      "fail": 0,
+      "files": 3,
+      "log": "/tmp/wes-3378-attachment-final.log",
+      "coverage": "补充请求发送后A→B→A迟到失败不恢复旧附件与旧正文"
+    },
+    "buildWeb": "通过，/tmp/wes-3378-attachment-build.log",
+    "uiScope": "无新增确定性问题",
+    "web": {
+      "pass": 1021,
+      "fail": 29,
+      "files": 108,
+      "log": "/tmp/wes-3378-attachment-web.log",
+      "note": "此全量先于新增1条已通过的scope回归，未声称1051条全量通过。"
+    },
+    "modules": {
+      "pass": 1238,
+      "fail": 6,
+      "skipped": 0,
+      "tests": 1244,
+      "log": "/tmp/wes-3378-attachment-modules-driver.log",
+      "mode": "C11双URL同指workload_eval_test",
+      "failures": [
+        "5条执行期限/取消时序",
+        "1条resolveKek配置环境回退"
+      ],
+      "isolated": {
+        "file": "skills.execution.test.ts",
+        "pass": 66,
+        "fail": 0,
+        "log": "/tmp/wes-3378-attachment-isolated-driver.log"
+      },
+      "note": "未修改后端、凭据配置或失败断言。"
+    },
+    "browser": {
+      "environment": "内置浏览器http://127.0.0.1:3006，用户mjlkevin，1281px桌面视口",
+      "originalSession": {
+        "sessionId": "33782966-44d4-476f-b38e-6af1a96856cc",
+        "count": 15,
+        "ids": "REQ-001至REQ-015",
+        "pending": false,
+        "inputEmpty": true,
+        "attachmentStatus": "已发送",
+        "afterReturn": "15条仍可见"
+      },
+      "attachmentTest": {
+        "sessionId": "9af3a9b0-e4c4-4123-912a-a23713e9221d",
+        "runId": "d8ee9c3a-ef19-4b25-b063-32362054b8ae",
+        "material": "本次新建的合成md，不是真实客户材料",
+        "prompt": "【附件回归测试】请仅拆解本次附加的合成材料，不使用其他会话材料。",
+        "whilePending": {
+          "composerText": "",
+          "composerContainsFile": false,
+          "userBubbleContainsFile": true,
+          "pending": true
+        },
+        "completed": {
+          "requirements": 1,
+          "status": "completed",
+          "createdAt": "2026-11-04T14:31:27.201Z",
+          "completedAt": "2026-11-04T14:31:38.972Z"
+        },
+        "afterReload": {
+          "resultVisible": true,
+          "composerText": "",
+          "composerContainsFile": false,
+          "pending": false,
+          "sendEnabled": true,
+          "fileStatus": "已发送"
+        }
+      },
+      "screenshots": [
+        "docs/superpowers/evidence/2026-11-04-wes-sandbox/3378-original-15-results.png",
+        "docs/superpowers/evidence/2026-11-04-wes-sandbox/3378-attachment-cleared-pending.png",
+        "docs/superpowers/evidence/2026-11-04-wes-sandbox/3378-attachment-completed-refresh.png"
+      ],
+      "failureRecovery": "本轮未人为制造真实网络故障；原File恢复、重复上传与跨会话迟到隔离由自动化验证。",
+      "userAcceptance": "待用户确认，不把代理浏览器复验当用户验收。"
+    },
+    "review": "独立复核无阻断，另行实跑16/16；服务器持久化后附件展示未验证。",
+    "baselineFailureComparison": {
+      "method": "复制当前UI工作区到临时目录，仅将本次两文件恢复为HEAD内容；不改主目录",
+      "files": 7,
+      "pass": 63,
+      "fail": 18,
+      "log": "/tmp/wes-3378-attachment-baseline-failures.log",
+      "note": "18项assessment-frozen-basis失败同样存在；其余11项全量失败在此隔离定向运行未复现，不把它们一概判为固定基线故障。"
+    },
+    "board": {
+      "pages": 21,
+      "errors": 0,
+      "warnings": 0
+    },
+    "followupFocused": {
+      "pass": 17,
+      "fail": 0,
+      "log": "/tmp/wes-3378-attachment-browser-followup-tests.log"
+    },
+    "publicationSnapshot": {
+      "base": "fb9821e0060ac54bab73992e418fa2af104be533",
+      "method": "从Git暂存树导出隔离快照，只含本次12文件；排除其他未提交WIP",
+      "web": {
+        "files": 105,
+        "pass": 1027,
+        "fail": 0,
+        "log": "/tmp/wes-attachment-publish-web.log"
+      },
+      "buildWeb": "通过，/tmp/wes-attachment-publish-build.log",
+      "secretScan": "12个提交文件扫描无命中",
+      "board": {
+        "pages": 21,
+        "errors": 0,
+        "warnings": 0,
+        "log": "/tmp/wes-attachment-publish-isolated-board-check.log"
+      },
+      "note": "此前混合工作区Web29失败、modules6失败记录保留；本次后端源码不变。"
+    }
+  },
+  "next": "用户可直接在内置浏览器查看原会话15条结果；附件补修已实机验证，待用户验收及后续提交指示。",
+  "executionDisplayStatus": "原会话中央消息区实际显示REQ-001至REQ-015，已完成，无理解占位；切换会话返回后仍可见。历史截图时的等待未复现为永久停滞，未新增后端修复。",
+  "boundary": "本轮只新增合成测试会话和一次明确拆解任务；原会话只读查看，未重发、未审批、未重置历史Run；本轮无产品源码变更。",
+  "publication": {
+    "authorization": "用户明确要求提交推送",
+    "branch": "main",
+    "remote": "origin",
+    "status": "ready_to_commit",
+    "base": "fb9821e0060ac54bab73992e418fa2af104be533",
+    "scope": "附件发送清空修复、5条新增回归、限定看板记录与3张实机截图"
+  }
+}

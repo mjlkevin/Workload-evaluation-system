@@ -41,7 +41,7 @@ export default function useComposerBusinessTask({ workbench, onStarted, userId }
     if (!draft.prompt && !draft.file) { setError('请输入问题、任务或附加材料。'); return }
     if (draft.file && (draft.file.size > 2 * 1024 * 1024 || !/\.(xlsx|txt|md)$/i.test(draft.file.name))) { setError('支持 2 MiB 内的 .xlsx、.txt 或 .md 材料。'); return }
     flight.current = token; setBusy(true); setError('')
-    let clearedPrompt = false
+    let clearedPrompt = false, clearedFile = false
     try {
       const catalog = await listExecutionCatalog()
       if (!scope.current(token)) return
@@ -64,14 +64,15 @@ export default function useComposerBusinessTask({ workbench, onStarted, userId }
       const fingerprint = JSON.stringify([session.sessionId, body])
       if (attempt.current?.fingerprint !== fingerprint) attempt.current = { fingerprint, submissionKey: crypto.randomUUID() }
       if (!scope.current(token)) return
-      setPendingMessages([{ id: `skill-chat-user:${attempt.current.submissionKey}`, role: 'user', text: body.content, skillContext: { kind: current.kind, target: { name: current.name } } }, { id: `skill-chat-assistant:${attempt.current.submissionKey}`, role: 'assistant', text: '正在理解你的输入…', loading: true }])
+      const file = draft.file ? { name: draft.file.name, size: draft.file.size, type: draft.file.type } : undefined
+      setPendingMessages([{ id: `skill-chat-user:${attempt.current.submissionKey}`, role: 'user', text: body.content, ...(file ? { file } : {}), skillContext: { kind: current.kind, target: { name: current.name } } }, { id: `skill-chat-assistant:${attempt.current.submissionKey}`, role: 'assistant', text: '正在理解你的输入…', loading: true }])
       // The submitted text already belongs to the message stream, even while the model is pending.
       if (latest.current.composer === draft.rawPrompt) { latest.current.setComposer(''); latest.current.clearComposerDraft?.(); clearedPrompt = true }
+      if (draft.file && latest.current.selectedFile === draft.file) { latest.current.setSelectedFile?.(null); clearedFile = true }
       const result = await sendSkillConversation(session.sessionId, { ...body, submissionKey: attempt.current.submissionKey })
       if (!scope.current(token)) return
       setError('')
       if (result.action === 'execute') { setSelectedTask(null); onStarted?.(result.run) }
-      if (latest.current.selectedFile === draft.file) latest.current.setSelectedFile?.(null)
       attempt.current = null; upload.current = null
       // Persisted reply/clarification and task user messages share the existing central history source.
       try { await latest.current.loadSessions?.() } catch { /* loadSessions owns its visible error state. */ }
@@ -79,6 +80,7 @@ export default function useComposerBusinessTask({ workbench, onStarted, userId }
       if (scope.current(token)) {
         // A functional restore preserves text entered after dispatch and handles batched rejection.
         if (clearedPrompt) latest.current.setComposer(current => current === '' ? draft.rawPrompt : current)
+        if (clearedFile) latest.current.setSelectedFile?.(current => current == null ? draft.file : current)
         setError(message(err))
       }
     }
