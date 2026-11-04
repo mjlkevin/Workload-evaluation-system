@@ -46,8 +46,9 @@
       "ui/V2_PROTOTYPE/src/__tests__/composer-business-invocation.test.jsx"
     ],
     "behavior": "附件随pending用户消息入流即清空；失败在相同scope且无新File时恢复原File；成功不再迟到清空；保持source与submissionKey重试复用。",
-    "committed": false,
-    "pushed": false
+    "committed": true,
+    "pushed": true,
+    "sourceCommit": "c0049717651ad53c9535f239e0451c2c155d8bc7"
   },
   "verification": {
     "red": {
@@ -174,15 +175,19 @@
       "note": "此前混合工作区Web29失败、modules6失败记录保留；本次后端源码不变。"
     }
   },
-  "next": "用户可直接在内置浏览器查看原会话15条结果；附件补修已实机验证，待用户验收及后续提交指示。",
+  "next": "本次附件补修与验证记录已提交并推送；用户最终验收仍待明确确认，其他未提交工作保留。",
   "executionDisplayStatus": "原会话中央消息区实际显示REQ-001至REQ-015，已完成，无理解占位；切换会话返回后仍可见。历史截图时的等待未复现为永久停滞，未新增后端修复。",
   "boundary": "本轮只新增合成测试会话和一次明确拆解任务；原会话只读查看，未重发、未审批、未重置历史Run；本轮无产品源码变更。",
   "publication": {
     "authorization": "用户明确要求提交推送",
     "branch": "main",
     "remote": "origin",
-    "status": "ready_to_commit",
+    "status": "source_pushed_verified",
     "base": "fb9821e0060ac54bab73992e418fa2af104be533",
-    "scope": "附件发送清空修复、5条新增回归、限定看板记录与3张实机截图"
+    "scope": "附件发送清空修复、5条新增回归、限定看板记录与3张实机截图",
+    "sourceCommit": "c0049717651ad53c9535f239e0451c2c155d8bc7",
+    "verifiedRemoteHeadAtReceipt": "c0049717651ad53c9535f239e0451c2c155d8bc7",
+    "verifiedBy": "git push origin main成功，git ls-remote核实与源提交一致；随后仅回填本发布回执。",
+    "ci": "尚未核实GitHub CI，未声称CI通过。"
   }
 }
