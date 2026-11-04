@@ -37,3 +37,5 @@
 真实云合成脚本生成三类文件并释放实例；uid1000、环境仅PATH/HOME/LANG，stdout/stderr各限16KiB，超时返回124。模型代码通过非交互脚本执行，必须逐个写入当前工作目录下的输出文件；BytesIO、最后表达式和打印结果不会被自动保存。
 
 接口依据：[创建模板](https://help.aliyun.com/zh/model-studio/sandbox-api-template-create)、[创建实例](https://help.aliyun.com/zh/model-studio/sandbox-api-create)。临时Key未保存连接或凭据配置，生产另配独立Key。
+
+本地验收更新：用户已明确授权创建独立WES验收Key，当前preview库default连接已启用、模板检查200。凭据仅以既有AES-GCM方式保存，未存此前Qoderwork临时Key；生产环境另行配置。Kimi工具枚举已补显式字符串类型，原会话HTML验收详见实现记录。

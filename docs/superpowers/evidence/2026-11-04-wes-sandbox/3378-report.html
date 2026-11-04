@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>需求解析报告</title>
+<style>
+body{font-family:sans-serif;max-width:860px;margin:0 auto;padding:24px;line-height:1.7;color:#333}
+h1{border-bottom:2px solid #2f6fdb;padding-bottom:8px}
+h2{margin-top:28px;font-size:1.15em;color:#2f6fdb}
+.label{font-weight:bold}
+.src{background:#f5f7fa;padding:8px 12px;border-left:3px solid #ccc}
+ul{margin:6px 0;padding-left:22px}
+</style>
+</head>
+<body>
+<h1>需求解析报告</h1>
+<p>共 7 条需求条目</p>
+<h2>REQ-001 门店店长实时查看库存及安全库存预警</h2>
+<p><span class="label">需求描述：</span>门店店长能够在系统中实时查看本门店各商品的当前库存数量，并能看到安全库存预警信息（如低于安全线的标识）。</p>
+<p class="src"><span class="label">原文：</span>门店店长需要在系统里实时查看本店各商品的库存数量和安全库存预警</p>
+<p class="label">待确认问题：</p>
+<ul>
+<li>“实时”的具体要求是什么（如秒级刷新、分钟级同步）？</li>
+<li>安全库存预警的展示形式是什么（列表标识、颜色提示、单独预警页面）？</li>
+<li>安全库存线由谁维护、按什么维度设置（门店级还是商品级）？</li>
+<li>店长是否只能查看本店数据，是否需要权限控制？</li>
+</ul>
+<h2>REQ-002 库存低于安全线自动推送企业微信提醒</h2>
+<p><span class="label">需求描述：</span>当商品库存低于安全库存线时，系统自动通过企业微信向对应门店店长和区域督导推送提醒消息。</p>
+<p class="src"><span class="label">原文：</span>库存低于安全线时系统自动通过企业微信推送提醒给店长和区域督导</p>
+<p class="label">待确认问题：</p>
+<ul>
+<li>推送的触发机制是什么（实时触发还是定时扫描）？</li>
+<li>同一商品持续低于安全线时是否重复推送，频率如何控制？</li>
+<li>提醒消息需要包含哪些内容（商品、当前库存、安全库存等）？</li>
+<li>区域督导与门店的对应关系如何确定？</li>
+<li>企业微信的对接方式是否已有现成接口或应用？</li>
+</ul>
+<h2>REQ-003 总部采购按分类和供应商查询近90天出入库流水</h2>
+<p><span class="label">需求描述：</span>总部采购人员可以按商品分类、供应商两个维度查询近90天内的出入库流水记录。</p>
+<p class="src"><span class="label">原文：</span>总部采购人员可以按商品分类、供应商维度查询近90天的出入库流水</p>
+<p class="label">待确认问题：</p>
+<ul>
+<li>出入库流水需要展示哪些字段（单据类型、数量、时间、门店等）？</li>
+<li>查询范围是全部门店还是可指定门店？</li>
+<li>“近90天”是否允许自定义时间范围？</li>
+<li>商品分类和供应商数据来源于现有ERP还是本系统维护？</li>
+</ul>
+<h2>REQ-004 出入库流水导出Excel</h2>
+<p><span class="label">需求描述：</span>总部采购人员可以将查询到的出入库流水结果导出为Excel文件。</p>
+<p class="src"><span class="label">原文：</span>并支持导出Excel</p>
+<p class="label">待确认问题：</p>
+<ul>
+<li>导出是否受查询条件限制（仅导出当前筛选结果）？</li>
+<li>导出数据量是否有上限？</li>
+<li>导出文件的列字段和格式是否有既定模板？</li>
+</ul>
+<h2>REQ-005 与ERP采购订单模块对接同步采购在途数量</h2>
+<p><span class="label">需求描述：</span>系统需与现有自研ERP的采购订单模块对接，自动同步采购在途数量，供库存管理使用。</p>
+<p class="src"><span class="label">原文：</span>系统需要与现有ERP的采购订单模块对接，自动同步采购在途数量</p>
+<p class="label">待确认问题：</p>
+<ul>
+<li>ERP采购订单模块提供何种对接方式（API、数据库、消息队列）？</li>
+<li>同步频率要求是什么（实时、定时）？</li>
+<li>在途数量的口径如何定义（已下单未收货、部分收货如何处理）？</li>
+<li>同步失败时的异常处理和对账机制要求？</li>
+</ul>
+<h2>REQ-006 门店间调拨需区域经理审批后生效</h2>
+<p><span class="label">需求描述：</span>门店之间发起库存调拨时，必须经过区域经理审批通过后调拨才能生效（库存数量才发生变更）。</p>
+<p class="src"><span class="label">原文：</span>门店之间调拨需要区域经理审批后才能生效</p>
+<p class="label">待确认问题：</p>
+<ul>
+<li>调拨申请的发起角色是谁（店长还是其他岗位）？</li>
+<li>审批流程是单级审批还是可能多级？</li>
+<li>审批通过/驳回后库存如何变更，是否有在途调拨状态？</li>
+<li>审批是否需要消息通知（如企业微信）？</li>
+<li>区域经理与门店的管辖关系数据从哪里来？</li>
+</ul>
+<h2>REQ-007 每月1号自动生成上月库存盘点差异汇总表</h2>
+<p><span class="label">需求描述：</span>系统在每月1号自动生成上一个自然月的库存盘点差异汇总表，满足财务要求。</p>
+<p class="src"><span class="label">原文：</span>财务要求每月1号自动生成上月库存盘点差异汇总表</p>
+<p class="label">待确认问题：</p>
+<ul>
+<li>盘点差异汇总表包含哪些字段和统计口径（按门店、按商品）？</li>
+<li>盘点数据如何产生（系统内盘点功能还是导入）？</li>
+<li>生成后如何提供给财务（系统内查看、导出、推送）？</li>
+<li>生成时间点（1号几点）及失败重跑机制要求？</li>
+<li>差异的认定规则是什么（实盘与账面差异）？</li>
+</ul>
+</body>
+</html>
