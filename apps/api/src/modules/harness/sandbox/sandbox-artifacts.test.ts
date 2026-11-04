@@ -114,6 +114,26 @@ test('unsupported raw-text contexts cannot disguise navigation through nested st
     await assert.rejects(validateSandboxArtifact('x.html', 'html', Buffer.from(html)));
   }
 });
+test('Unicode whitespace never changes a non-raw browser tag into a scanner raw-text element', async () => {
+  for (const space of ['\u00a0', '\u000b', '\u2003', '\u2028']) {
+    const html = `<html><head><style${space}><meta http-equiv="refresh" content="0;url=https://bad.example"></style></head><body>report</body></html>`;
+    await assert.rejects(validateSandboxArtifact('x.html', 'html', Buffer.from(html)));
+  }
+});
+test('canonical HTML tree must retain explicit structural sections and forbid active nodes', async () => {
+  // HTML ignores the textarea token in a select; the scanner would otherwise
+  // mistake the following live refresh element for inert textarea contents.
+  const html = '<html><head></head><body><select><style><meta http-equiv="refresh" content="0;url=https://bad.example"></style></select></body></html>';
+  await assert.rejects(validateSandboxArtifact('x.html', 'html', Buffer.from(html)));
+});
+test('HTML parser has pre-parse marker and canonical traversal resource budgets', async () => {
+  const html = '<html><head></head><body>' + '<p>x</p>'.repeat(10001) + '</body></html>';
+  await assert.rejects(validateSandboxArtifact('x.html', 'html', Buffer.from(html)));
+  // Fewer than 20k source markers, but text/comment siblings exceed the DOM
+  // node budget after the standard parser constructs the canonical tree.
+  const nodes = '<html><head></head><body>' + 'x<!-- note -->'.repeat(10001) + '</body></html>';
+  await assert.rejects(validateSandboxArtifact('x.html', 'html', Buffer.from(nodes)));
+});
 test('private store roundtrip is atomic, UUID-only, bounded and refuses symlinks', async () => {
   const root = await mkdtemp(join(tmpdir(), 'wes-artifacts-')); const store = new LocalSandboxArtifactStore(root); const id = randomUUID();
   try {

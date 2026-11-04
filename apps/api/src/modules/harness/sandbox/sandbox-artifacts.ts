@@ -3,6 +3,7 @@ import { mkdir, lstat, open, realpath, rename, unlink, chmod } from 'node:fs/pro
 import { join, resolve, posix } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { inflateRawSync } from 'node:zlib';
+import { parse as parseHtml, type DefaultTreeAdapterTypes } from 'parse5';
 import { assertSandboxRelativePath, SANDBOX_MAX_FILE_BYTES, SANDBOX_UUID } from '../../../services/sandbox/sandbox-provider';
 
 export const SANDBOX_HTML_CSP = "default-src 'none'; script-src 'none'; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'; frame-src 'none'; frame-ancestors 'self'; style-src 'unsafe-inline'; img-src data:; sandbox";
@@ -185,9 +186,46 @@ function validateOffice(format: 'docx' | 'xlsx', bytes: Buffer): void {
 /** Conservative HTML grammar: explicit document sections and balanced tags.
  * Raw-text elements consume through their real end tag, as browsers do; their
  * apparent `<body>` text cannot stand in for the actual document body. */
+const FORBIDDEN_HTML_ELEMENTS = new Set(['base', 'form', 'iframe', 'frame', 'frameset', 'object', 'embed', 'portal', 'link', 'set', 'svg', 'math', 'plaintext', 'noscript', 'xmp', 'noembed', 'noframes']);
+function checkHtmlAttribute(key: string, value: string): void {
+  if (key.startsWith('on') || ['http-equiv', 'target', 'action', 'formaction', 'ping', 'srcdoc'].includes(key)) fail();
+  if ((key === 'href' || key.endsWith(':href')) && !/^#[a-zA-Z0-9_.:-]*$/.test(value)) fail();
+}
+
+function checkCanonicalHtml(html: string, scannerElements: Map<number, string>): void {
+  const document = parseHtml(html, { sourceCodeLocationInfo: true, scriptingEnabled: true });
+  const pending: Array<{ node: DefaultTreeAdapterTypes.Node; depth: number }> = [{ node: document, depth: 0 }];
+  const canonicalElements = new Set<number>(); let count = 0;
+  while (pending.length) {
+    const { node, depth } = pending.pop()!;
+    if (++count > 20000 || depth > 128) fail();
+    if ('tagName' in node) {
+      const name = node.tagName, location = node.sourceCodeLocation;
+      if (node.namespaceURI !== 'http://www.w3.org/1999/xhtml' || FORBIDDEN_HTML_ELEMENTS.has(name) || name.startsWith('animate') || node.attrs.length > 64) fail();
+      for (const attr of node.attrs) checkHtmlAttribute(attr.name.toLowerCase(), attr.value);
+      if (location?.startTag) {
+        const offset = location.startTag.startOffset;
+        if (scannerElements.get(offset) !== name || canonicalElements.has(offset)) fail();
+        canonicalElements.add(offset);
+      } else if (name !== 'tbody' && name !== 'colgroup') fail();
+      if (name === 'html' || name === 'head' || name === 'body') {
+        if (!location?.startTag || !location.endTag || (name === 'html' ? node.parentNode?.nodeName !== '#document' : !node.parentNode || !('tagName' in node.parentNode) || node.parentNode.tagName !== 'html')) fail();
+      }
+      if (name === 'template' && 'content' in node) pending.push({ node: node.content, depth: depth + 1 });
+    }
+    if ('childNodes' in node) for (const child of node.childNodes) pending.push({ node: child, depth: depth + 1 });
+  }
+  // Browser-ignored/renamed tags, reconstructed formatting nodes, and active
+  // markup hidden by a scanner raw-text assumption cannot silently disappear.
+  if (canonicalElements.size !== scannerElements.size) fail();
+}
+
 function validateHtml(bytes: Buffer): void {
   const html = utf8(bytes);
   if (html.includes('\0')) fail();
+  let markers = 0;
+  for (let i = 0; i < html.length; i++) if (html[i] === '<' && ++markers > 20000) fail();
+  const scannerElements = new Map<number, string>();
   const stack: string[] = [];
   const voids = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr']);
   const raw = new Set(['script', 'style', 'title', 'textarea']);
@@ -196,7 +234,7 @@ function validateHtml(bytes: Buffer): void {
   while (cursor < html.length) {
     const start = html.indexOf('<', cursor);
     const text = html.slice(cursor, start < 0 ? html.length : start);
-    if ((!stack.length || stack[stack.length - 1] === 'html' || stack[stack.length - 1] === 'head') && text.trim()) fail();
+    if ((!stack.length || stack[stack.length - 1] === 'html' || stack[stack.length - 1] === 'head') && /[^\t\n\f\r ]/.test(text)) fail();
     if (start < 0) { cursor = html.length; break; }
     if (html.startsWith('<!--', start)) {
       const end = html.indexOf('-->', start + 4); if (end < 0) fail();
@@ -206,7 +244,7 @@ function validateHtml(bytes: Buffer): void {
       if (content.startsWith('>') || content.startsWith('->') || content.endsWith('-') || /--|[<>]/.test(content)) fail();
       cursor = end + 3; continue;
     }
-    const declaration = /^<!doctype\s+html\s*>/i.exec(html.slice(start));
+    const declaration = /^<!doctype[\t\n\f\r ]+html[\t\n\f\r ]*>/i.exec(html.slice(start));
     if (declaration) {
       if (doctype || sections || stack.length) fail();
       doctype = true; cursor = start + declaration[0].length; continue;
@@ -220,28 +258,29 @@ function validateHtml(bytes: Buffer): void {
       else if (char === '<') fail();
     }
     if (end >= html.length || quote) fail();
-    const token = html.slice(start + 1, end), close = /^\/([a-z][a-z0-9:-]*)\s*$/i.exec(token);
+    const token = html.slice(start + 1, end), close = /^\/([a-z][a-z0-9:-]*)[\t\n\f\r ]*$/i.exec(token);
     cursor = end + 1;
     if (close) {
       if (stack.pop() !== close[1].toLowerCase()) fail();
       continue;
     }
-    const open = /^([a-z][a-z0-9:-]*)(?:\s[^<>]*)?\/?$/i.exec(token);
+    const open = /^([a-z][a-z0-9:-]*)(?:[\t\n\f\r ][^<>]*)?\/?$/i.exec(token);
     if (!open) fail();
     const name = open![1].toLowerCase(), parent = stack[stack.length - 1];
     // Foreign-content parsing changes HTML raw-text rules, so inline SVG/MathML
     // are outside this conservative preview grammar; data images remain usable.
-    if (['base', 'form', 'iframe', 'frame', 'frameset', 'object', 'embed', 'portal', 'link', 'set', 'svg', 'math', 'plaintext', 'noscript', 'xmp', 'noembed', 'noframes'].includes(name) || name.startsWith('animate')) fail();
+    if (FORBIDDEN_HTML_ELEMENTS.has(name) || name.startsWith('animate')) fail();
+    scannerElements.set(start, name);
     // CSP does not prevent this iframe from navigating itself. Reject refresh,
     // embedded browsing contexts and navigation attributes before preview.
     let attributes = token.slice(open![1].length).replace(/\/$/, '');
     const seen = new Set<string>();
-    while (attributes.trim()) {
-      const attr = /^\s+([^\s"'<>/=\x00-\x20]+)(?:\s*=\s*(?:"([^"<]*)"|'([^'<]*)'|([^\s"'`=<>]+)))?/.exec(attributes);
+    while (/[^\t\n\f\r ]/.test(attributes)) {
+      const attr = /^[\t\n\f\r ]+([^\t\n\f\r "'<>/=\x00-\x20]+)(?:[\t\n\f\r ]*=[\t\n\f\r ]*(?:"([^"<]*)"|'([^'<]*)'|([^\t\n\f\r "'`=<>]+)))?/.exec(attributes);
       if (!attr) fail();
       const key = attr![1].toLowerCase(), value = attr![2] ?? attr![3] ?? attr![4] ?? '';
-      if (seen.has(key) || seen.size >= 64 || key.startsWith('on') || ['http-equiv', 'target', 'action', 'formaction', 'ping', 'srcdoc'].includes(key)) fail();
-      if ((key === 'href' || key.endsWith(':href')) && !/^#[a-zA-Z0-9_.:-]*$/.test(value)) fail();
+      if (seen.has(key) || seen.size >= 64) fail();
+      checkHtmlAttribute(key, value);
       seen.add(key); attributes = attributes.slice(attr![0].length);
     }
     if (name === 'html') { if (sections || stack.length) fail(); sections = 1; }
@@ -264,6 +303,7 @@ function validateHtml(bytes: Buffer): void {
     } else { if (stack.length >= 128) fail(); stack.push(name); }
   }
   if (stack.length || sections !== 3) fail();
+  checkCanonicalHtml(html, scannerElements);
 }
 
 export async function validateSandboxArtifact(path: string, format: 'html' | 'docx' | 'xlsx', bytes: Buffer): Promise<{ mimeType: string; sha256: string; size: number }> {
