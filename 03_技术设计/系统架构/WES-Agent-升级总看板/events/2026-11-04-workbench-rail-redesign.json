@@ -138,7 +138,7 @@
     "backendRestarted": false
   },
   "review": "五轴自查：原回调与停止二次确认保持；原生选择不嵌套按钮；菜单键盘/指针焦点分开；搜索不变更选择；仅现有tokens与React，不新增业务写入。",
-  "integrationState": "唯一活动目录main的本地未提交改动；未推送。",
+  "integrationState": "本次UI代码已提交为 5221aa80c9d64a607a3b87fd27bb3c3381a04e87；用户已授权推送，实际结果见2026-11-04-ui-polish-push.json。",
   "additionalPages": [
     "design"
   ],
@@ -155,5 +155,6 @@
     }
   ],
   "boardValidation": "board-build生成21页；board-consistency-check 0错误0警告；board-event-check通过。",
-  "boardScope": "同步issues、requirements、design、plan、testing、monitoring、changes。沿用既有编号，需求数量与阶段不变；事件为过程资产，不新增独立文档KPI。"
+  "boardScope": "同步issues、requirements、design、plan、testing、monitoring、changes。沿用既有编号，需求数量与阶段不变；事件为过程资产，不新增独立文档KPI。",
+  "submissionValidation": "本批精确提交快照105文件1022/1022与构建通过；此前混合工作区失败记录保留。"
 }

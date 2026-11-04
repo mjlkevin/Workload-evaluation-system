@@ -1,0 +1,147 @@
+{
+  "id": "BE-2026-11-04-ui-polish-push",
+  "date": "2026-11-04",
+  "type": "verification",
+  "scope": "本轮工作台侧栏、聊天区、产物卡和顶部页签的提交与推送",
+  "summary": "按用户“提交、推送”授权分批提交本轮UI，保留其他本地改动。",
+  "status": "四个UI提交完成；精确快照全量通过；文档提交及推送待执行",
+  "pages": [
+    "index",
+    "plan",
+    "testing",
+    "monitoring",
+    "changes"
+  ],
+  "authorization": "用户明确要求：提交、推送。",
+  "baseCommit": "985fd432f4a6179f838f50569d43c668d6018faf",
+  "selectedFiles": [
+    "ui/V2_PROTOTYPE/src/components/AiWorkbench/SessionRail.jsx",
+    "ui/V2_PROTOTYPE/src/components/AiWorkbench/RailIcon.jsx",
+    "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/index.jsx",
+    "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/ChatArea/BackgroundRunsPanel.jsx",
+    "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/ChatArea/WorkflowTemplates.jsx",
+    "ui/V2_PROTOTYPE/src/__tests__/workbench-rail.test.jsx",
+    "03_技术设计/系统架构/WES-Agent-升级总看板/events/2026-11-04-workbench-rail-redesign.json",
+    "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/ChatArea/index.jsx",
+    "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/ChatArea/Composer.jsx",
+    "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/ChatArea/MessageList.jsx",
+    "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/ChatArea/MessageBubble.jsx",
+    "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/ChatArea/ThinkingTrace.jsx",
+    "ui/V2_PROTOTYPE/src/index.css",
+    "ui/V2_PROTOTYPE/src/__tests__/chat-area-ui.test.jsx",
+    "ui/V2_PROTOTYPE/src/__tests__/AiHomeWorkbench.test.jsx",
+    "ui/V2_PROTOTYPE/src/__tests__/draft-roundtrip.test.jsx",
+    "ui/V2_PROTOTYPE/src/__tests__/session-isolation.test.jsx",
+    "ui/V2_PROTOTYPE/src/__tests__/streaming-ux.test.jsx",
+    "ui/V2_PROTOTYPE/src/__tests__/unified-view.test.jsx",
+    "03_技术设计/系统架构/WES-Agent-升级总看板/events/2026-11-04-workbench-chat-ui.json",
+    "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/ChatArea/SandboxArtifacts.jsx",
+    "ui/V2_PROTOTYPE/src/__tests__/SandboxArtifacts.test.jsx",
+    "03_技术设计/系统架构/WES-Agent-升级总看板/events/2026-11-04-artifact-card-ui.json",
+    "ui/V2_PROTOTYPE/src/components/Layout/WorkspaceTabs.jsx",
+    "ui/V2_PROTOTYPE/layout.css",
+    "ui/V2_PROTOTYPE/src/__tests__/WorkspaceTabsOverflow.test.jsx",
+    "ui/V2_PROTOTYPE/src/__tests__/WorkspaceTabsScrollHint.test.jsx",
+    "03_技术设计/系统架构/WES-Agent-升级总看板/events/2026-11-04-workspace-tabs-overflow.json",
+    "README.md",
+    "ui/V2_PROTOTYPE/README.md",
+    "03_技术设计/系统演进/实现与文档对齐说明.md",
+    "03_技术设计/系统架构/WES-Agent-升级总看板/index.html",
+    "03_技术设计/系统架构/WES-Agent-升级总看板/issues.html",
+    "03_技术设计/系统架构/WES-Agent-升级总看板/requirements.html",
+    "03_技术设计/系统架构/WES-Agent-升级总看板/design.html",
+    "03_技术设计/系统架构/WES-Agent-升级总看板/plan.html",
+    "03_技术设计/系统架构/WES-Agent-升级总看板/testing.html",
+    "03_技术设计/系统架构/WES-Agent-升级总看板/monitoring.html",
+    "03_技术设计/系统架构/WES-Agent-升级总看板/changes.html",
+    "03_技术设计/系统架构/WES-Agent-升级总看板/events/2026-11-04-ui-polish-push.json"
+  ],
+  "excluded": "未包含评估模块、沙箱后端、运行配置及其他会话过程记录；共享文件仅提取本轮标记区块和RP-068新增台账。",
+  "ledgerScope": "本轮提交快照从53项增至54项（23已验收、20待验、9推进、2暂缓）；工作目录55项还包含未提交RP-066等本地状态更新，不一并提交。",
+  "review": "分为四个业务表面提交，单提交少于1000变更行；五轴检查通过，隔离HTML维持CSP原文与空sandbox，API/权限不变；无新增依赖。",
+  "verification": {
+    "firstWeb": "精确待提交快照105文件，1019/1022；3个页面加载断言失败。",
+    "repeatWeb": "根脚本重跑1021/1022；1个不同页面加载断言失败。",
+    "isolated": "首轮3个失败文件单独19/19通过。",
+    "concurrencyNote": "前两轮根脚本未把worker选项透传给vitest，实际为默认并发；最终改用UI包脚本透传并明确单进程。",
+    "finalWeb": "明确单进程105文件1022/1022通过，零失败、零跳过；原并发3项/1项页面加载失败留证。",
+    "build": "精确待提交快照build:web通过",
+    "secrets": "本轮39个文件显式扫描通过，无密钥字段；不宣称全项目安全审计。",
+    "board": "精确待提交快照21页，0错误0警告，四个事件校验通过",
+    "logs": [
+      "/tmp/wes-ui-push-export-web.log",
+      "/tmp/wes-ui-push-export-web-serial.log",
+      "/tmp/wes-ui-push-export-isolated.log",
+      "/tmp/wes-ui-push-export-web-one-worker.log",
+      "/tmp/wes-ui-push-export-build.log",
+      "/tmp/wes-ui-push-export-board-check.log",
+      "/tmp/wes-ui-push-export-secrets.log"
+    ],
+    "backendModules": "本批未修改API/数据库；精确快照只复跑前端和构建，不把此前混合工作区的模块测试当作本批后端验证。",
+    "uiScope": "No new deterministic UI findings；/tmp/wes-ui-push-scope.log"
+  },
+  "publication": {
+    "remote": "origin",
+    "branch": "main",
+    "pushed": false
+  },
+  "humanAcceptance": "用户授权提交推送，不等同于各业务需求整体用户验收完成。",
+  "commits": [
+    {
+      "hash": "5221aa80c9d64a607a3b87fd27bb3c3381a04e87",
+      "title": "feat(workbench): 让会话与工作流入口更清晰易达",
+      "files": [
+        "ui/V2_PROTOTYPE/src/components/AiWorkbench/SessionRail.jsx",
+        "ui/V2_PROTOTYPE/src/components/AiWorkbench/RailIcon.jsx",
+        "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/index.jsx",
+        "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/ChatArea/BackgroundRunsPanel.jsx",
+        "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/ChatArea/WorkflowTemplates.jsx",
+        "ui/V2_PROTOTYPE/src/__tests__/workbench-rail.test.jsx",
+        "03_技术设计/系统架构/WES-Agent-升级总看板/events/2026-11-04-workbench-rail-redesign.json"
+      ],
+      "event": "2026-11-04-workbench-rail-redesign.json"
+    },
+    {
+      "hash": "6246436a085d1b366d662e96f4ae31ae07dda994",
+      "title": "feat(workbench): 提升对话阅读与输入操作效率",
+      "files": [
+        "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/ChatArea/index.jsx",
+        "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/ChatArea/Composer.jsx",
+        "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/ChatArea/MessageList.jsx",
+        "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/ChatArea/MessageBubble.jsx",
+        "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/ChatArea/ThinkingTrace.jsx",
+        "ui/V2_PROTOTYPE/src/index.css",
+        "ui/V2_PROTOTYPE/src/__tests__/chat-area-ui.test.jsx",
+        "ui/V2_PROTOTYPE/src/__tests__/AiHomeWorkbench.test.jsx",
+        "ui/V2_PROTOTYPE/src/__tests__/draft-roundtrip.test.jsx",
+        "ui/V2_PROTOTYPE/src/__tests__/session-isolation.test.jsx",
+        "ui/V2_PROTOTYPE/src/__tests__/streaming-ux.test.jsx",
+        "ui/V2_PROTOTYPE/src/__tests__/unified-view.test.jsx",
+        "03_技术设计/系统架构/WES-Agent-升级总看板/events/2026-11-04-workbench-chat-ui.json"
+      ],
+      "event": "2026-11-04-workbench-chat-ui.json"
+    },
+    {
+      "hash": "929c8c578f7d54e18c10ba6a8d0e89af381c80a2",
+      "title": "fix(workbench): 压紧产物卡并恢复隔离预览",
+      "files": [
+        "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/ChatArea/SandboxArtifacts.jsx",
+        "ui/V2_PROTOTYPE/src/__tests__/SandboxArtifacts.test.jsx",
+        "03_技术设计/系统架构/WES-Agent-升级总看板/events/2026-11-04-artifact-card-ui.json"
+      ],
+      "event": "2026-11-04-artifact-card-ui.json"
+    },
+    {
+      "hash": "93d29f2cbaa1cb4729bf813e2dbdadbb903e888a",
+      "title": "feat(workspace): 让过多页签保持单行且可快速切换",
+      "files": [
+        "ui/V2_PROTOTYPE/src/components/Layout/WorkspaceTabs.jsx",
+        "ui/V2_PROTOTYPE/layout.css",
+        "ui/V2_PROTOTYPE/src/__tests__/WorkspaceTabsOverflow.test.jsx",
+        "ui/V2_PROTOTYPE/src/__tests__/WorkspaceTabsScrollHint.test.jsx",
+        "03_技术设计/系统架构/WES-Agent-升级总看板/events/2026-11-04-workspace-tabs-overflow.json"
+      ],
+      "event": "2026-11-04-workspace-tabs-overflow.json"
+    }
+  ]
+}

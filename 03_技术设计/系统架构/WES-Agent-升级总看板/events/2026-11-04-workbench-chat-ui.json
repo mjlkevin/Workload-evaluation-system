@@ -148,7 +148,7 @@
     "newBusinessMutation": false
   },
   "review": "五轴自查：输入/Slash/IME/附件/复制与确认回调保持；局部正文CSS只供MessageBubble使用；历史跳转仅本地滚动，跟随状态按会话恢复；菜单重复打开复用末尾命令；未改后端、状态源或左栏。",
-  "integrationState": "唯一活动目录main的本地未提交改动；未推送。",
+  "integrationState": "本次UI代码已提交为 6246436a085d1b366d662e96f4ae31ae07dda994；用户已授权推送，实际结果见2026-11-04-ui-polish-push.json。",
   "evidence": [
     {
       "ref": "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/ChatArea/index.jsx",
@@ -223,5 +223,6 @@
       "modules": "隔离模块1242/1244通过、2失败、零跳过：late post-prepare checker after cancel cannot complete model 与 resolveKek缺省警告断言；均已在上一轮出现，本次仅改一处消息宽度样式。",
       "board": "21页构建及一致性通过，0错误0警告，事件校验通过。"
     }
-  }
+  },
+  "submissionValidation": "本批精确提交快照105文件1022/1022与构建通过；此前混合工作区失败记录保留。"
 }
