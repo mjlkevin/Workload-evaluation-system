@@ -104,5 +104,38 @@
     "runtimeConfigurationCommitted": false,
     "worktreesRetained": true
   },
-  "next": "原长提示超时、后续结构化结果衔接、Office人工编辑及生产独立配置继续按原范围验证。"
+  "next": "原长提示超时、后续结构化结果衔接、Office人工编辑及生产独立配置继续按原范围验证。",
+  "postMergeVerification": {
+    "mainApiBuild": "pass",
+    "mainFocused": {
+      "tests": 36,
+      "pass": 36,
+      "fail": 0,
+      "skipped": 0
+    },
+    "fixedCandidateSandbox": {
+      "tests": 49,
+      "pass": 49,
+      "fail": 0,
+      "skipped": 0
+    },
+    "sourcePreservationHashChecks": 13,
+    "board": {
+      "pages": 21,
+      "errors": 0,
+      "warnings": 0
+    },
+    "workingTreeScope": "主目录原SKU工作与后续公网策略文档保持未提交；源码合并固定ac0a078",
+    "dependencyBootstrap": "完整安装因注册表/离线缓存不足未完成；本地node_modules临时复用已验证目录的e2b2.31.0、parse5 7.3.0、workspace Ajv8与ajv-formats；不进Git，候选工作树保留",
+    "failureEvidence": [
+      "/tmp/wes-merge-main-install-offline.log",
+      "/tmp/wes-merge-main-build-api-linked.log"
+    ],
+    "passedEvidence": [
+      "/tmp/wes-merge-main-build-api-final.log",
+      "/tmp/wes-merge-main-focused-driver.log",
+      "/tmp/wes-merge-ac0-corrected-driver.log",
+      "/tmp/wes-merge-main-board-check.log"
+    ]
+  }
 }
