@@ -1,3 +1,4 @@
+import SandboxArtifacts from './SandboxArtifacts.jsx'
 import InteractiveFormCard from '../../../../components/AiWorkbench/InteractiveFormCard.jsx'
 import { pickArray } from '../../utils/harnessPayload.js'
 import ThinkingTrace from './ThinkingTrace.jsx'
@@ -93,6 +94,7 @@ export default function MessageBubble({
             onSubmit={onAskUserSubmit}
           />
         )}
+        {!isUser && !message.error && <SandboxArtifacts artifacts={(message.toolCalls || []).flatMap(call => call.artifacts || [])} />}
         {!isUser && !message.error && pickArray(message.artifacts).map((artifact) => (
           <ReportViewer
             key={artifact.harnessArtifactId || artifact.artifactId || artifact.title}

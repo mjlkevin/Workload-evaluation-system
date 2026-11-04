@@ -1,3 +1,4 @@
+import SandboxArtifacts from './SandboxArtifacts.jsx'
 import ToolCallChip from './ToolCallChip.jsx'
 import { TOOL_CALL_STATUS } from '../../utils/messageFormatter.js'
 import AskUserForm from './AskUserForm.jsx'
@@ -51,6 +52,7 @@ export default function RunToolTray({ calls, toolActionState, onApprove, onRejec
           />
         ))}
       </div>
+      <SandboxArtifacts artifacts={list.flatMap(call => call.artifacts || [])} />
       {/* 批次 9：刷新后仍要能把控件交回用户，否则 Run 卡在 waiting 而界面上无处可填 */}
       {onAskUserSubmit && (
         <AskUserForm calls={list} actionState={toolActionState} onSubmit={onAskUserSubmit} />

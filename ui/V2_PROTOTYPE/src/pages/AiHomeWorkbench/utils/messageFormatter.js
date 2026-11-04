@@ -79,6 +79,10 @@ const MAX_ERROR_PREVIEW_CHARS = 120
 
 function normalizeToolCallFields(call) {
   const out = {}
+  if (Array.isArray(call.artifacts)) {
+    const artifacts = call.artifacts.slice(0, 5).filter(a => a && /^[a-f0-9-]{36}$/i.test(a.id) && ['html', 'docx', 'xlsx'].includes(a.format) && typeof a.name === 'string' && typeof a.title === 'string' && Number.isFinite(a.size) && Number.isFinite(Date.parse(a.expiresAt)))
+    if (artifacts.length) out.artifacts = artifacts.map(({id,name,title,format,size,expiresAt}) => ({id,name,title,format,size,expiresAt}))
+  }
   if (Number.isInteger(call.callIndex) && call.callIndex > 0) out.callIndex = call.callIndex
   if (TOOL_CALL_STATUSES.has(call.status)) out.status = call.status
   if (Number.isFinite(call.elapsedMs) && call.elapsedMs >= 0) out.elapsedMs = call.elapsedMs
@@ -296,7 +300,7 @@ export function applyToolCallEventToList(calls, event, context = {}) {
       name: displayName,
       ...(callIndex ? { callIndex } : {}),
       status,
-      ...normalizeToolCallFields({ elapsedMs: payload.elapsedMs, errorPreview: payload.error }),
+      ...normalizeToolCallFields({ elapsedMs: payload.elapsedMs, errorPreview: payload.error, ...(eventType === TOOL_CALL_EVENT_TYPES.COMPLETED && displayName === 'sandbox_execute' ? { artifacts: payload.artifacts } : {}) }),
     }]
   }
 
@@ -343,7 +347,7 @@ export function applyToolCallEventToList(calls, event, context = {}) {
   if (current.status === TOOL_CALL_STATUS.REJECTED) {
     const next = {
       ...current,
-      ...normalizeToolCallFields({ elapsedMs: payload.elapsedMs, errorPreview: payload.error }),
+      ...normalizeToolCallFields({ elapsedMs: payload.elapsedMs, errorPreview: payload.error, ...(eventType === TOOL_CALL_EVENT_TYPES.COMPLETED && displayName === 'sandbox_execute' ? { artifacts: payload.artifacts } : {}) }),
     }
     if (JSON.stringify(next) === JSON.stringify(current)) return null
     return list.map((call, i) => (i === index ? next : call))
@@ -356,7 +360,7 @@ export function applyToolCallEventToList(calls, event, context = {}) {
     ...current,
     ...(displayName && !current?.name ? { name: displayName } : {}),
     status,
-    ...normalizeToolCallFields({ elapsedMs: payload.elapsedMs, errorPreview: payload.error }),
+    ...normalizeToolCallFields({ elapsedMs: payload.elapsedMs, errorPreview: payload.error, ...(eventType === TOOL_CALL_EVENT_TYPES.COMPLETED && displayName === 'sandbox_execute' ? { artifacts: payload.artifacts } : {}) }),
   }
   if (next.approval) {
     // 收口后不再需要展示参数：approval 只留决策痕迹
