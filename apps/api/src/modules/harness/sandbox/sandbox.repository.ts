@@ -217,7 +217,7 @@ export function createSandboxRepository(
     async patch(id, patch) {
       await database
         .update(jobs)
-        .set({ ...patch, updatedAt: new Date() })
+        .set({ ...patch, ...(patch.execution ? {execution: sql`${jobs.execution} || ${JSON.stringify(patch.execution)}::jsonb`} : {}), updatedAt: new Date() })
         .where(
           and(
             eq(jobs.id, id),
