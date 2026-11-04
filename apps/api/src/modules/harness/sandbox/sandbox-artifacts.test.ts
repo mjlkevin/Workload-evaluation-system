@@ -92,6 +92,28 @@ test('HTML rejects active navigation independently of CSP, preserving fragment r
   ]) await assert.rejects(validateSandboxArtifact('x.html', 'html', wrap(head, body)));
   assert.ok(await validateSandboxArtifact('x.html', 'html', wrap('<meta charset="utf-8">', '<a href="#section">jump</a><p id="section">正文</p>')));
 });
+test('HTML rejects abrupt or malformed comments that browsers close before hidden navigation', async () => {
+  for (const head of [
+    '<!--><meta http-equiv="refresh" content="0;url=https://bad.example"><!-- -->',
+    '<!---><meta http-equiv="refresh" content="0;url=https://bad.example"><!-- -->',
+    '<!-- safe --!><meta http-equiv="refresh" content="0;url=https://bad.example"><!-- -->',
+    '<!-- nested <!--><meta http-equiv="refresh" content="0;url=https://bad.example"><!-- -->',
+    '<!-- internal -- comment -->',
+  ]) await assert.rejects(validateSandboxArtifact('x.html', 'html', Buffer.from(`<html><head>${head}</head><body>report</body></html>`)));
+  assert.ok(await validateSandboxArtifact('x.html', 'html', Buffer.from('<html><head><!-- Report title --><title>Report</title></head><body><!-- 正文 -->report</body></html>')));
+});
+test('HTML rejects noncanonical raw-text end tags rather than hiding following navigation', async () => {
+  for (const name of ['title', 'style', 'script', 'textarea']) for (const ending of [`</${name} ignored>`, `</${name}/>`, `</${name}\tignored>`]) {
+    const html = `<html><head><${name}>text${ending}<meta http-equiv="refresh" content="0;url=https://bad.example"></${name}></head><body>report</body></html>`;
+    await assert.rejects(validateSandboxArtifact('x.html', 'html', Buffer.from(html)));
+  }
+});
+test('unsupported raw-text contexts cannot disguise navigation through nested styles', async () => {
+  for (const name of ['noscript', 'xmp', 'noembed', 'noframes']) {
+    const html = `<html><head></head><body><${name}><style></${name}><meta http-equiv="refresh" content="0;url=https://bad.example"></style></${name}></body></html>`;
+    await assert.rejects(validateSandboxArtifact('x.html', 'html', Buffer.from(html)));
+  }
+});
 test('private store roundtrip is atomic, UUID-only, bounded and refuses symlinks', async () => {
   const root = await mkdtemp(join(tmpdir(), 'wes-artifacts-')); const store = new LocalSandboxArtifactStore(root); const id = randomUUID();
   try {

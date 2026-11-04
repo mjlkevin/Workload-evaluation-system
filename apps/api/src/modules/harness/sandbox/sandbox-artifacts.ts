@@ -200,6 +200,10 @@ function validateHtml(bytes: Buffer): void {
     if (start < 0) { cursor = html.length; break; }
     if (html.startsWith('<!--', start)) {
       const end = html.indexOf('-->', start + 4); if (end < 0) fail();
+      const content = html.slice(start + 4, end);
+      // Browsers close <!--> / <!---> / --!> differently from indexOf('-->').
+      // Permit only simple canonical comments, never markup or dash runs.
+      if (content.startsWith('>') || content.startsWith('->') || content.endsWith('-') || /--|[<>]/.test(content)) fail();
       cursor = end + 3; continue;
     }
     const declaration = /^<!doctype\s+html\s*>/i.exec(html.slice(start));
@@ -227,7 +231,7 @@ function validateHtml(bytes: Buffer): void {
     const name = open![1].toLowerCase(), parent = stack[stack.length - 1];
     // Foreign-content parsing changes HTML raw-text rules, so inline SVG/MathML
     // are outside this conservative preview grammar; data images remain usable.
-    if (['base', 'form', 'iframe', 'frame', 'frameset', 'object', 'embed', 'portal', 'link', 'set', 'svg', 'math', 'plaintext'].includes(name) || name.startsWith('animate')) fail();
+    if (['base', 'form', 'iframe', 'frame', 'frameset', 'object', 'embed', 'portal', 'link', 'set', 'svg', 'math', 'plaintext', 'noscript', 'xmp', 'noembed', 'noframes'].includes(name) || name.startsWith('animate')) fail();
     // CSP does not prevent this iframe from navigating itself. Reject refresh,
     // embedded browsing contexts and navigation attributes before preview.
     let attributes = token.slice(open![1].length).replace(/\/$/, '');
@@ -249,9 +253,14 @@ function validateHtml(bytes: Buffer): void {
     // close avoids validating a different tree than the browser will construct.
     if (token.endsWith('/')) fail();
     if (raw.has(name)) {
-      const closing = new RegExp(`</${name}\\s*>`, 'ig'); closing.lastIndex = cursor;
+      // HTML also recognizes </title ignored> and </title/> as end tags.
+      // Locate the FIRST browser-recognizable candidate and reject it unless
+      // canonical, rather than skipping it and hiding subsequent active markup.
+      const closing = new RegExp(`</${name}(?=[\\t\\n\\f\\r />])`, 'ig'); closing.lastIndex = cursor;
       const found = closing.exec(html); if (!found) fail();
-      cursor = closing.lastIndex;
+      const canonical = new RegExp(`^</${name}[\\t\\n\\f\\r ]*>`, 'i').exec(html.slice(found!.index));
+      if (!canonical) fail();
+      cursor = found!.index + canonical![0].length;
     } else { if (stack.length >= 128) fail(); stack.push(name); }
   }
   if (stack.length || sections !== 3) fail();
