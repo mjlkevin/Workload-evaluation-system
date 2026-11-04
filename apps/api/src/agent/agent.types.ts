@@ -62,6 +62,8 @@ export interface AgentTool {
    */
   mcpAllowedRoles?: readonly V2Role[];
   /** 真正执行：调用底层 usecase；runtime 为可信运行上下文（O2 · A4 注入） */
+  /** Server-only plan freezing before persistent approval. Never exposed in provider schemas. */
+  prepareForApproval?(args: Record<string, unknown>, user: AgentUser, runtime?: RuntimeContext): Promise<Record<string, unknown>>;
   execute(args: Record<string, unknown>, user: AgentUser, runtime?: RuntimeContext): Promise<unknown>;
 }
 
@@ -79,7 +81,7 @@ export interface ToolResult {
 // tool_result 补可选 `toolCallId`。审批闸门与 UI 事件按 callId 对账——审批请求
 // 只带 callId、参数以 tool.call.started 那一份为唯一来源，事件里就必须带得上这个 id。
 export type AgentEvent =
-  | { kind: "tool_call"; name: string; arguments: Record<string, unknown>; toolCallId?: string }
+  | { kind: "tool_call"; name: string; arguments: Record<string, unknown>; toolCallId?: string; preparedForApproval?: boolean }
   | { kind: "tool_result"; name: string; ok: boolean; data?: unknown; error?: string; toolCallId?: string }
   | { kind: "need_confirm"; name: string; arguments: Record<string, unknown> }
   | { kind: "final"; content: string };

@@ -92,6 +92,9 @@ export type WorkbenchDispatchData = {
 };
 
 export type WorkbenchDispatchInput = {
+  /** Trusted worker context; never populated from a request body. */
+  sandboxContext?: unknown;
+  runtime?: import("../../agent/context/context.types").RuntimeContext;
   /** 受信任的入站请求 ID，贯穿检索、生成与 trace */
   requestId?: string;
   user: AuthUser;

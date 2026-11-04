@@ -19,6 +19,10 @@ export type RuntimeContext = Readonly<{
   workflowKey: string;
   aiSessionId?: string;
   harnessRunId?: string;
+  harnessAttemptId?: string;
+  toolStepKey?: string;
+  toolOrdinal?: number;
+  abortSignal?: AbortSignal;
   tenantId?: string;
 }>;
 

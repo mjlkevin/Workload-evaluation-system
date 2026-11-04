@@ -1,3 +1,4 @@
+import { buildSandboxTool } from './tools/sandbox.tools';
 import type { AuthUser, BusinessRole, KnowledgeBaseProfile } from "../types";
 import type { RuntimeContext } from "./context/context.types";
 import { ToolRegistry } from "./tool-registry";
@@ -90,6 +91,7 @@ export function createDefaultRegistry(user: AuthUser, runtime?: RuntimeContext):
   // 注册在写操作之后、发现工具之前：既有 8 个工具的注入顺序因此逐字节不变，
   // list_tools 仍在末位（按需发现模式按 category=discovery 排除它）。
   registry.register(buildAskUserTool());
+  if (runtime?.harnessRunId) registry.register(buildSandboxTool());
 
   // ---- 批次 4：能力清单（capability_discovery 正则退役后的承接方） ----
   // 排在 ask_user 之后、发现工具之前：原 8 个工具的注入顺序仍逐字节不变。

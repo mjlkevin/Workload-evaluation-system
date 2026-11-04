@@ -370,16 +370,25 @@ function toWorkbenchToolLoopResult(
 async function executeToolCallBatch(ctx: ToolBatchContext, calls: ToolCall[]): Promise<void> {
   for (const call of calls) {
     const name = call.name;
-    const args = call.arguments ?? {};
+    let args = call.arguments ?? {};
+    const ordinal = ++ctx.callCursor.value;
+    const runtime = ctx.runtime ? { ...ctx.runtime, toolOrdinal: ordinal } : undefined;
+    let preparationError: string | undefined;
+    let preparedForApproval = false;
+    const tool = ctx.registry.get(name);
+    if (tool?.prepareForApproval && (!ctx.injectedToolNames || ctx.injectedToolNames.has(name))) {
+      try { args = await tool.prepareForApproval(args, ctx.agentUser, runtime); preparedForApproval = true; }
+      catch (err) { preparationError = toEffectError(err); }
+    }
     // callId 在这一点归一化：UI 事件（参数唯一来源）与审批事件必须带同一份，
     // 否则 1b 按 callId 回查参数会查不到。模型给的原始 id 不直接落库。
     const callId = normalizeWorkbenchToolCallId(call.id);
-    ctx.onEvent?.({ kind: "tool_call", name, arguments: args, toolCallId: callId });
+    ctx.onEvent?.({ kind: "tool_call", name, arguments: args, toolCallId: callId, ...(preparedForApproval ? { preparedForApproval: true } : {}) });
 
-    ctx.callCursor.value += 1;
-    const ordinal = ctx.callCursor.value;
+
 
     const resolveOutcome = async (): Promise<WorkbenchToolEffectOutput> => {
+      if (preparationError) return { ok: false, error: preparationError };
       const registered = ctx.registry.get(name);
       if (!registered) {
         return { ok: false, error: `未注册工具: ${name}` };
@@ -404,7 +413,7 @@ async function executeToolCallBatch(ctx: ToolBatchContext, calls: ToolCall[]): P
         return requireToolUserInput(ctx, { ordinal, toolName: name, callId, arguments: args });
       }
       try {
-        const data = await ctx.registry.execute(name, args, ctx.agentUser, ctx.runtime);
+        const data = await ctx.registry.execute(name, args, ctx.agentUser, runtime);
         return { ok: true, data };
       } catch (err) {
         return { ok: false, error: toEffectError(err) };

@@ -1,3 +1,4 @@
+import { sandboxArtifactReferences, type SandboxArtifactReference } from "../../modules/harness/sandbox/sandbox.artifact-surface";
 // ============================================================
 // 批次 0.5 · ②：工作台工具调用的 UI 事件面（单一决策点）
 // ============================================================
@@ -72,6 +73,7 @@ export type WorkbenchToolCallSummary = {
   status: WorkbenchToolCallStatus;
   elapsedMs: number;
   errorPreview?: string;
+  artifacts?: SandboxArtifactReference[];
 };
 
 /** 会话消息 metadata.toolCalls 的落库形状（摘要 + 按名合并的 source） */
@@ -186,7 +188,10 @@ export function createWorkbenchToolEventSink(input: {
           callIndex: index,
           name,
           ...(event.toolCallId ? { callId: event.toolCallId } : {}),
-          arguments: toUiVisibleJson(event.arguments),
+          // Sandbox code is an approved, server-frozen <=128KiB program. Preserve the exact
+          // reviewed text; generic preview truncation must not hide executable suffixes.
+          arguments: event.name === 'sandbox_execute' && event.preparedForApproval === true
+            ? structuredClone(event.arguments) : toUiVisibleJson(event.arguments),
         });
         if (progressIntervalMs > 0) {
           timer = setInterval(() => {
@@ -206,6 +211,8 @@ export function createWorkbenchToolEventSink(input: {
         const elapsedMs = Math.max(0, now() - startedAt);
         const ok = event.ok;
         const errorPreview = ok ? undefined : clipInline(event.error ?? "工具执行失败", MAX_UI_ERROR_PREVIEW_CHARS);
+        const artifacts = event.name === "sandbox_execute" && ok ? sandboxArtifactReferences(event.data) : undefined;
+        if (current && artifacts) current.artifacts = artifacts;
         if (current) {
           current.elapsedMs = elapsedMs;
           current.status = ok ? WORKBENCH_TOOL_CALL_STATUS.COMPLETED : WORKBENCH_TOOL_CALL_STATUS.FAILED;
@@ -216,7 +223,7 @@ export function createWorkbenchToolEventSink(input: {
         }
         const base = { callIndex, name: current?.name || event.name, elapsedMs };
         if (ok) {
-          input.emit("tool.call.completed", { ...base, resultPreview: toResultPreview(event.data) });
+          input.emit("tool.call.completed", { ...base, resultPreview: toResultPreview(artifacts ? { status: "completed", artifacts } : event.data), ...(artifacts ? { artifacts } : {}) });
         } else {
           input.emit("tool.call.failed", { ...base, error: clipString(event.error ?? "工具执行失败") });
         }
