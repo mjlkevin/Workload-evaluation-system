@@ -54,34 +54,29 @@ it('实际中央消息混排普通消息、真实阶段、回答与拒绝；只�
   fireEvent.click(within(pane).getByRole('button', { name: '提交补充信息' }))
   await waitFor(() => expect(business.submitInput).toHaveBeenCalledWith('run-a', pending, { count: 4 }))
 })
-it('右侧仅摘要，定位当前问题后中央记录获得焦点；角色模板与附件入口保留', () => {
+it('移除右栏和定位入口，中央保留待确认事项、执行历史；角色快捷提问及附件不变', () => {
   mount()
-  const right = screen.getByRole('complementary', { name: 'AI 工作区' })
-  expect(within(right).getByText('任务摘要')).toBeInTheDocument()
-  expect(within(right).getByText('实际业务任务')).toBeInTheDocument()
-  expect(within(right).getByText('当前核对阶段')).toBeInTheDocument()
-  expect(within(right).queryByRole('spinbutton')).not.toBeInTheDocument()
-  expect(within(right).queryByText('实际分析阶段')).not.toBeInTheDocument()
-  expect(within(right).queryByText('旧输出占位')).not.toBeInTheDocument()
-  fireEvent.click(within(right).getByRole('button', { name: '定位待处理（1）' }))
-  expect(document.activeElement.closest('[data-testid="ai-home-message-pane"]')).toBeInTheDocument()
+  expect(screen.queryByRole('complementary', { name: 'AI 工作区' })).not.toBeInTheDocument()
+  expect(screen.queryByText('任务摘要')).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /定位待处理|折叠工作区|展开工作区/ })).not.toBeInTheDocument()
+  const pane=screen.getByTestId('ai-home-message-pane')
+  expect(within(pane).getByRole('spinbutton')).toBeInTheDocument()
+  expect(within(pane).getByText('实际分析阶段')).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: '原角色模板' }))
   expect(workbench.startWorkflow).toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: '附加文件' }))
   expect(chat.chooseFile).toHaveBeenCalled()
 })
-it('最终结果只在中央呈现，摘要定位最终结果；每个执行根仅有一组当前动作', () => {
+it('最终结果仍在中央，每个执行根仅有一组当前动作，右栏不保留空壳', () => {
   const parent = snapshot(), child = snapshot()
   parent.status = 'failed'; child.runId = 'run-b'; child.status = 'completed'; child.createdAt = '2026-11-04T00:00:02Z'
   child.businessExecution = { ...child.businessExecution, pendingInput: undefined, results: { output: { title: '实际最终结果' } } }
   business.runs = [parent, child]
   mount()
-  const right = screen.getByRole('complementary', { name: 'AI 工作区' })
+  expect(screen.queryByRole('complementary', { name: 'AI 工作区' })).not.toBeInTheDocument()
   expect(screen.getByTestId('ai-home-message-pane')).toHaveTextContent('实际最终结果')
-  expect(within(right).queryByText('实际最终结果')).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: '重试执行' })).not.toBeInTheDocument()
-  fireEvent.click(within(right).getByRole('button', { name: '定位结果' }))
-  expect(document.activeElement).toHaveTextContent('实际最终结果')
+  expect(screen.queryByRole('button', { name: '定位结果' })).not.toBeInTheDocument()
 })
 it('业务加载错误在中央仅显示一次，已有业务标识时隐藏旧占位且保留普通消息', () => {
   business.runs = []; business.error = '快照暂不可用'; business.loading = true
@@ -92,11 +87,12 @@ it('业务加载错误在中央仅显示一次，已有业务标识时隐藏旧�
   expect(screen.getByText('普通消息原文')).toBeInTheDocument()
   expect(screen.queryByText('旧输出占位')).not.toBeInTheDocument()
 })
-it('普通会话继续使用旧工作区，不受其他会话业务标识影响', () => {
+it('普通会话也不显示右侧占位；其他会话业务标识不影响中央内容', () => {
   business.runs = []
   workbench.unifiedView.runs = [{ runId: 'foreign', sessionId: 'other', hasBusinessExecution: true }]
   mount()
-  expect(screen.getByText('旧输出占位')).toBeInTheDocument()
+  expect(screen.queryByText('旧输出占位')).not.toBeInTheDocument()
+  expect(screen.queryByRole('complementary', { name: 'AI 工作区' })).not.toBeInTheDocument()
   expect(screen.queryByText('任务摘要')).not.toBeInTheDocument()
 })
 it('轮询和展开不把阅读旧记录的用户拉到底部；回到底部后继续跟随，切换会话重置', () => {
@@ -169,4 +165,25 @@ it('已发送提示词显示服务端绑定的Skill标签；刷新回放不依�
   business.runs=[run];mount()
   const message=screen.getByText('请处理这份需求').closest('article')
   expect(within(message).getByLabelText('已调用 Skill 实际业务任务')).toBeInTheDocument()
+})
+
+it('旧会话的独立写入确认、未挂载产物和关联结果全部在中央，确认仍由原回调执行', () => {
+  business.runs=[]
+  const confirm=vi.fn()
+  workbench.activeSession={sessionId:'s1',artifacts:[{artifactId:'old-report',title:'原始粗评结果',type:'rough_report',content:'预计120天'}],pendingActions:[{actionId:'old-action',status:'pending',title:'创建旧项目评估'}],linkedRecords:{projectName:'旧项目'}}
+  // This is the existing ordinary-session confirmation channel, not a new write path.
+  render(<MemoryRouter><MessageList messages={[]} session={workbench.activeSession} bubbleProps={{}} onConfirmSessionAction={confirm} /></MemoryRouter>)
+  const pane=screen.getByTestId('ai-home-message-pane')
+  expect(within(pane).getByText('原始粗评结果')).toBeInTheDocument()
+  expect(within(pane).getByText('项目：旧项目')).toBeInTheDocument()
+  fireEvent.click(within(pane).getByRole('button',{name:'确认执行'}))
+  expect(confirm).toHaveBeenCalledWith(workbench.activeSession.pendingActions[0])
+})
+it('旧会话报告已在消息中展示时不重复；无效遗留字段不阻断消息流', () => {
+  const artifact={artifactId:'report-once',type:'requirement_analysis_report',title:'只显示一次的报告',content:{}}
+  const props={messages:[{id:'assistant-report',role:'assistant',text:'报告已完成',artifacts:[artifact]}],session:{artifacts:[artifact],attachments:[],pendingActions:[]},bubbleProps:{}}
+  const h=render(<MemoryRouter><MessageList {...props}/></MemoryRouter>)
+  expect(screen.getAllByText('只显示一次的报告')).toHaveLength(1)
+  h.rerender(<MemoryRouter><MessageList {...props} session={{artifacts:{legacy:'invalid'},attachments:null,pendingActions:null}}/></MemoryRouter>)
+  expect(screen.getByText('报告已完成')).toBeInTheDocument()
 })

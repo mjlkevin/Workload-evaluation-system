@@ -2,10 +2,11 @@ import { useLayoutEffect, useRef } from 'react'
 import BusinessExecutionMessage from '../BusinessExecutionMessage.jsx'
 import { BusinessRunActions } from '../BusinessExecutionControls.jsx'
 import MessageBubble from './MessageBubble.jsx'
+import SessionBusinessRecords from './SessionBusinessRecords.jsx'
 import { normalizeProjectionSource } from '../../utils/messageFormatter.js'
 import { RoleBadge } from './MessageBits.jsx'
 
-export default function MessageList({ messages, paneRef, activeWorkflow, centerTitle, centerHint, outputState, onChooseFile, bubbleProps, sessionId, sending, business }) {
+export default function MessageList({ messages, paneRef, activeWorkflow, centerTitle, centerHint, outputState, onChooseFile, bubbleProps, sessionId, sending, business, session, onConfirmSessionAction, confirmingSessionActionId }) {
   const localRef = useRef(null)
   const scrollRef = paneRef ?? localRef
   const following = useRef(true)
@@ -89,6 +90,7 @@ export default function MessageList({ messages, paneRef, activeWorkflow, centerT
             </div>
           )
         })}
+        <SessionBusinessRecords session={session} messages={messages} bubbleProps={bubbleProps} onConfirmAction={onConfirmSessionAction} confirmingActionId={confirmingSessionActionId} />
       </div>
     </div>
   )

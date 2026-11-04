@@ -1,0 +1,89 @@
+{
+  "id": "BE-2026-11-04-workbench-remove-inspector",
+  "date": "2026-11-04",
+  "type": "requirement",
+  "issueId": "ISS-2026-11-04-001",
+  "relatedRequirements": [
+    "RP-050"
+  ],
+  "dedup": "命中 ISS-2026-11-04-001 / RP-050，用户将右侧辅助摘要调整为完全移除",
+  "originalFeedback": "右侧这个任务摘要先去掉吧，执行过程、待确认事项和结果都在中间消息流里展示就行，整体尽量和 Codex 保持一致。",
+  "disposition": "requirement",
+  "priority": "P1",
+  "status": "本地实现及前端/浏览器验证完成；用户验收待回填",
+  "scope": "仅AI工作台：移除右栏并释放列宽；保留中央Skill执行历史/确认/结果；旧会话待确认、未展示产物和关联记录移至中央。左下角色快捷提问仅解释用途，暂不修改。",
+  "acceptance": [
+    "工作台不渲染任务摘要、工作区或折叠入口且无空列",
+    "业务等待确认、执行历史和结果仍在中央",
+    "旧会话写入确认可通过原回调执行，产物和关联记录可见",
+    "普通聊天、斜杠技能、附件及响应式保持可用"
+  ],
+  "evidence": [
+    "当前用户浏览器批注1/2",
+    "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/index.jsx",
+    "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/StatusPanel/RunStageIndicator.jsx"
+  ],
+  "pages": [
+    "issues",
+    "requirements",
+    "design",
+    "plan",
+    "changes",
+    "testing",
+    "monitoring",
+    "risks"
+  ],
+  "implementationPerformed": true,
+  "verification": {
+    "red": "business-message-wiring 4failed/7passed;legacy invalid-array guard 1failed/11passed",
+    "focused": "57/57 before added legacy guard;final guard covered in Web990",
+    "web": "101 files;990/990;0skip;maxWorkers2,minWorkers1",
+    "buildWeb": "passed",
+    "uiScope": "No new deterministic UI findings",
+    "modules": "1156/1159;3 timing failures;0skip",
+    "modulesIsolated": "65/66;late post-prepare checker cancellation case failed;0skip",
+    "modulesFailureBoundary": "No backend source, assertions or budgets changed;all failure logs retained",
+    "logs": [
+      "/tmp/wes-no-inspector-web-final.log",
+      "/tmp/wes-no-inspector-build-final.log",
+      "/tmp/wes-no-inspector-scope-final.log",
+      "/tmp/wes-no-inspector-modules-summary.log",
+      "/tmp/wes-no-inspector-isolated-summary.log"
+    ]
+  },
+  "leftQuickPrompts": {
+    "question": "这是干嘛的？",
+    "answer": "角色预设的快捷提问，点击填入输入框，发送后处理；与发布的Skill/Workflow目录不同",
+    "implementationChange": false
+  },
+  "review": "Five-axis self-review: central confirmation remains original callback;no new write path;existing reports deduplicated;no independent-review claim",
+  "integrationState": "local codex/wes-skills-c;not merged;not pushed",
+  "browserEvidence": {
+    "account": "mjlkevin",
+    "rightRail": 0,
+    "summary": false,
+    "retainedBusinessEntries": 33,
+    "desktop": {
+      "viewport": 1440,
+      "pageWidth": 1440,
+      "columns": "260px 924px",
+      "messageWidth": 922
+    },
+    "narrow": {
+      "viewport": 760,
+      "pageWidth": 760,
+      "columns": "649px",
+      "composerWidth": 647,
+      "composerContent": 647
+    },
+    "viewportReset": true,
+    "screenshots": [
+      "no-inspector-1440.png",
+      "no-inspector-760.png",
+      "no-inspector-final.png"
+    ],
+    "path": "/Users/kevin/.codex/visualizations/2026/11/04/01a1a4db-1dd5-7c33-9b3d-2077e4e7ccb4",
+    "newBusinessMutation": false
+  },
+  "boardValidation": "两处21页面，0错误0警告"
+}

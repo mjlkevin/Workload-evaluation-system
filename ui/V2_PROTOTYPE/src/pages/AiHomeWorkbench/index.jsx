@@ -8,14 +8,12 @@ import useHarnessRun from './hooks/useHarnessRun.js'
 import useBusinessExecution from './hooks/useBusinessExecution.js'
 import useComposerBusinessTask from './hooks/useComposerBusinessTask.js'
 import ComposerTaskParameters from './components/ComposerTaskParameters.jsx'
-import BusinessExecutionSummary from './components/BusinessExecutionSummary.jsx'
 import { buildBusinessConversationEntries, groupBusinessConversationEntries } from './utils/businessMessageTimeline.js'
 import useWorkbenchState from './hooks/useWorkbenchState.js'
 import ChatArea from './components/ChatArea/index.jsx'
 import BackgroundRunsPanel from './components/ChatArea/BackgroundRunsPanel.jsx'
 import WorkflowTemplates from './components/ChatArea/WorkflowTemplates.jsx'
 import ConfirmDialog from './components/ConfirmDialog.jsx'
-import WorkspacePanel from './components/WorkspacePanel/index.jsx'
 
 /**
  * AI 工作台入口：纯布局组装。状态与行为全部收敛在 hooks/ 与 components/。
@@ -37,9 +35,6 @@ export default function AiHomeWorkbench({ currentUser }) {
   const conversation = useMemo(() => groupBusinessConversationEntries(buildBusinessConversationEntries(
     chat.messages, business.runs, { sessionId: workbench.activeSession?.sessionId || '' },
   )), [chat.messages, business.runs, workbench.activeSession?.sessionId])
-  const hasBusinessExecution = business.runs.length > 0 || !!workbench.unifiedView?.runs?.some(
-    run => run.sessionId === workbench.activeSession?.sessionId && run.hasBusinessExecution,
-  )
   const invocation = useComposerBusinessTask({ workbench, userId: currentUser?.id || currentUser?.userId, onStarted: () => {
     business.refresh()
     workbench.refreshUnifiedView?.()
@@ -172,7 +167,7 @@ export default function AiHomeWorkbench({ currentUser }) {
   }
 
   return (
-    <div className={`ai-home-workbench${workbench.workspacePanelCollapsed ? ' ai-home-workbench--inspector-collapsed' : ''}`} data-testid="ai-home-workbench" style={{ display: 'grid', gap: 16, height: '100%', minHeight: 0, overflow: 'hidden', padding: '12px 16px' }}>
+    <div className="ai-home-workbench" data-testid="ai-home-workbench" style={{ display: 'grid', gap: 16, height: '100%', minHeight: 0, overflow: 'hidden', padding: '12px 16px' }}>
       <h1 className="sr-only">AI 工作台</h1>
       <aside className="ai-home-rail" style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
         <BackgroundRunsPanel runs={backgroundRuns.runs} runCounts={runCounts} onStopRun={requestStopRun} />
@@ -195,19 +190,6 @@ export default function AiHomeWorkbench({ currentUser }) {
 
       <ChatArea preset={workbench.preset} workbench={{ ...workbench, backgroundRuns }} chat={{ ...chat, sendMessage: sendMessageWithRunsNotify }} harness={harness} conversation={conversation} business={business} invocation={invocation} />
 
-      <WorkspacePanel
-        collapsed={workbench.workspacePanelCollapsed}
-        onToggle={workbench.toggleWorkspacePanel}
-        session={workbench.activeSession}
-        sending={chat.sending}
-        onConfirmAction={harness.confirmPendingAction}
-        confirmingActionId={harness.confirmingActionId}
-        messageCount={chat.messages.length}
-        outputState={workbench.outputState}
-        hasBusinessExecution={hasBusinessExecution}
-      >
-        {hasBusinessExecution && <BusinessExecutionSummary entries={conversation} runs={business.runs} />}
-      </WorkspacePanel>
       <ComposerTaskParameters invocation={invocation} />
 
       {workbench.deleteTargetSession && (

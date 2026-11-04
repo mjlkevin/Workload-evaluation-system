@@ -39,17 +39,15 @@ describe('AiHomeWorkbench', () => {
     localStorage.removeItem('wes-ai-workspace-panel-collapsed')
   })
 
-  test('collapses AI workspace panel and remembers the preference', async () => {
+  test('AI工作台始终无右侧摘要和折叠入口，旧折叠偏好不再占用列宽', async () => {
+    localStorage.setItem('wes-ai-workspace-panel-collapsed','true')
     renderAiWorkbench()
-
-    await screen.findByRole('complementary', { name: 'AI 工作区' })
-    expect(screen.getByText('预期产出')).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: '折叠工作区' }))
-
-    expect(screen.getByText('预期产出').closest('.ai-home-inspector__content')).toHaveClass('ai-home-inspector__content--hidden')
-    expect(screen.getByRole('button', { name: '展开工作区' })).toBeInTheDocument()
-    expect(localStorage.getItem('wes-ai-workspace-panel-collapsed')).toBe('true')
+    const root=await screen.findByTestId('ai-home-workbench')
+    expect(root).not.toHaveClass('ai-home-workbench--inspector-collapsed')
+    expect(screen.queryByRole('complementary',{name:'AI 工作区'})).not.toBeInTheDocument()
+    expect(screen.queryByRole('button',{name:/展开工作区|折叠工作区/})).not.toBeInTheDocument()
+    expect(screen.queryByText('预期产出')).not.toBeInTheDocument()
+    expect(screen.getByRole('textbox',{name:'AI 工作台输入'})).toBeInTheDocument()
   })
 
   test('selected workflow reshapes the central empty state and composer context', async () => {
@@ -855,7 +853,7 @@ describe('AiHomeWorkbench', () => {
     expect(await screen.findByText(/项目创建失败：权限不足/)).toBeInTheDocument()
   })
 
-  test('renders artifact workspace as a run timeline', async () => {
+  test('旧会话的原始材料、产物、确认及关联结果均在中央消息区', async () => {
     server.use(
       http.get(`${BASE}/ai-sessions`, () => HttpResponse.json({
         success: true,
@@ -893,15 +891,12 @@ describe('AiHomeWorkbench', () => {
 
     renderAiWorkbench()
 
-    const timeline = await screen.findByRole('list', { name: 'AI 会话执行链路' })
-    expect(within(timeline).getByText('输入来源')).toBeInTheDocument()
-    expect(within(timeline).getByText('AI 执行')).toBeInTheDocument()
-    expect(within(timeline).getByText('结构化产物')).toBeInTheDocument()
-    expect(within(timeline).getByText('交付与关联')).toBeInTheDocument()
-    expect(within(timeline).getByText('XX制造需求.xlsx')).toBeInTheDocument()
-    expect(within(timeline).getByText('粗评报告')).toBeInTheDocument()
-    expect(within(timeline).getByText('创建项目评估方案')).toBeInTheDocument()
-    expect(within(timeline).getByText(/项目：XX制造 WMS 项目/)).toBeInTheDocument()
+    const pane = screen.getByTestId('ai-home-message-pane')
+    expect(await within(pane).findByText('XX制造需求.xlsx')).toBeInTheDocument()
+    expect(within(pane).getByText('粗评报告')).toBeInTheDocument()
+    expect(within(pane).getByText('创建项目评估方案')).toBeInTheDocument()
+    expect(within(pane).getByText(/项目：XX制造 WMS 项目/)).toBeInTheDocument()
+    expect(screen.queryByRole('list', { name: 'AI 会话执行链路' })).not.toBeInTheDocument()
   })
 
   test('deletes an AI home session after confirmation', async () => {

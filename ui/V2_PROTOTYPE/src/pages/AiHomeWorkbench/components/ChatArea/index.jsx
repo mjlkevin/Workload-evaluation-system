@@ -91,6 +91,9 @@ export default function ChatArea({ preset, workbench, chat, harness, conversatio
       <MessageList
         messages={conversation ?? chat.messages}
         sessionId={workbench.activeSession?.sessionId}
+        session={workbench.activeSession}
+        onConfirmSessionAction={harness.confirmPendingAction}
+        confirmingSessionActionId={harness.confirmingActionId}
         business={business}
         sending={chat.sending}
         paneRef={chat.messagePaneRef}

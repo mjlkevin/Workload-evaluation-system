@@ -7,19 +7,9 @@ import { getAiHomePreset } from '../../aiHomePresets.js'
 import { pickArray, stripPendingMarker } from '../utils/harnessPayload.js'
 import { getWorkflowOutputs } from '../utils/workflowOutputs.js'
 
-const WORKSPACE_PANEL_COLLAPSED_KEY = 'wes-ai-workspace-panel-collapsed'
-
-function readWorkspacePanelCollapsed() {
-  try {
-    return localStorage.getItem(WORKSPACE_PANEL_COLLAPSED_KEY) === 'true'
-  } catch {
-    return false
-  }
-}
-
 /**
  * 收敛 AI 工作台分散的 useState：预设/工作流、会话列表、输入草稿、
- * 附件选择、工作区折叠、会话删除确认、客户主体检索。
+ * 附件选择、会话删除确认、客户主体检索。
  * callbacks.onActiveSessionDeleted 用于删除当前会话后清空消息区。
  *
  * O5 Sprint 3A：首屏与刷新时机接入统一视图（GET /ai/home-workbench/view），
@@ -44,7 +34,6 @@ export default function useWorkbenchState(currentUser, callbacks = {}) {
   const [deleteTargetSession, setDeleteTargetSession] = useState(null)
   const [deletingSessionId, setDeletingSessionId] = useState('')
   const [deleteSessionError, setDeleteSessionError] = useState('')
-  const [workspacePanelCollapsed, setWorkspacePanelCollapsed] = useState(readWorkspacePanelCollapsed)
   const [workbenchCompanyLookupOpen, setWorkbenchCompanyLookupOpen] = useState(false)
   const [workbenchCompanyLookupLoading, setWorkbenchCompanyLookupLoading] = useState(false)
   const [workbenchCompanyCandidates, setWorkbenchCompanyCandidates] = useState([])
@@ -128,14 +117,6 @@ export default function useWorkbenchState(currentUser, callbacks = {}) {
   function clearComposerDraft() {
     if (composerSessionId) sessionRuntimeStore.writeComposerDraft(composerUserId, composerSessionId, '')
   }
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(WORKSPACE_PANEL_COLLAPSED_KEY, workspacePanelCollapsed ? 'true' : 'false')
-    } catch {
-      // localStorage may be unavailable in private or embedded contexts.
-    }
-  }, [workspacePanelCollapsed])
 
   useEffect(() => {
     if (activeSession?.workflowKey && !activeWorkflowKey) {
@@ -243,8 +224,6 @@ export default function useWorkbenchState(currentUser, callbacks = {}) {
     setDraftBeforeLogin,
     selectedFile,
     setSelectedFile,
-    workspacePanelCollapsed,
-    toggleWorkspacePanel: () => setWorkspacePanelCollapsed((value) => !value),
     startWorkflow,
     startNewSession,
     selectSession,
