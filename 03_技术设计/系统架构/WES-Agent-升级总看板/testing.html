@@ -878,6 +878,7 @@
 <section class="section" data-board-event-id="BE-2026-11-04-execution-parameters:testing"><h2>执行参数与用户原话 · 已区分</h2><p>命中ISS-2026-11-04-001 / RP-050。初始执行输入为参数快照，并非用户另发消息；改为左侧中性执行参数记录且默认折叠，原数据不变。消息专项36/36，实际展开核对原文，后台真实Run不变。</p><p><a href="events/2026-11-04-message-sender-distinction.json">截图、问题与检查结果</a>。用户确认/补充记录保留，未把系统执行记录冒充LLM自然语言回复。</p></section>
 </main>
 <section class="section" data-board-event-id="BE-2026-11-04-composer-clear-on-dispatch:testing"><h2>发送即清空 · 等待态已实测</h2><p>RED 2失败10通过；定向13/13、Web996/996、模块1176/1176、Web构建及UI范围通过。真实模型等待5.0秒时编辑框为空，原文在消息流。</p><p><a href="events/2026-11-04-composer-clear-on-dispatch.json">清空时机、回归与截图</a>；用户验收待回填。</p></section>
+<section class="section" data-board-event-id="BE-2026-11-04-aliyun-sandbox-api-smoke:testing"><h2>真实沙箱API · 连接、执行与文件读写通过</h2><p>模板/实例读取200，SDK连接成功；远程Python3.13.13，1+1返回2，文件写回一致。docx/openpyxl未预装，未生成Word/Excel。</p><p><a href="events/2026-11-04-aliyun-sandbox-api-smoke.json">API实取、失败路径与凭据边界</a>；本次不宣称工作台文档生成已交付。</p></section>
   <script src="assets/board-ui.js" defer></script>
 </body>
 </html>

@@ -1,0 +1,114 @@
+{
+  "id": "BE-2026-11-04-aliyun-sandbox-api-smoke",
+  "date": "2026-11-04",
+  "issueId": "ISS-2026-08-27-004",
+  "type": "verification",
+  "authorization": "用户明确要求继续连通API；只连接其手动创建的既有实例",
+  "dedup": "命中既有沙箱架构评估，不新增需求或WES产品缺陷",
+  "workspaceId": "llm-ef3lbkxivkuz1aqh",
+  "region": "cn-beijing",
+  "templateCode": "bb3b840b-a198-4d95-a2f9-e338f7724710",
+  "bailianSandboxId": "64e5430a-e28c-4673-b69d-75c6a2585854",
+  "sandboxID": "sbx-2fceec35-89b4-4d5a-9269-bd3adb6364b5",
+  "sdk": "Node.js e2b@2.31.0, Node v24.15.0",
+  "success": {
+    "time": "2026-11-04T07:33:13.509Z",
+    "steps": [
+      {
+        "method": "GET",
+        "path": "/templates/bb3b840b-a198-4d95-a2f9-e338f7724710",
+        "httpStatus": 200,
+        "requestId": "0a146651-165e-9044-b2ca-e38525d920cf"
+      },
+      {
+        "method": "GET",
+        "path": "/sandboxes/sbx-2fceec35-89b4-4d5a-9269-bd3adb6364b5",
+        "httpStatus": 200,
+        "requestId": "a488acda-45f8-9bdb-8f7e-d15b7d8322d6",
+        "state": "running"
+      },
+      {
+        "method": "Sandbox.connect",
+        "success": true,
+        "sandboxId": "sbx-2fceec35-89b4-4d5a-9269-bd3adb6364b5"
+      },
+      {
+        "method": "commands.run",
+        "command": "python --version",
+        "exitCode": 0,
+        "stdout": "Python 3.13.13"
+      },
+      {
+        "method": "files.write/read",
+        "path": "/home/user/workspace/hello_bailian_sandbox.md",
+        "matched": true
+      },
+      {
+        "method": "commands.run",
+        "command": "python print(1+1)",
+        "exitCode": 0,
+        "stdout": "2"
+      }
+    ],
+    "credentialsPersisted": false,
+    "credentialsChanged": false,
+    "existingInstanceOnly": true
+  },
+  "dependencies": {
+    "docx": false,
+    "openpyxl": false,
+    "jinja2": true
+  },
+  "observations": [
+    {
+      "stage": "首次鉴权",
+      "result": "Token Plan团队版Key访问通用Sandbox接口返回401 Invalid API-key provided",
+      "requestIds": [
+        "a4282ff8-782b-9ca7-8973-25c6f2534693",
+        "d9ba24ec-71e8-9ef1-8c70-d2e7b987e5c4"
+      ]
+    },
+    {
+      "stage": "实例ID辨别",
+      "result": "直接以控制台百炼管理ID读取返回404；列表返回原生sandboxID，以原生ID读取与SDK连接成功",
+      "requestId": "cf0f0908-c8ab-9026-8cbe-e8fbf8e2d599"
+    },
+    {
+      "stage": "SDK版本",
+      "result": "PyPI官方查询e2b/2.31.0与e2b-code-interpreter/2.8.1均200，要求Python>=3.10；本机3.9.6导致pip安装失败。改用官方Node示例固定的e2b@2.31.0成功，未修改Skill或项目依赖。"
+    },
+    {
+      "stage": "测试日志适配",
+      "result": "临时传入空logger时触发onResponse Response类型检查；移除可选logger后SDK连接及数据面通过。未修改SDK源码。"
+    }
+  ],
+  "credentialHandling": "使用控制台既有按量付费密钥，仅在进程内存使用；未新建、重置、删除或持久化密钥。报告不含密钥、envd/traffic token或数据面访问URL。",
+  "cloudMutations": [
+    "SDK连接既有运行实例",
+    "写入/home/user/workspace/hello_bailian_sandbox.md，内容为hello bailian；读回一致"
+  ],
+  "lifecycleCheck": {
+    "state": "running",
+    "originalEndAt": "2026-11-11T07:23:12.533344Z",
+    "endAtAfterConnect": "2026-11-11T07:23:12Z",
+    "result": "原有效期保留（返回精度为秒）"
+  },
+  "resourcesCreated": false,
+  "resourcesReleased": false,
+  "wesToolIntegrated": false,
+  "businessDataUsed": false,
+  "old403Conclusion": "新模板已由用户成功创建；旧模板403的失败身份未确认，日志资源范围差异不作为已确认根因。",
+  "next": "文档生成需准备python-docx/openpyxl；正式WES适配、加密凭据配置、产物保存下载及LLM工具调用尚未实施。",
+  "sources": [
+    "https://help.aliyun.com/zh/model-studio/sandbox-api-overview",
+    "https://help.aliyun.com/zh/model-studio/sandbox-best-practice-code-interpreter",
+    "https://help.aliyun.com/zh/model-studio/error-code-start"
+  ],
+  "credentialMetadata": {
+    "existingPayAsYouGoKeyId": "5446675",
+    "existingDescription": "Qoderwork",
+    "usedFor": "本次用户授权的Sandbox验证",
+    "storedInWes": false
+  },
+  "boardChecks": "主目录与候选目录各21页，0错误0警告；文档/需求/缺陷统计未增。"
+}
