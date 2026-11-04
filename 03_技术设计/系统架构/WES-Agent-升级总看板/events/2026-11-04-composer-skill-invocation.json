@@ -60,5 +60,10 @@
     "预览目录接口本轮曾45秒；后续448ms，未宣称性能优化"
   ],
   "integrationState": "local codex/wes-skills-c;not merged;not pushed",
-  "review": "five-axis self-review: scope, semantic permission, session fencing, idempotency, error preservation verified;no independent reviewer claim"
+  "review": "five-axis self-review: scope, semantic permission, session fencing, idempotency, error preservation verified;no independent reviewer claim",
+  "implementationCommit": "f684c0d",
+  "boardValidation": {
+    "worktree": "21 pages;0errors;0warnings",
+    "canonical": "21 pages;0errors;0warnings"
+  }
 }
