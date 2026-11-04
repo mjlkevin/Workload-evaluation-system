@@ -181,8 +181,15 @@ export function createSandboxService(deps: {
         ["provisioning", "staging", "executing", "collecting"].includes(
           job.state,
         )
-      )
+      ) {
+        if (job.execution?.attemptId === scope.attemptId)
+          throw error(
+            "SANDBOX_IN_PROGRESS",
+            "任务正在执行，请等待当前执行结束",
+            409,
+          );
         await repo.patch(job.id, { state: "unknown" });
+      }
       if (job.state !== "planned")
         throw error(
           "SANDBOX_STATE_UNKNOWN",

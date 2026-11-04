@@ -260,3 +260,30 @@ test("known created handle is retained if initial database write and subsequent 
   assert.equal(f.job().sandboxId, "cloud");
   assert.equal(f.job().cleanup, "pending");
 });
+test("same-attempt duplicate cannot invalidate an active collecting task", async () => {
+  const f = fixture();
+  const originalCreate = f.provider.create;
+  let arrived!: () => void, resume!: () => void;
+  const collecting = new Promise<void>(resolve => { arrived = resolve; });
+  const held = new Promise<void>(resolve => { resume = resolve; });
+  f.provider.create = async () => {
+    const instance = await originalCreate();
+    const read = instance.readOutput;
+    instance.readOutput = async () => { arrived(); await held; return read(); };
+    return instance;
+  };
+  const publish = f.repository.publish;
+  f.repository.publish = async (...values) => {
+    assert.equal(f.job().state, "collecting", "duplicate must not overwrite active state");
+    return publish(...values);
+  };
+  const ready = await f.service.prepare(scope, args);
+  f.approve();
+  const first = f.service.execute(scope, ready);
+  await collecting;
+  try {
+    await assert.rejects(() => f.service.execute(scope, ready), (e: any) => e.code === "SANDBOX_IN_PROGRESS");
+  } finally { resume(); }
+  assert.equal((await first).status, "completed");
+  assert.deepEqual(f.counts(), { create: 1, run: 1, release: 1 });
+});
