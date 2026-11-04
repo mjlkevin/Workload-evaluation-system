@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 import useComposerBusinessTask from '../pages/AiHomeWorkbench/hooks/useComposerBusinessTask.js'
@@ -30,7 +31,7 @@ it('缺失输入由中央消息追问，继续补充走相同能力，不弹参�
 })
 it('附件受控上传交给对话，失败重试复用上传与提交键',async()=>{
  wb.selectedFile=new File(['原文'],'需求.txt');api.uploadExecutionSource.mockResolvedValue({attachmentId:'file-1',sourceAvailable:true});api.sendSkillConversation.mockRejectedValueOnce(new Error('network'))
- const h=mount();act(()=>h.result.current.selectTask(task));await act(()=>h.result.current.send());expect(wb.setComposer).not.toHaveBeenCalled()
+ const h=mount();act(()=>h.result.current.selectTask(task));await act(()=>h.result.current.send());expect(wb.setComposer).toHaveBeenCalledWith('');expect(wb.setComposer.mock.calls.at(-1)[0]('')).toBe('原始提示词')
  await act(()=>h.result.current.send())
  expect(api.sendSkillConversation.mock.calls[0][1].sources).toEqual([{kind:'file',id:'file-1'}]);expect(api.sendSkillConversation.mock.calls[0][1].submissionKey).toBe(api.sendSkillConversation.mock.calls[1][1].submissionKey);expect(api.uploadExecutionSource).toHaveBeenCalledTimes(1)
 })
@@ -47,10 +48,39 @@ it('双击只发送一次，目录版本变化明确拒绝',async()=>{
 })
 it('响应迟到不擦除同会话新正文；不支持材料不发送',async()=>{
  let release;api.sendSkillConversation.mockImplementation(()=>new Promise(resolve=>{release=resolve}));const h=mount();act(()=>h.result.current.selectTask(task));let sending;act(()=>{sending=h.result.current.send()});await waitFor(()=>expect(release).toBeTypeOf('function'))
- wb={...wb,composer:'新正文'};h.rerender();await act(async()=>{release({action:'reply',message:'答复'});await sending});expect(wb.setComposer).not.toHaveBeenCalled()
+ wb={...wb,composer:'新正文'};h.rerender();await act(async()=>{release({action:'reply',message:'答复'});await sending});expect(wb.setComposer).toHaveBeenCalledTimes(1);expect(wb.setComposer).toHaveBeenCalledWith('')
  wb={...wb,selectedFile:new File(['x'],'不支持.pdf')};h.rerender();await act(()=>h.result.current.send());expect(h.result.current.error).toMatch(/2 MiB/)
 })
 it('刷新后从最后追问恢复能力标签；移除后不被轮询重新加回',async()=>{
  wb.activeSession.messages=[{role:'assistant',metadata:{skillConversation:{action:'clarify',selection:{...task}}}}]
  const h=mount();await waitFor(()=>expect(h.result.current.selectedTask).toMatchObject({id:'skill-a'}));act(()=>h.result.current.removeTask());h.rerender();expect(h.result.current.selectedTask).toBeNull()
+})
+
+function mountControlled() {
+ return renderHook(() => {
+  const [composer,setComposer]=useState(wb.composer)
+  const invocation=useComposerBusinessTask({workbench:{...wb,composer,setComposer},onStarted,userId:'u1'})
+  return {...invocation,composer,setComposer}
+ })
+}
+it('消息进入流时立即清空编辑框，不等待模型返回，消息保留完整原文',async()=>{
+ let resolve;api.sendSkillConversation.mockImplementation(()=>new Promise(done=>{resolve=done}))
+ const h=mountControlled();act(()=>h.result.current.selectTask(task));let sending;act(()=>{sending=h.result.current.send()})
+ await waitFor(()=>expect(resolve).toBeTypeOf('function'))
+ expect(h.result.current.busy).toBe(true);expect(h.result.current.composer).toBe('');expect(h.result.current.pendingMessages[0].text).toBe('原始提示词')
+ await act(async()=>{resolve({action:'reply',message:'回答'});await sending})
+ expect(h.result.current.composer).toBe('')
+})
+it('发送失败恢复刚清空的原文，保留能力标签与重试信息',async()=>{
+ let reject;api.sendSkillConversation.mockImplementation(()=>new Promise((_,fail)=>{reject=fail}))
+ const h=mountControlled();act(()=>h.result.current.selectTask(task));let sending;act(()=>{sending=h.result.current.send()});await waitFor(()=>expect(reject).toBeTypeOf('function'))
+ expect(h.result.current.composer).toBe('');await act(async()=>{reject(new Error('network'));await sending})
+ expect(h.result.current.composer).toBe('原始提示词');expect(h.result.current.selectedTask.id).toBe('skill-a');expect(h.result.current.error).toBeTruthy()
+})
+it.each(['success','failure'])('迟到%s不清除或覆盖用户新写的草稿',async outcome=>{
+ let resolve,reject;api.sendSkillConversation.mockImplementation(()=>new Promise((done,fail)=>{resolve=done;reject=fail}))
+ const h=mountControlled();act(()=>h.result.current.selectTask(task));let sending;act(()=>{sending=h.result.current.send()});await waitFor(()=>expect(resolve).toBeTypeOf('function'))
+ act(()=>h.result.current.setComposer('下一条草稿'))
+ await act(async()=>{if(outcome==='success')resolve({action:'reply',message:'回答'});else reject(new Error('network'));await sending})
+ expect(h.result.current.composer).toBe('下一条草稿')
 })
