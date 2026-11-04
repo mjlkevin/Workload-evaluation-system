@@ -279,12 +279,44 @@ type WorkbenchToolLoopCommon = {
   recordToolEffect?: WorkbenchToolEffectRecorder;
   /** Persist visible model decisions before executing tools; reasoning stays transient. */
   modelTurns?: {
+    /** Ordinary chat freezes its model history only once this tool is selected. */
+    activationTool?: string;
     read(ordinal: number): Promise<WorkbenchModelTurn | undefined>;
     save(ordinal: number, value: WorkbenchModelTurn): Promise<WorkbenchModelTurn>;
   };
 };
 
 export type WorkbenchModelTurn = { content: string; toolCalls?: ToolCall[]; model?: string; finishReason?: string };
+
+/** Before a sandbox is selected, ordinary approval/input turns retain their
+ * regeneration behavior. Activation freezes the entire prefix, preserving tool
+ * ordinals when an earlier read or approved write precedes the sandbox call. */
+function modelTurnCache(ports: WorkbenchToolLoopCommon["modelTurns"]) {
+  let active = !ports?.activationTool;
+  const pending = new Map<number, WorkbenchModelTurn>();
+  return {
+    async read(ordinal: number) {
+      const cached = await ports?.read(ordinal);
+      if (cached) active = true;
+      return cached;
+    },
+    async save(ordinal: number, value: WorkbenchModelTurn) {
+      if (!ports) return value;
+      pending.set(ordinal, value);
+      if (value.toolCalls?.some(call => call.name === ports.activationTool)) active = true;
+      if (!active) return value;
+      let result = value;
+      for (const [number, decision] of pending) {
+        const saved = await ports.save(number, decision);
+        if (saved.content !== decision.content || modelDecisionHash(saved.toolCalls ?? []) !== modelDecisionHash(decision.toolCalls ?? []))
+          throw new Error("model_turn_conflict");
+        pending.delete(number);
+        if (number === ordinal) result = saved;
+      }
+      return result;
+    },
+  };
+}
 
 export type WorkbenchToolLoopInput = WorkbenchToolLoopCommon & {
   invoke: (params: {
@@ -459,6 +491,7 @@ export async function runWorkbenchToolLoop(
   const trace: WorkbenchToolCallTrace[] = [];
   const callCursor = { value: 0 };
   const knowledgeTrace: { value?: ZhipuKnowledgeToolTrace } = {};
+  const cache = modelTurnCache(input.modelTurns);
   let content = "";
 
   for (let turn = 1; turn <= maxTurns; turn += 1) {
@@ -470,9 +503,9 @@ export async function runWorkbenchToolLoop(
       transientReasoning = response.reasoningContent;
       return {content:response.content, ...(response.toolCalls ? {toolCalls:response.toolCalls} : {})};
     };
-    const cached = await input.modelTurns?.read(turn);
+    const cached = await cache.read(turn);
     const generated = cached ?? await invoke();
-    const response = !cached && input.modelTurns ? await input.modelTurns.save(turn, generated) : generated;
+    const response = !cached ? await cache.save(turn, generated) : generated;
     content = response.content ?? "";
     const calls = response.toolCalls ?? [];
     if (calls.length === 0) return toWorkbenchToolLoopResult(content, turn, false, trace, knowledgeTrace);
@@ -500,8 +533,8 @@ export async function runWorkbenchToolLoop(
  * 能把 trace.toolCalls 落到 assistant metadata（与同步路径同一数据通路）。
  */
 /** Cache only complete visible decisions. Direct iteration preserves stream return/cancel semantics. */
-async function* replayableModelStream(input: WorkbenchToolLoopStreamInput, messages: WorkbenchToolLoopMessage[], turn: number): AsyncGenerator<StreamingChunk> {
-  const cached = await input.modelTurns?.read(turn);
+async function* replayableModelStream(input: WorkbenchToolLoopStreamInput, messages: WorkbenchToolLoopMessage[], turn: number, cache: ReturnType<typeof modelTurnCache>): AsyncGenerator<StreamingChunk> {
+  const cached = await cache.read(turn);
   if (cached) { yield {contentDelta:cached.content,toolCalls:cached.toolCalls,model:cached.model,finishReason:cached.finishReason}; return; }
   if (!input.modelTurns) { yield* input.invokeStream({messages,turnOrdinal:turn}); return; }
   let content = "", model: string | undefined, finishReason: string | undefined;
@@ -520,7 +553,7 @@ async function* replayableModelStream(input: WorkbenchToolLoopStreamInput, messa
     yield visible;
   }
   if (input.runtime?.abortSignal?.aborted) throw new Error("model_turn_cancelled");
-  const saved = await input.modelTurns.save(turn, {content,...(calls.length ? {toolCalls:calls} : {}),...(model ? {model} : {}),...(finishReason ? {finishReason} : {})});
+  const saved = await cache.save(turn, {content,...(calls.length ? {toolCalls:calls} : {}),...(model ? {model} : {}),...(finishReason ? {finishReason} : {})});
   if (saved.content !== content || modelDecisionHash(saved.toolCalls ?? []) !== modelDecisionHash(calls)) throw new Error("model_turn_conflict");
   if (saved.toolCalls?.length) yield {contentDelta:"",kind:"metadata",toolCalls:saved.toolCalls,model:saved.model,finishReason:saved.finishReason};
 }
@@ -533,6 +566,7 @@ export async function* runWorkbenchToolLoopStream(
   const trace: WorkbenchToolCallTrace[] = [];
   const callCursor = { value: 0 };
   const knowledgeTrace: { value?: ZhipuKnowledgeToolTrace } = {};
+  const cache = modelTurnCache(input.modelTurns);
   let content = "";
 
   for (let turn = 1; turn <= maxTurns; turn += 1) {
@@ -545,7 +579,7 @@ export async function* runWorkbenchToolLoopStream(
     // 而 id 缺失时 provider 按 index 兜底成 call_0，故第二轮的同名调用是合法新调用。
     // 集合声明在轮循环内 → 每轮天然重置；若改成全局去重会吞掉后续轮次的调用。
     const seenTurnCallIds = new Set<string>();
-    for await (const chunk of replayableModelStream(input, [...workingMessages], turn)) {
+    for await (const chunk of replayableModelStream(input, [...workingMessages], turn, cache)) {
       yield chunk;
       if (chunk.kind !== "metadata") turnContent += chunk.contentDelta ?? "";
       if (chunk.reasoningContentDelta) turnReasoningContent += chunk.reasoningContentDelta;

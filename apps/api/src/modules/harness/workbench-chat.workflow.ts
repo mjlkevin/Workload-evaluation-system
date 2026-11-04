@@ -345,6 +345,7 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps, mod
               // 命中已记录 effect 时 recordToolEffectOnce 直接回存量 output 且不调用
               // execute —— 重放同一 Run 不会重复执行工具，幂等语义与外层同构。
               ...(deps.readModelTurn ? {modelTurns: {
+                ...(mode === 'chat' ? {activationTool: 'sandbox_execute'} : {}),
                 read: (ordinal: number) => deps.readModelTurn!(run.harnessRunId,ctx.makeEffectKey("workbench_chat_model_turn",ordinal)),
                 save: async (ordinal: number, value: import("../../services/ai/workbench-tool-loop").WorkbenchModelTurn) => {
                   if (ctx.abortSignal.aborted) throw new Error("model_turn_cancelled");

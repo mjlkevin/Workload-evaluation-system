@@ -85,3 +85,40 @@ test("partial model failure cannot save a decision or execute tools", async()=>{
   await assert.rejects(async()=>{for await(const _ of stream){}},/fixture-offline/);
   assert.equal(saved,false);
 });
+
+test("ordinary tool approval still regenerates arguments until a sandbox decision activates caching", async () => {
+  const registry = new ToolRegistry(), saved = new Map<number, any>(), asked: string[] = [];
+  registry.register({name:"ordinary_write",description:"write",capability:"estimates:read",mutates:true,parameters:{type:"object"},execute:async()=>{throw Error("pending must not execute")}});
+  const modelTurns = {activationTool:"sandbox_execute",read:async(n:number)=>saved.get(n),save:async(n:number,value:any)=>{saved.set(n,value);return value}};
+  for (const project of ["first", "changed"]) {
+    await assert.rejects(runWorkbenchToolLoop({messages:[],registry,agentUser:{id:"u",capabilities:["estimates:read"]},allowToolNames:new Set(),modelTurns,
+      toolApprovalGate:async call=>{asked.push(String(call.arguments.project));throw Error("pending")},
+      invoke:async()=>({content:"",toolCalls:[{id:"write",name:"ordinary_write",arguments:{project}}]})}),/pending/);
+  }
+  assert.deepEqual(asked,["first","changed"]);
+  assert.equal(saved.size,0,"ordinary approvals must retain their existing regeneration semantics");
+});
+
+test("first sandbox decision freezes earlier model turns so preceding tool ordinals survive resume", async () => {
+  const {runWorkbenchToolLoopStream} = await import("./workbench-tool-loop");
+  const registry = new ToolRegistry(), saved = new Map<number,any>(), effects = new Map<number,any>();
+  const invoked:number[] = [], preparedOrdinals:number[] = [], executedCodes:string[] = [];
+  let approved = false, reads = 0;
+  registry.register({name:"lookup",description:"read",capability:"estimates:read",mutates:false,parameters:{type:"object"},execute:async()=>{reads++;return {data:"owned"}}});
+  registry.register({name:"sandbox_execute",description:"cloud",capability:"estimates:read",mutates:false,exfiltrates:true,parameters:{type:"object"},
+    prepareForApproval:async(args,_,runtime)=>{preparedOrdinals.push(runtime!.toolOrdinal!);return args},execute:async(args)=>{executedCodes.push(String(args.code));return {status:"completed"}}});
+  const input: Parameters<typeof runWorkbenchToolLoopStream>[0] = {messages:[],registry,agentUser:{id:"u",capabilities:["estimates:read"]},runtime:{actor:{userId:"u"}} as any,allowToolNames:new Set(["lookup"]),
+    modelTurns:{activationTool:"sandbox_execute",read:async(n:number)=>saved.get(n),save:async(n:number,value:any)=>{saved.set(n,structuredClone(value));return saved.get(n)}},
+    recordToolEffect:async(n:number,execute:any)=>{if(effects.has(n))return effects.get(n);const out=await execute();effects.set(n,out);return out},
+    toolApprovalGate:async()=>{if(!approved)throw Error("pending");return {decision:"execute" as const}},
+    invokeStream:async function*({turnOrdinal}:{turnOrdinal:number}){invoked.push(turnOrdinal);if(turnOrdinal===1)yield {contentDelta:"",toolCalls:[{id:"lookup-call",name:"lookup",arguments:{}}]};
+      else if(turnOrdinal===2)yield {contentDelta:"",toolCalls:[{id:"cloud-call",name:"sandbox_execute",arguments:{code:approved?"changed-code":"frozen-code"}}]};else yield {contentDelta:"done",model:"fixture",finishReason:"stop"}}};
+  await assert.rejects(async()=>{for await(const _ of runWorkbenchToolLoopStream(input)){}},/pending/);
+  assert.deepEqual([...saved.keys()],[1,2]);
+  approved = true;
+  for await(const _ of runWorkbenchToolLoopStream(input)){}
+  assert.deepEqual(invoked,[1,2,3]);
+  assert.deepEqual(preparedOrdinals,[2,2]);
+  assert.deepEqual(executedCodes,["frozen-code"]);
+  assert.equal(reads,1);
+});
