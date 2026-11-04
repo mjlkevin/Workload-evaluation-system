@@ -287,3 +287,16 @@ test("same-attempt duplicate cannot invalidate an active collecting task", async
   assert.equal((await first).status, "completed");
   assert.deepEqual(f.counts(), { create: 1, run: 1, release: 1 });
 });
+test("missing declared output gives model a safe repairable file contract", async()=>{
+ const f=fixture(),create=f.provider.create;
+ f.provider.create=async()=>({...await create(),readOutput:async()=>{throw Error('private transport credential body')}});
+ const ready=await f.service.prepare(scope,args);f.approve();
+ await assert.rejects(()=>f.service.execute(scope,ready),(e:any)=>e.code==='SANDBOX_OUTPUT_INVALID'&&e.message.includes('report.html')&&!e.message.includes('private'));
+ assert.equal(f.counts().release,1);
+});
+test("invalid document identifies the declared output without publishing artifacts", async()=>{
+ const f=fixture();const request={...args,outputs:[{path:'report.docx',format:'docx',title:'Word'}]};
+ const ready=await f.service.prepare(scope,request);f.approve();
+ await assert.rejects(()=>f.service.execute(scope,ready),(e:any)=>e.code==='SANDBOX_ARTIFACT_INVALID'&&e.message.includes('report.docx'));
+ assert.equal(f.job().state,'failed');assert.equal(f.job().result,null);assert.equal(f.counts().release,1);
+});

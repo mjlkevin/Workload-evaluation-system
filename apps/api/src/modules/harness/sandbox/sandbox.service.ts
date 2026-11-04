@@ -325,18 +325,21 @@ export function createSandboxService(deps: {
         let total = 0;
         for (const output of job.request.outputs) {
           await guard();
-          const bytes = await instance.readOutput(
-            output.path,
-            20 * 1024 * 1024,
-          );
+          let bytes: Buffer;
+          try {
+            bytes = await instance.readOutput(output.path, 20 * 1024 * 1024);
+          } catch {
+            throw error("SANDBOX_OUTPUT_INVALID", `无法读取声明的独立文件 ${output.path}。请把每个产物实际写到当前工作目录下的相对路径，不能只返回内存字节流、打印结果或放进另一个ZIP；修订后重新确认`, 422);
+          }
           total += bytes.length;
           if (total > 50 * 1024 * 1024)
             throw error("SANDBOX_OUTPUT_LIMIT", "产物总量超过50MiB", 413);
-          const valid = await validateSandboxArtifact(
-            output.path,
-            output.format,
-            bytes,
-          );
+          let valid: Awaited<ReturnType<typeof validateSandboxArtifact>>;
+          try {
+            valid = await validateSandboxArtifact(output.path, output.format, bytes);
+          } catch {
+            throw error("SANDBOX_ARTIFACT_INVALID", `文件 ${output.path} 不符合 ${output.format.toUpperCase()} 文档结构或安全限制。请生成完整规范文件，修订后重新确认`, 422);
+          }
           const a: SandboxArtifact = {
             id: randomUUID(),
             jobId: job.id,
