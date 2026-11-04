@@ -444,6 +444,78 @@ test("KimiProvider: 流式按 index 聚合 delta.tool_calls 分片并在末 chun
   }
 });
 
+test("KimiProvider: 流式工具参数保留 Python 代码的空格、换行和缩进", async () => {
+  const originalFetch = globalThis.fetch;
+  const code = 'from io import BytesIO\n\ndef create_html():\n    buffer = BytesIO()\n    return buffer\n';
+  const expectedArguments = { code, label: "  HTML export  " };
+  // 单独的空格、JSON 格式换行和转义换行都可以成为上游分片边界。
+  const fragments = JSON.stringify(expectedArguments, null, 2).split(/( +|\n|\\n)/).filter(Boolean);
+  const events = fragments.map((argumentsFragment, index) => ({
+    choices: [{
+      delta: { tool_calls: [{
+        index: 0,
+        ...(index === 0 ? { id: "call_python", type: "function" } : {}),
+        function: {
+          ...(index === 0 ? { name: "sandbox_execute_python" } : {}),
+          arguments: argumentsFragment,
+        },
+      }] },
+      finish_reason: null,
+    }],
+  }));
+  globalThis.fetch = async () => new Response(
+    events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join("") +
+      'data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}\n\ndata: [DONE]\n\n',
+    { status: 200 },
+  );
+
+  try {
+    const calls = [];
+    const provider = new KimiProvider({ apiKey: "test-key" });
+    for await (const chunk of provider.streamChatCompletion({
+      messages: [{ role: "user", content: "生成 HTML" }],
+    })) {
+      if (chunk.toolCalls) calls.push(...chunk.toolCalls);
+    }
+    assert.deepEqual(calls, [{
+      id: "call_python",
+      name: "sandbox_execute_python",
+      arguments: expectedArguments,
+    }]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+for (const source of ["delta", "message"] as const) {
+  for (const reasoningField of ["reasoning_content", "reasoningContent"] as const) {
+    test(`KimiProvider: ${source}.${reasoningField} 流式文本保留独立空白分片`, async () => {
+      const originalFetch = globalThis.fetch;
+      const contentFragments = ["  Hello", " ", "world", "\n", "    ", "完成  ", "\r\n"];
+      const reasoningFragments = ["  先", " ", "判断", "\n", "\t", "then act  ", "\r\n"];
+      const events = contentFragments.map((content, index) => ({
+        choices: [{ [source]: { content, [reasoningField]: reasoningFragments[index] } }],
+      }));
+      globalThis.fetch = async () => new Response(
+        events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join("") + 'data: [DONE]\n\n',
+        { status: 200 },
+      );
+
+      try {
+        const chunks = [];
+        const provider = new KimiProvider({ apiKey: "test-key" });
+        for await (const chunk of provider.streamChatCompletion({
+          messages: [{ role: "user", content: "保留格式" }],
+        })) chunks.push(chunk);
+        assert.deepEqual(chunks.map((chunk) => chunk.contentDelta), contentFragments);
+        assert.deepEqual(chunks.map((chunk) => chunk.reasoningContentDelta), reasoningFragments);
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+  }
+}
+
 test("KimiProvider: 结束帧之后厂商补发的纯用量帧不得再次携带同一批 tool_calls", async () => {
   const originalFetch = globalThis.fetch;
   const encoder = new TextEncoder();

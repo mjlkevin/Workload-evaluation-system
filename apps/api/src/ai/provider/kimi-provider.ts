@@ -536,6 +536,11 @@ async function parseSuccess(
   };
 }
 
+// SSE 文本和工具参数按原样拼接；逐片 trim 会破坏词间空格与代码缩进。
+function asStreamFragment(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
 async function* parseStream(
   response: globalThis.Response,
   model: string,
@@ -627,8 +632,8 @@ async function* parseStream(
             continue;
           }
           const choice = json.choices?.[0];
-          const delta = asString(choice?.delta?.content || choice?.message?.content);
-          const reasoningDelta = asString(
+          const delta = asStreamFragment(choice?.delta?.content || choice?.message?.content);
+          const reasoningDelta = asStreamFragment(
             choice?.delta?.reasoning_content ||
               choice?.delta?.reasoningContent ||
               choice?.message?.reasoning_content ||
@@ -640,7 +645,7 @@ async function* parseStream(
             toolCallParts.set(key, {
               id: prev.id || asString(frag?.id) || undefined,
               name: prev.name || asString(frag?.function?.name) || undefined,
-              arguments: prev.arguments + asString(frag?.function?.arguments),
+              arguments: prev.arguments + asStreamFragment(frag?.function?.arguments),
             });
           }
           finishReason = asString(choice?.finish_reason) || finishReason;
