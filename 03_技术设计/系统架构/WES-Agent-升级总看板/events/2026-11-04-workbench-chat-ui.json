@@ -148,7 +148,7 @@
     "newBusinessMutation": false
   },
   "review": "五轴自查：输入/Slash/IME/附件/复制与确认回调保持；局部正文CSS只供MessageBubble使用；历史跳转仅本地滚动，跟随状态按会话恢复；菜单重复打开复用末尾命令；未改后端、状态源或左栏。",
-  "integrationState": "本次UI代码已提交为 6246436a085d1b366d662e96f4ae31ae07dda994；用户已授权推送，实际结果见2026-11-04-ui-polish-push.json。",
+  "integrationState": "本次UI代码已通过origin/main推送，核验提交 4f4043bc359898e666b5be0c9a19519ba8a1f464；详细回执见2026-11-04-ui-polish-push.json。",
   "evidence": [
     {
       "ref": "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/ChatArea/index.jsx",

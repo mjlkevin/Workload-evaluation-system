@@ -4,7 +4,7 @@
   "type": "verification",
   "scope": "本轮工作台侧栏、聊天区、产物卡和顶部页签的提交与推送",
   "summary": "按用户“提交、推送”授权分批提交本轮UI，保留其他本地改动。",
-  "status": "四个UI提交完成；精确快照全量通过；文档提交及推送待执行",
+  "status": "本轮代码与验证记录已提交并推送GitHub main；远端读回一致",
   "pages": [
     "index",
     "plan",
@@ -83,7 +83,11 @@
   "publication": {
     "remote": "origin",
     "branch": "main",
-    "pushed": false
+    "pushed": true,
+    "verifiedCommit": "4f4043bc359898e666b5be0c9a19519ba8a1f464",
+    "verifiedAt": "2026-11-04T14:15:44.623104+00:00",
+    "verification": "git ls-remote origin refs/heads/main 与 git rev-parse HEAD 相同",
+    "receipt": "本回执在已核验的代码/文档提交之后补充。"
   },
   "humanAcceptance": "用户授权提交推送，不等同于各业务需求整体用户验收完成。",
   "commits": [
@@ -143,5 +147,10 @@
       ],
       "event": "2026-11-04-workspace-tabs-overflow.json"
     }
-  ]
+  ],
+  "preservation": {
+    "unrelatedFilesCompared": 68,
+    "changed": 0,
+    "index": "仅本轮内容入提交；其他共享文档hunk及源文件改动仍保留在本地。"
+  }
 }

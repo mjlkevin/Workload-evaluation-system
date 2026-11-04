@@ -163,7 +163,7 @@
       "scrollbarHeight": 0
     }
   },
-  "integrationState": "本次UI代码已提交为 93d29f2cbaa1cb4729bf813e2dbdadbb903e888a；用户已授权推送，实际结果见2026-11-04-ui-polish-push.json。",
+  "integrationState": "本次UI代码已通过origin/main推送，核验提交 4f4043bc359898e666b5be0c9a19519ba8a1f464；详细回执见2026-11-04-ui-polish-push.json。",
   "review": "五轴自查：原openTab和未保存门闩复用；原生select承担键盘与关闭行为；控件不参与scrollWidth；resize observer与事件清理完整；无业务/鉴权/后端变更。",
   "boardValidation": "board-build 21页；board-consistency-check 0错误0警告；board-event-check通过。需求主台账新增RP-068，当前摘要55项：25已验收、16待验、12待处理/推进、2暂缓。",
   "submissionValidation": "本批精确提交快照105文件1022/1022与构建通过；此前混合工作区失败记录保留。"

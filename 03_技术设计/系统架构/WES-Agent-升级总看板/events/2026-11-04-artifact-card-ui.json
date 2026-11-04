@@ -167,7 +167,7 @@
       "summary": "组件行为、原下载与预览隔离回归"
     }
   ],
-  "integrationState": "本次UI代码已提交为 929c8c578f7d54e18c10ba6a8d0e89af381c80a2；用户已授权推送，实际结果见2026-11-04-ui-polish-push.json。",
+  "integrationState": "本次UI代码已通过origin/main推送，核验提交 4f4043bc359898e666b5be0c9a19519ba8a1f464；详细回执见2026-11-04-ui-polish-push.json。",
   "review": "五轴自查：单组件owner，原JWT API与文件不变；srcDoc保留授权响应CSP且严格sandbox；忙态互斥；折叠恢复焦点；下载URL释放和卸载abort保持。",
   "boardValidation": {
     "build": "21页面构建通过",

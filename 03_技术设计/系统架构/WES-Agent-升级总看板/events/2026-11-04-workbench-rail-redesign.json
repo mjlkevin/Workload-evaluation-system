@@ -138,7 +138,7 @@
     "backendRestarted": false
   },
   "review": "五轴自查：原回调与停止二次确认保持；原生选择不嵌套按钮；菜单键盘/指针焦点分开；搜索不变更选择；仅现有tokens与React，不新增业务写入。",
-  "integrationState": "本次UI代码已提交为 5221aa80c9d64a607a3b87fd27bb3c3381a04e87；用户已授权推送，实际结果见2026-11-04-ui-polish-push.json。",
+  "integrationState": "本次UI代码已通过origin/main推送，核验提交 4f4043bc359898e666b5be0c9a19519ba8a1f464；详细回执见2026-11-04-ui-polish-push.json。",
   "additionalPages": [
     "design"
   ],
