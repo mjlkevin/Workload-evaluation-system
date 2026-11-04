@@ -714,6 +714,8 @@
 <section class="section" data-board-event-id="BE-2026-11-04-workbench-remove-inspector:risks"><h2>工作台移除右侧摘要 · 本地实现</h2><p>命中 ISS-2026-11-04-001 / RP-050。按用户指定方案移除整个右侧工作区及折叠空列；执行、确认、结果统一在中央，旧会话确认、材料、产物和关联仍可访问。</p><p>Web990/990、构建和UI范围检查通过；模块1156/1159及隔离65/66，取消/超时时序失败保留，未改后端逻辑或测试预算。</p><p><a href="events/2026-11-04-workbench-remove-inspector.json">实取验证与浏览器证据</a>；左下角色快捷提问保持原样。本地候选，未合主线、未推送；用户验收待回填。</p></section>
 <section class="section" data-board-event-id="BE-2026-11-04-skill-conversation:risks"><h2>执行语义已修正 · 发布与测试边界保留</h2><p>LLM只提出执行意图，服务端仍校验权限、输入与期望版本，业务写入独立确认。验收Skill测试指令未改；依赖审计45项既有风险和旧占位夹具扫描命中保留。后台取消时序2例仍失败，最终验收待确认。</p><p><a href="events/2026-11-04-skill-capability-input-misinterpretation.json">原问题与回归</a> · <a href="events/2026-11-04-message-sender-distinction.json">消息来源优化</a> · <a href="../../../docs/superpowers/evidence/2026-11-04-skill-conversation-and-message-senders.json">完整验证证据</a></p></section>
 </main>
+<section class="section" data-board-event-id="BE-2026-11-04-composer-clear-on-dispatch:risks"><h2>失败恢复保留草稿 · 旧失败证据保留</h2><p>失败仅恢复本次清空后的空正文，不覆盖用户新输入；未修改后端超时。前轮取消时序两项失败日志保留，本次模块1176/1176通过。</p><p><a href="events/2026-11-04-composer-clear-on-dispatch.json">清空时机、回归与截图</a>；用户验收待回填。</p></section>
+<section class="section" data-board-event-id="BE-2026-11-04-aliyun-sandbox-feasibility:risks"><h2>阿里云沙箱文档生成 · 可行性分析</h2><p>命中ISS-2026-08-27-004，补充外部执行工具方案。LLM理解任务，沙箱生成文件，WES取回并保存后在消息流展示；不替换业务后端。依赖、字体、网络和产物归属待方案确认，未实施、未创建云资源。</p><p><a href="events/2026-11-04-aliyun-sandbox-feasibility.json">官方依据与范围边界</a>；保持question，不新增实现需求。</p></section>
   <script src="assets/board-ui.js" defer></script>
 </body>
 </html>

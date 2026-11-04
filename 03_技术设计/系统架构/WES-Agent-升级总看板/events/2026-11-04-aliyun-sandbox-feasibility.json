@@ -1,0 +1,21 @@
+{
+  "id": "BE-2026-11-04-aliyun-sandbox-feasibility",
+  "date": "2026-11-04",
+  "type": "question",
+  "issueId": "ISS-2026-08-27-004",
+  "dedup": "命中既有Agent底座现成方案及沙箱边界评估，补充阿里云文档生成场景，不另建需求",
+  "originalFeedback": "我是不是可以关联一个阿里云的sandbox，让LLM部分任务在sandbox里处理？比如用户提出希望整理出html/WORD/excel文档",
+  "verifiedSources": [
+    "https://help.aliyun.com/zh/model-studio/sandbox-best-practice-code-interpreter",
+    "https://help.aliyun.com/zh/model-studio/sandbox-api-overview",
+    "https://help.aliyun.com/zh/model-studio/sandbox-best-practice-aio"
+  ],
+  "facts": "官方支持Python/Node运行、文件处理、上传和取回产物；创建模板及SLR授权不代表WES已接通。现有Skill工具契约对MCP来源仍为simulationOnly。",
+  "proposal": "LLM理解输入和选择工具；WES后端受控适配器调用阿里云沙箱。固定依赖/字体/模板，生成HTML/docx/xlsx；验证并保存为有会话归属的产物，再在中央消息流预览下载。执行环境不替代WES业务后端。",
+  "boundary": "只传本次任务所需材料，平台凭据留在WES后端；不把原始沙箱控制URL给前端，产物取回后释放执行资源。",
+  "status": "question / 可行性已分析，接入方案与实施待用户决策",
+  "implementationPerformed": false,
+  "cloudResourcesCreated": false,
+  "authorizationGranted": false,
+  "next": "如进入实施，先确认资源/地域/凭据配置方式、产物归属与保留策略，再立独立文档工具适配任务；本轮不扩展RP-050实现范围。"
+}

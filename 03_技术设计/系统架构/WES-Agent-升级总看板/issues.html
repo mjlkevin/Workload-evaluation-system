@@ -51,7 +51,7 @@
           <span><b>流转</b> Issue → triage → Defect / Requirement / Risk / Close</span>
           <span><b>更新日期</b> 2026-11-04</span>
         </div>
-        <div class="pill-row" style="margin-top:18px"><span class="pill brand">43 问题（40 个编号，历史撞号3次保留）</span><span class="pill warn">4 待分诊/待裁决</span><span class="pill warn">21 转缺陷</span><span class="pill brand">9 转需求</span><span class="pill">9 不转/关闭/治理</span></div>
+        <div class="pill-row" style="margin-top:18px"><span class="pill brand">44 问题（41 个编号，历史撞号3次保留）</span><span class="pill warn">4 待分诊/待裁决</span><span class="pill warn">22 转缺陷</span><span class="pill brand">9 转需求</span><span class="pill">9 不转/关闭/治理</span></div>
       </div>
     </div>
 
@@ -90,6 +90,7 @@
             <col style="width:11%">
           </colgroup>
           <tr><th>ID</th><th>日期</th><th>标题</th><th>来源</th><th>原始反馈</th><th>证据</th><th>分析状态</th><th>分流</th><th>下一步</th></tr>
+<tr data-board-event-id="BE-2026-11-04-composer-clear-on-dispatch:issues"><td class="mono">ISS-2026-11-04-003</td><td>2026-11-04</td><td>Skill消息发送后编辑框残留原文</td><td>用户截图 / 3006</td><td>用户问：为什么消息已发送，编辑框里还残留消息？中央已出现用户原文和等待占位。</td><td><a href="events/2026-11-04-composer-clear-on-dispatch.json">清空时机、回归与截图</a></td><td><span class="status run">本地修复</span></td><td>转缺陷 · DEF-2026-11-04-002</td><td>P2；等待模型时立即清空，失败安全恢复；真实等待态已验证，待用户验收。</td></tr>
 <tr data-board-event-id="BE-2026-11-04-skill-capability-input-misinterpretation:issues"><td class="mono">ISS-2026-11-04-002</td><td>2026-11-04</td><td>询问技能用途被误拆成业务需求</td><td>用户实测 / AI工作台</td><td>选中验收Skill询问“这个skill能做什么？”，被生成查询和导出两条需求。</td><td><a href="events/2026-11-04-skill-capability-input-misinterpretation.json">实际Run、发布指令与截图</a></td><td><span class="status run">本地修复</span></td><td>转缺陷 · DEF-2026-11-04-001</td><td>P1；LLM先理解再决定回答/追问/执行；真实反例已回归，待用户验收。</td></tr>
             <tr data-board-event-id="BE-2026-10-21-system-controls-polish:issues">
               <td class="mono">ISS-2026-10-21-001</td><td>2026-10-21</td><td>系统管理对象展示不统一（控件优化 → 全模块列表化方案）</td><td>用户截图及后续设计调研请求</td>
@@ -454,11 +455,11 @@
               <td>2026-08-27</td>
               <td>对比 bytedance/deer-flow 后判断 WES Agent 底座是否在重复造轮子</td>
               <td>user_architecture_question</td>
-              <td>用户要求读 deer-flow 并与 WES 对比，认为「几乎我们是在重复造轮子」。核查结论分两层：① 产品域零重叠——工作量评估链路、规则 DSL、版本机制、成本人天、Excel 导入导出（约占 apps/api 源码 63%）在 deer-flow 中无对位物；② Agent 底座层存在实质重叠，约 1.07 万行源码（harness 6333 / trace 1522 / agent 1135 / knowledge 968 / memory 772）对位 deer-flow <code class="inline">backend/packages/harness/deerflow</code> 的 runtime/{runs,checkpointer,events,stream_bridge}、tracing、agents/memory（4 后端）、agents/middlewares（45 个）。不建议迁移的三条硬约束：栈不同（Python/LangGraph/FastAPI vs TypeScript/Express，接入即引入第二后端运行时，触碰 AGENTS.md §12）；deer-flow 自述 authz 为 best-effort behavioral scoping, not a hard security boundary，与 WES 的 owner 隔离/写确认/证据链硬要求相反；WES 8 个业务工具（create_project / estimate_implementation / generate_wbs / rule_lookup / export_report 等）无论用哪个底座都要自己写。真正的风险不在已建部分，而在下一步：未开工的 RP-050（skill manifest + 级联 Matcher）与 deer-flow skills 子系统重叠度最高。<b>补充（同轮追问「若最初以 deer-flow 为骨架」）</b>：该选项在时间线上不可得——deer-flow 2.0 是 ground-up rewrite、与 1.x 零共享代码，2026-06-25 发布；WES harness 首个 commit 2026-06-17（早 8 天），agent 目录 2026-06-15，项目起步 2026-03-24（当时 deer-flow 仍是 1.x deep-research 工作流 demo）。且即使今天重来，可替换面仅约 6500 行 = <code class="inline">apps/api</code> 源码 13%（runtime 通用件 3110 + trace 1522 + agent 编排 1135 + memory 772）；harness 内 WES 域件约 3200 行（证据链/产物/草稿确认闸门/工作台投影）与 <code class="inline">services/ai</code> 5733 行意图路由不可替换。</td>
+              <td>用户要求读 deer-flow 并与 WES 对比，认为「几乎我们是在重复造轮子」。核查结论分两层：① 产品域零重叠——工作量评估链路、规则 DSL、版本机制、成本人天、Excel 导入导出（约占 apps/api 源码 63%）在 deer-flow 中无对位物；② Agent 底座层存在实质重叠，约 1.07 万行源码（harness 6333 / trace 1522 / agent 1135 / knowledge 968 / memory 772）对位 deer-flow <code class="inline">backend/packages/harness/deerflow</code> 的 runtime/{runs,checkpointer,events,stream_bridge}、tracing、agents/memory（4 后端）、agents/middlewares（45 个）。不建议迁移的三条硬约束：栈不同（Python/LangGraph/FastAPI vs TypeScript/Express，接入即引入第二后端运行时，触碰 AGENTS.md §12）；deer-flow 自述 authz 为 best-effort behavioral scoping, not a hard security boundary，与 WES 的 owner 隔离/写确认/证据链硬要求相反；WES 8 个业务工具（create_project / estimate_implementation / generate_wbs / rule_lookup / export_report 等）无论用哪个底座都要自己写。真正的风险不在已建部分，而在下一步：未开工的 RP-050（skill manifest + 级联 Matcher）与 deer-flow skills 子系统重叠度最高。<b>补充（同轮追问「若最初以 deer-flow 为骨架」）</b>：该选项在时间线上不可得——deer-flow 2.0 是 ground-up rewrite、与 1.x 零共享代码，2026-06-25 发布；WES harness 首个 commit 2026-06-17（早 8 天），agent 目录 2026-06-15，项目起步 2026-03-24（当时 deer-flow 仍是 1.x deep-research 工作流 demo）。且即使今天重来，可替换面仅约 6500 行 = <code class="inline">apps/api</code> 源码 13%（runtime 通用件 3110 + trace 1522 + agent 编排 1135 + memory 772）；harness 内 WES 域件约 3200 行（证据链/产物/草稿确认闸门/工作台投影）与 <code class="inline">services/ai</code> 5733 行意图路由不可替换。<details><summary>2026-11-04 沙箱文档生成追问</summary>用户询问阿里云沙箱生成HTML/Word/Excel是否可行。官方支持代码执行及文件取回；WES需要受控工具适配、产物持久化和消息流预览下载。<a href="events/2026-11-04-aliyun-sandbox-feasibility.json">官方依据与拟议边界</a>。本轮仅分析，无云资源创建、无授权操作。</details></td>
               <td><code class="inline">apps/api/src/modules/harness/*（6333 源码 + 7201 测试行，durable run/attempt 租约/checkpoint/outbox/recovery/projector）</code> <code class="inline">apps/api/src/agent/orchestrator.ts（tool-calling 循环 + list_tools 按需发现，对位 deferred_tool_filter_middleware）</code> <code class="inline">github.com/bytedance/deer-flow（MIT，8.1 万 star，harness 包 501 个 py 文件，最近推送 2026-08-27）</code> <code class="inline">requirements.html RP-050（skill manifest 驱动级联匹配，当前仅详细登记未开工）</code></td>
-              <td><span class="status warn"><span class="dot"></span>待分诊</span></td>
+              <td><span class="status warn">已分析待决策</span></td>
               <td>待架构侧裁决（预期产出为范围排除项而非需求；已建底座不主张重构迁移）</td>
-              <td>下一步待用户裁决：是否把「沙箱代码执行 / 子代理并行编排 / 技能市场与技能审核 / MCP 客户端 / 浏览器自动化」写入 <code class="inline">risks.html</code> 范围排除，并在 RP-050 开工前补一条「先评估现成方案」前置门；本条不改动任何代码。</td>
+              <td>2026-11-04：阿里云沙箱文档生成可行性已分析；接入范围、产物保存及资源配置待决策。本轮不实施，不创建云资源。</td>
             </tr>
             <tr>
               <td class="mono">ISS-2026-08-27-005</td>

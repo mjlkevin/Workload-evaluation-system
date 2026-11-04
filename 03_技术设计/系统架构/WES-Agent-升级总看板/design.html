@@ -491,6 +491,8 @@
 <section class="section" data-board-event-id="BE-2026-11-04-skill-conversation:design"><h2>Skill作为对话上下文 · 执行入口分离</h2><p>新conversation入口读取授权发布能力、会话历史和原文；LLM返回自然语言回答、追问或执行意图。对话不套业务结果Schema，执行仍校验输入/版本/权限并保留写入确认。单一消息流表面、两个根问题，无新UI依赖。</p><p><a href="events/2026-11-04-skill-capability-input-misinterpretation.json">原问题与回归</a> · <a href="events/2026-11-04-message-sender-distinction.json">消息来源优化</a> · <a href="../../../docs/superpowers/evidence/2026-11-04-skill-conversation-and-message-senders.json">完整验证证据</a></p></section>
 <section class="section" data-board-event-id="BE-2026-11-04-remove-system-page-nav:design"><h2>系统管理菜单独立页面 · 本地实现</h2><p>命中ISS-2026-10-21-001 / RP-065。按用户要求移除正文内两层分类导航；左侧菜单直接进入页面，原路由、书签跳转及业务内容保留。</p><p>导航专项13/13，完整Web992/992、构建和两个表面分别UI范围检查通过。实际Skill/模型/Workflow入口及1440/760已验证，分类导航0处。<a href="events/2026-11-04-remove-system-page-nav.json">证据与截图</a>；候选待用户验收，未合主线未推送。</p></section>
 </main>
+<section class="section" data-board-event-id="BE-2026-11-04-composer-clear-on-dispatch:design"><h2>消息归属随发送切换</h2><p>提交原文保存在请求快照；进入消息流即清空。失败仅在同会话且编辑框仍空时恢复；迟到成功不再触碰正文。</p><p><a href="events/2026-11-04-composer-clear-on-dispatch.json">清空时机、回归与截图</a>；用户验收待回填。</p></section>
+<section class="section" data-board-event-id="BE-2026-11-04-aliyun-sandbox-feasibility:design"><h2>阿里云沙箱文档生成 · 可行性分析</h2><p>命中ISS-2026-08-27-004，补充外部执行工具方案。LLM理解任务，沙箱生成文件，WES取回并保存后在消息流展示；不替换业务后端。依赖、字体、网络和产物归属待方案确认，未实施、未创建云资源。</p><p><a href="events/2026-11-04-aliyun-sandbox-feasibility.json">官方依据与范围边界</a>；保持question，不新增实现需求。</p></section>
   <script src="assets/board-ui.js" defer></script>
 </body>
 </html>

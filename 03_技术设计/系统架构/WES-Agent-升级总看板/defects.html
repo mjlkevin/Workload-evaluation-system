@@ -56,7 +56,7 @@
              2026-09-02 DEF-2026-08-27-001 合入轮再实取：新增两行只登记项（DEF-2026-09-02-004 / -005）使总数 26→28；DEF-001 由 fixed_manual_pending 转 done 使 done 8→9、人工待复核 13→12；open 5→7。闭合校验 9 + 7 + 12 = 28
              2026-09-03 DEF-2026-09-03-001 合入轮实取：新增一行已修复（done），总数 28→29、done 9→10；open 7 不变、人工待复核 12 不变。闭合校验 10 + 7 + 12 = 29
              2026-09-23 对账轮实取：总数 29 不变；状态列归桶 open 6 / fixed·已修复·closed·done 合计 11 / fixed_manual_pending 12。闭合校验 6 + 11 + 12 = 29 -->
-        <div class="pill-row" style="margin-top:18px"><span class="pill brand">30 缺陷</span><span class="pill warn">7 待修复 / 返工</span><span class="pill ok">11 已修复 / 已关闭</span><span class="pill warn">12 人工待复核</span></div>
+        <div class="pill-row" style="margin-top:18px"><span class="pill brand">31 缺陷</span><span class="pill warn">7 待修复 / 返工</span><span class="pill ok">11 已修复 / 已关闭</span><span class="pill">13 人工待复核</span></div>
       </div>
     </div>
 
@@ -85,6 +85,7 @@
         </div>
         <table>
           <tr><th>缺陷 ID</th><th>来源 Issue</th><th>关联 RP</th><th>标题</th><th>等级</th><th>状态</th><th>影响范围</th><th>修复口径</th><th>验证</th><th>验收</th></tr>
+<tr data-board-event-id="BE-2026-11-04-composer-clear-on-dispatch:defects"><td class="mono">DEF-2026-11-04-002</td><td>ISS-2026-11-04-003</td><td>RP-050</td><td>发送清空滞后于模型响应</td><td>S3</td><td><span class="status run">fixed_manual_pending</span></td><td>带Skill标签的消息编辑框</td><td>消息进入流即清空；失败仅恢复空编辑框，不覆盖新草稿。</td><td><a href="events/2026-11-04-composer-clear-on-dispatch.json">清空时机、回归与截图</a>；定向13、Web996、模块1176通过。</td><td>真实等待态已观察；用户验收待回填。</td></tr>
 <tr data-board-event-id="BE-2026-11-04-skill-capability-input-misinterpretation:defects"><td class="mono">DEF-2026-11-04-001</td><td>ISS-2026-11-04-002</td><td>RP-050</td><td>带标签输入被强制解释为业务执行</td><td>S2</td><td><span class="status run">open</span></td><td>业务Skill可用目录 / 已发布验收定义 / 带标签能力询问</td><td>新增LLM对话理解入口；实际执行仍走原契约与确认，发布定义不变。</td><td><a href="events/2026-11-04-skill-capability-input-misinterpretation.json">用途/追问/任务真实回归已观察</a>；待用户验收。</td><td>能力询问不得生成需求；正常样本与原文依据保持；用户验收待执行。</td></tr>
             <tr>
               <td class="mono">DEF-2026-07-02-001</td>
