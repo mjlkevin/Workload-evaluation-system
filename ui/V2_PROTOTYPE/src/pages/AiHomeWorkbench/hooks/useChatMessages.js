@@ -320,7 +320,8 @@ export default function useChatMessages(workbench) {
     })
     return runTrail.calls.filter((call) => {
       if (!call) return false
-      if (call.approval?.actionId && renderedActionIds.has(call.approval.actionId)) return false
+      // Approval identity includes its Run; a historical tool slot is not the same decision.
+      if (call.approval?.actionId) return !renderedActionIds.has(call.approval.actionId)
       return !renderedSlots.has(`${call.name || ''}#${call.callIndex || 0}`)
     })
   }, [runTrail, messages])

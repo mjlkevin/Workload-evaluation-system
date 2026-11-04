@@ -16,6 +16,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { sessionRuntimeStore } from '../hooks/useSessionRuntimeStore.js'
 import useChatMessages from '../pages/AiHomeWorkbench/hooks/useChatMessages.js'
 import ThinkingTrace from '../pages/AiHomeWorkbench/components/ChatArea/ThinkingTrace.jsx'
+import RunToolTray from '../pages/AiHomeWorkbench/components/ChatArea/RunToolTray.jsx'
 import {
   applyToolCallEventToList,
   createToolCallArgsCache,
@@ -453,6 +454,58 @@ describe('批次1b · useChatMessages 接线', () => {
       name: 'create_project',
       status: TOOL_CALL_STATUS.AWAITING_APPROVAL,
       approval: { actionId: 'act-9', runId: 'run-restore' },
+    })
+  })
+
+  test('historical completed tool slot cannot hide a different run approval with the same name and index', async () => {
+    let confirmations = 0
+    server.use(
+      http.get(`${BASE}/ai-runs/run-restore/tool-events`, () => HttpResponse.json({
+        success: true, data: { runId: 'run-restore', items: [
+          startedEvent(1, { callIndex: 2, name: 'sandbox_execute', callId: 'new-call', args: { title: 'New file' } }),
+          awaitingEvent(2, { callId: 'new-call', actionId: 'new-run-approval', toolName: 'sandbox_execute', ordinal: 2 }),
+        ] },
+      })),
+      http.post(`${BASE}/ai-runs/:runId/actions/:actionId/confirm`, () => {
+        confirmations += 1
+        return HttpResponse.json({ success: true, data: {} })
+      }),
+    )
+    const base = createWorkbench()
+    const workbench = createWorkbench({
+      activeSession: { ...base.activeSession, messages: [{
+        messageId: 'old-file-message', role: 'assistant', content: 'Previous file finished',
+        metadata: { toolCalls: [{ name: 'sandbox_execute', callIndex: 2, status: 'completed' }] },
+      }] },
+      unifiedView: { runs: [{ runId: 'run-restore', sessionId: 'session-1b', status: 'waiting' }] },
+    })
+    const hook = renderHook(() => useChatMessages(workbench))
+    await waitFor(() => expect(hook.result.current.messages).toHaveLength(1))
+    expect(hook.result.current.messages[0].toolCalls[0].status).toBe('completed')
+    await waitFor(() => expect(hook.result.current.pendingToolApprovals).toHaveLength(1))
+    expect(hook.result.current.pendingToolApprovals[0].approval).toMatchObject({
+      actionId: 'new-run-approval', runId: 'run-restore',
+    })
+    render(<RunToolTray calls={hook.result.current.toolTrail} onApprove={hook.result.current.approveToolCall} onReject={hook.result.current.rejectToolCall} />)
+    expect(screen.getByRole('button', { name: '同意 sandbox_execute' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: '拒绝 sandbox_execute' })).toBeEnabled()
+    expect(confirmations).toBe(0)
+  })
+
+  test('the exact approval already rendered in a live message is not duplicated in the tray', async () => {
+    const events = [
+      startedEvent(1, { callIndex: 2, name: 'sandbox_execute', callId: 'same-call', args: { title: 'Same file' } }),
+      awaitingEvent(2, { callId: 'same-call', actionId: 'same-approval', toolName: 'sandbox_execute', ordinal: 2 }),
+    ]
+    server.use(http.get(`${BASE}/ai-runs/run-1b/tool-events`, () => HttpResponse.json({
+      success: true, data: { runId: 'run-1b', items: events },
+    })))
+    const hook = renderChat({})
+    await waitFor(() => expect(hook.result.current.pendingToolApprovals).toHaveLength(1))
+    events.forEach(event => act(() => capturedStreamHandlers.onEvent(event)))
+    await waitFor(() => expect(hook.result.current.toolTrail).toHaveLength(0))
+    expect(hook.result.current.messages.find(message => message.id === 'loading-1').toolCalls[0]).toMatchObject({
+      status: 'awaiting_approval', approval: { actionId: 'same-approval' },
     })
   })
 
