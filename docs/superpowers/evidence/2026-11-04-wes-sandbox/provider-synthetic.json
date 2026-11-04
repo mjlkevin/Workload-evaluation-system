@@ -1,0 +1,64 @@
+{
+  "type": "real-cloud-provider-synthetic",
+  "networkScope": "public-internet-blocked; platform OSS internal channels retained by explicit user decision",
+  "templateCode": "f902c2af-a5bf-49c9-829d-bc704b8c798d",
+  "buildID": "36d6e887-df67-4a8f-af5e-5cbc209a03ad",
+  "secretPersisted": false,
+  "modelUsed": false,
+  "files": [
+    {
+      "name": "report.html",
+      "mimeType": "text/html; charset=utf-8",
+      "sha256": "e7eb5acd0fab930500297d44c26471697ec977f4e4972c910cf391c201bee31b",
+      "size": 206,
+      "path": "/tmp/wes-sandbox-cloud-20261104/report.html"
+    },
+    {
+      "name": "report.docx",
+      "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "sha256": "360bc8af0ff27e68a6686f2d349a66ab84969781a7ea3baf15ffac8ac137f00a",
+      "size": 927,
+      "path": "/tmp/wes-sandbox-cloud-20261104/report.docx"
+    },
+    {
+      "name": "report.xlsx",
+      "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "sha256": "e50e2b4d13d675943e77fb78bbb81bcd8e03092e731df41181e44c6da73c27cf",
+      "size": 1481,
+      "path": "/tmp/wes-sandbox-cloud-20261104/report.xlsx"
+    }
+  ],
+  "templateVerified": true,
+  "sandboxId": "sbx-2570996f-cdaa-46d6-80a7-d6348555c78c",
+  "execution": {
+    "exitCode": 0,
+    "checks": {
+      "uid": 1000,
+      "network": {
+        "pypi.org": {
+          "blocked": true,
+          "reason": "URLError"
+        },
+        "example.com": {
+          "blocked": true,
+          "reason": "URLError"
+        }
+      },
+      "generated": 3,
+      "envKeys": [
+        "PATH",
+        "HOME",
+        "LANG"
+      ]
+    }
+  },
+  "flood": {
+    "exitCode": 0,
+    "stdoutBytes": 16384,
+    "stderrBytes": 16384
+  },
+  "timeout": {
+    "exitCode": 124
+  },
+  "released": true
+}

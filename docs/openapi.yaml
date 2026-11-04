@@ -8821,6 +8821,107 @@ paths:
           $ref: "#/components/responses/SkillFailure"
         "503":
           $ref: "#/components/responses/SkillFailure"
+  /api/v1/system/sandbox-connections:
+    get:
+      tags: [System]
+      summary: 读取默认沙箱连接（仅 admin）
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: WES envelope；data 包含 connection、hasApiKey、keyVersion，不回显密钥
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code: {type: integer, const: 0}
+                  message: {type: string}
+                  data:
+                    type: object
+                    properties:
+                      connection:
+                        oneOf:
+                          - {$ref: '#/components/schemas/SandboxConnection'}
+                          - {type: 'null'}
+                      hasApiKey: {type: boolean}
+                      keyVersion: {type: integer}
+        '401': {description: 未登录}
+        '403': {description: 非管理员}
+    put:
+      tags: [System]
+      summary: 保存默认连接与独立按量付费密钥（仅 admin）
+      description: 密钥使用既有凭据库加密保存。配置或密钥身份变化会使此前计划失效，必须重新确认。
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [connection]
+              properties:
+                connection: {$ref: '#/components/schemas/SandboxConnection'}
+                apiKey: {type: string, writeOnly: true, description: 可选；与 clearApiKey=true 互斥，不可用于自动保存临时测试密钥}
+                clearApiKey: {type: boolean}
+      responses:
+        '200': {description: 返回脱敏连接状态，与 GET 相同}
+        '400': {description: 配置无效或启用前缺少独立密钥}
+        '401': {description: 未登录}
+        '403': {description: 非管理员}
+  /api/v1/system/sandbox-connections/test:
+    post:
+      tags: [System]
+      summary: 只读核对模板构建及隔离配置（不创建实例）
+      security: [{bearerAuth: []}]
+      responses:
+        '200': {description: WES envelope；data.ready=true}
+        '401': {description: 未登录}
+        '403': {description: 非管理员}
+        '503': {description: 未配置、模板未就绪、隔离配置无法证明或云端不可用}
+  /api/v1/ai-artifacts/{artifactId}/download:
+    get:
+      tags: [AI]
+      summary: 下载当前用户当前有效会话的沙箱文件
+      description: 仅文件所有者可读，需 estimates:read；到期、归档会话、跨用户均不提供文件。成功返回原始字节，失败使用 WES envelope；不接受路径或 URL。
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: artifactId
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: attachment；private,no-store；nosniff
+          content:
+            text/html: {schema: {type: string}}
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document: {schema: {type: string, format: binary}}
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: {schema: {type: string, format: binary}}
+        '401': {description: 未登录}
+        '403': {description: 缺少业务能力}
+        '404': {description: 文件不可见或已失效}
+        '409': {description: 文件校验失败}
+  /api/v1/ai-artifacts/{artifactId}/preview:
+    get:
+      tags: [AI]
+      summary: 获取隔离 HTML 预览
+      description: 与下载相同的 owner、会话与过期校验；只支持 HTML。响应携带 CSP 头并在 HTML 首字节前加入策略 meta；客户端仍须使用 sandbox 空权限 iframe，不添加 allow-scripts 或 allow-same-origin。
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: artifactId
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: inline；private,no-store；禁止脚本、网络、表单和嵌套框架
+          content:
+            text/html: {schema: {type: string}}
+        '400': {description: 非 HTML 文件}
+        '401': {description: 未登录}
+        '403': {description: 缺少业务能力}
+        '404': {description: 文件不可见或已失效}
+        '409': {description: 文件校验失败}
 components:
   securitySchemes:
     bearerAuth:
@@ -8853,6 +8954,18 @@ components:
       description: 模型供应商标识。
 
   schemas:
+    SandboxConnection:
+      type: object
+      additionalProperties: false
+      required: [id, workspaceId, region, templateCode, templateRevision, aliyunUid, enabled]
+      properties:
+        id: {type: string, const: default}
+        workspaceId: {type: string, pattern: '^llm-[a-z0-9-]{1,80}$'}
+        region: {type: string, const: cn-beijing}
+        templateCode: {type: string, maxLength: 160}
+        templateRevision: {type: string, minLength: 1, maxLength: 160, description: 固定的 ready 构建 ID，不允许 latest}
+        aliyunUid: {type: string, pattern: '^[0-9]{6,30}$'}
+        enabled: {type: boolean}
     SkillDefinition:
       type: object
       additionalProperties: false

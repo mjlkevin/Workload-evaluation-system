@@ -1,0 +1,62 @@
+{
+  "type": "real-model-real-Harness-real-cloud",
+  "secretPersisted": false,
+  "connectionSaved": false,
+  "model": "qwen-plus",
+  "creations": 1,
+  "releases": 1,
+  "modelRequests": 3,
+  "files": [
+    {
+      "id": "a24338f5-6e4f-4374-9445-a827c8bd1dfd",
+      "name": "report.html",
+      "format": "html",
+      "size": 409,
+      "sha256": "6bd728f144ea0ccdc06c9dc253f66e1f88a17fc224c0621ae1d11ad4b3a1ba2b",
+      "path": "/tmp/wes-sandbox-real-model-files/report.html",
+      "downloadStatus": 200,
+      "foreignStatus": 404,
+      "anonymousStatus": 401
+    },
+    {
+      "id": "7d699a57-a2ef-4f16-a986-66d095dae224",
+      "name": "report.docx",
+      "format": "docx",
+      "size": 2131,
+      "sha256": "1f30ee8b63b02d687f308b33c3a8ca6b93b98e59dd8a397b063f37fb2cf6a6db",
+      "path": "/tmp/wes-sandbox-real-model-files/report.docx",
+      "downloadStatus": 200,
+      "foreignStatus": 404,
+      "anonymousStatus": 401
+    },
+    {
+      "id": "9941222b-7142-4873-be31-72af718ce9e2",
+      "name": "report.xlsx",
+      "format": "xlsx",
+      "size": 4807,
+      "sha256": "bb9de46826bf8d31a58912ce4c1839d9546b45a8d53da3f3a817ad6f02cd72ae",
+      "path": "/tmp/wes-sandbox-real-model-files/report.xlsx",
+      "downloadStatus": 200,
+      "foreignStatus": 404,
+      "anonymousStatus": 401
+    }
+  ],
+  "ownerId": "34baf6ef-4206-4438-b3cc-b3afa67e817b",
+  "sessionId": "73a5a5a2-725b-4cda-a1b3-02880acdd376",
+  "purpose": {
+    "runId": "a7df78b3-b82a-4f00-8aa0-fc674d6e54f8",
+    "status": "completed",
+    "creations": 0
+  },
+  "runId": "d903d02f-d232-43ab-8628-79db3b5d0dab",
+  "beforeApproval": {
+    "status": "waiting",
+    "creations": 0
+  },
+  "afterApproval": {
+    "status": "completed",
+    "errorCode": null,
+    "errorMessage": null
+  },
+  "passed": true
+}

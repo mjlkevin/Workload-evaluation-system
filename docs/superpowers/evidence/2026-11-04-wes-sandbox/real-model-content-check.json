@@ -1,0 +1,10 @@
+{
+  "passed": true,
+  "allFormatsRetain": [
+    "role",
+    "date query",
+    "export"
+  ],
+  "unprovidedFieldsAbsent": true,
+  "method": "docx paragraphs, xlsx actual cell values, HTML actual text"
+}

@@ -16,7 +16,7 @@
     ],
     "idCollisionAvoided": "RP-066已被SKU控件需求使用"
   },
-  "status": "设计中 / 待用户评审",
+  "status": "设计已实施 / 待人工验收",
   "design": "docs/superpowers/specs/2026-11-04-wes-sandbox-invocation-design.md",
   "proposals": [
     "单一sandbox_execute原生工具与正式Harness工作流",
@@ -35,8 +35,8 @@
     "Harness任务与凭据已使用PostgreSQL，凭据AES-GCM加密"
   ],
   "priorEvidence": "events/2026-11-04-aliyun-sandbox-api-smoke.json",
-  "validationBoundary": "本轮仅设计；未修改运行代码，未新增云资源；文档生成与WES集成真实验收待执行",
-  "nextStep": "用户评审设计后编制实施计划；不自动实现或启动Loop",
+  "validationBoundary": "原设计阶段证据保留；本轮实现、真实云与模型验证另见BE-2026-11-04-wes-sandbox-implementation",
+  "nextStep": "生产独立Key与扩展真实场景、用户验收",
   "boardAudit": {
     "requirements": {
       "rawRows": 54,
@@ -133,5 +133,13 @@
     "productTests": "设计文档变更，无运行代码改动，未运行产品测试",
     "visual": "截图发现历史长状态导致列宽挤压；未改共享样式。首次需求/来源行误入thead已修正入tbody；尚不主张表格视觉验收通过。",
     "evidenceDirectory": "/Users/kevin/.codex/visualizations/2026/11/04/01a1a4db-1dd5-7c33-9b3d-2077e4e7ccb4"
-  }
+  },
+  "authorization": {
+    "date": "2026-11-04",
+    "user": "开始实现",
+    "scope": "按设计实施受控通用代码执行及HTML/Word/Excel文件交付",
+    "defaults": "沿用逐次确认、专属实例、30天保留的设计默认值"
+  },
+  "implementationPlan": "docs/superpowers/plans/2026-11-04-wes-sandbox-invocation.md",
+  "implementationEvent": "events/2026-11-04-wes-sandbox-implementation.json"
 }
