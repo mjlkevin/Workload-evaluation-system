@@ -225,6 +225,13 @@
       "when": 1793779295614,
       "tag": "0031_lazy_human_cannonball",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1793781072123,
+      "tag": "0032_good_nitro",
+      "breakpoints": true
     }
   ]
 }
