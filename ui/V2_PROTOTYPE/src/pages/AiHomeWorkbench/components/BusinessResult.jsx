@@ -65,7 +65,7 @@ function RequirementReport({ report }) {
             {item.sources.map((source, i) => (
               <blockquote key={i} className="m-0 grid gap-1 border-l border-line pl-3">
                 <p className="m-0 whitespace-pre-wrap break-words">{source.quote}</p>
-                <cite className="break-words text-xs not-italic text-ink-2">{source.sourceId} · {source.start}–{source.end}</cite>
+                <cite className="break-all text-xs not-italic text-ink-2">{source.sourceId} · {source.start}–{source.end}</cite>
               </blockquote>
             ))}
           </div>
