@@ -79,39 +79,23 @@ describe('System management navigation', () => {
     expect(screen.getAllByText(/实施评估依赖规则/).length).toBeGreaterThan(0)
   })
 
-  test('页签条两级：一级分组切换 + 组内只显本组子页', async () => {
+  test('各页面正文不再重复渲染两层分类导航', async () => {
     renderAppAt('/system/ai/model-config')
-
-    const groupBar = await screen.findByRole('tablist', { name: '系统管理分组' })
-    expect(within(groupBar).getByRole('tab', { name: /规则与标准/ })).toBeInTheDocument()
-    expect(within(groupBar).getByRole('tab', { name: /AI 与模型/, selected: true })).toBeInTheDocument()
-    expect(within(groupBar).getByRole('tab', { name: /运行与审计/ })).toBeInTheDocument()
-
-    // 组内子页签只渲染当前分组：AI 组有知识库，不应串入规则组的编码规则
-    const sectionBar = screen.getByRole('tablist', { name: '系统管理配置分类' })
-    expect(within(sectionBar).getByRole('tab', { name: /知识库/ })).toBeInTheDocument()
-    expect(within(sectionBar).queryByRole('tab', { name: /编码规则/ })).not.toBeInTheDocument()
-
-    // 切换分组 → 跳到目标分组默认子页（URL 驱动，非局部状态）
-    fireEvent.click(within(groupBar).getByRole('tab', { name: /规则与标准/ }))
-    expect(await screen.findByRole('heading', { name: '编码规则' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '模型配置' })).toBeInTheDocument()
+    expect(screen.queryByRole('tablist', { name: '系统管理分组' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('tablist', { name: '系统管理配置分类' })).not.toBeInTheDocument()
   })
 
-  test('两级页签均支持方向键与 Home/End，Tab 仅进入当前选中项', async () => {
-    renderAppAt('/system/rules/state-machines')
-    const groups = await screen.findByRole('tablist', { name: '系统管理分组' })
-    const rules = within(groups).getByRole('tab', { name: '规则与标准' })
-    expect(rules).toHaveAttribute('tabindex', '0')
-    expect(within(groups).getByRole('tab', { name: 'AI 与模型' })).toHaveAttribute('tabindex', '-1')
-    fireEvent.keyDown(rules, { key: 'ArrowRight' })
+  test('从左侧菜单独立进入规则、模型和状态机页面', async () => {
+    renderAppAt('/system/ai/model-config')
+    await screen.findByRole('heading', { name: '模型配置' })
+    const navigation = screen.getByRole('navigation', { name: '主导航' })
+    fireEvent.click(within(navigation).getByRole('link', { name: /编码规则/ }))
+    expect(await screen.findByRole('heading', { name: '编码规则' })).toBeInTheDocument()
+    fireEvent.click(within(navigation).getByRole('link', { name: /模型配置/ }))
     expect(await screen.findByRole('heading', { name: '模型配置' })).toBeInTheDocument()
-    expect(within(groups).getByRole('tab', { name: 'AI 与模型' })).toHaveFocus()
-
-    const sections = screen.getByRole('tablist', { name: '系统管理配置分类' })
-    fireEvent.keyDown(within(sections).getByRole('tab', { selected: true }), { key: 'End' })
-    expect(await screen.findByRole('heading', { name: '记忆管理' })).toBeInTheDocument()
-    expect(within(sections).getByRole('tab', { selected: true })).toHaveFocus()
-    fireEvent.keyDown(within(sections).getByRole('tab', { selected: true }), { key: 'Home' })
-    expect(await screen.findByRole('heading', { name: '模型配置' })).toBeInTheDocument()
+    fireEvent.click(within(navigation).getByRole('link', { name: /状态机规则/ }))
+    expect(await screen.findByRole('heading', { name: '状态机规则' })).toBeInTheDocument()
+    expect(screen.queryByRole('tablist', { name: '系统管理配置分类' })).not.toBeInTheDocument()
   })
 })
