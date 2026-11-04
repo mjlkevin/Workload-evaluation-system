@@ -36,3 +36,5 @@ export { createBusinessSkillsWorkbenchService, type BusinessSkillsWorkbenchServi
 export { createBusinessExecutionProjectionService } from './skills.workbench-projection';
 export { safeBusinessJson, buildBusinessExecutionView, sanitizeBusinessRunSnapshot, type BusinessExecutionView } from './skills.workbench-view';
 export { createBusinessWorkbenchViewService, type BusinessWorkbenchViewService } from './skills.workbench-unified';
+
+export { createSkillConversationService } from './skills.conversation';

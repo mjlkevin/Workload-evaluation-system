@@ -114,3 +114,8 @@ test('authority failure closes admission before any model/tool preparation and p
   await assert.rejects(service.submitInvocation(user, 'session', body()), (e: any) => e.code === 'EXECUTION_AUTHORITY_UNAVAILABLE' && e.status === 503 && !e.message.includes('private'));
   assert.equal(prepares, 0);
 });
+test('对话触发在队列事务内校验期望版本，不能静默执行新发布版本', async () => {
+ const f=fixture();await assert.rejects(f.service.submitInvocation(user,'session',body(),{conversationFingerprint:'conversation-hash',expectedVersionId:'new'}),(e:any)=>e.code==='INVOCATION_CONTEXT_CHANGED');
+ assert.equal(f.cached(),null);
+ const accepted=fixture();await accepted.service.submitInvocation(user,'session',body(),{conversationFingerprint:'conversation-hash',expectedVersionId:'old'});assert.equal(accepted.cached().executionConfig.conversationFingerprint,'conversation-hash');
+});

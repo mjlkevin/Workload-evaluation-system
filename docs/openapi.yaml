@@ -2904,6 +2904,66 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /api/v1/ai-executions/conversation:
+    post:
+      tags: [AIRuns]
+      summary: 将所选 Skill 或流程作为上下文进行对话
+      description: >
+        选择能力不构成执行请求。服务端读取当前授权发布版本、归属会话历史和受控原文，调用 generation 绑定模型理解输入。
+        reply/clarify 为自然语言回答或追问，原子保存成对消息且不创建Run；execute 校验输入与当前版本后复用既有执行入口。
+        模型判断不授予工具权限，业务写入仍独立确认。不得提交定义、模型配置或客户端历史。
+        请求正文最多12000个UTF-16字符，原文最多8份，上下文160KiB，模型输出4096tokens，模型理解阶段总时限45秒。
+        开始持久化或提交任务后由原有事务和队列决定结果，不在已接受后额外制造模型超时。提交键支持重放，重复内容冲突返回409。
+        与推荐共享每用户每分钟20次限流；需JWT、estimates:read及后台任务开关。
+      operationId: converseWithSelectedAbility
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [sessionId, submissionKey, content, selection]
+              properties:
+                sessionId: { type: string, minLength: 1, maxLength: 160 }
+                submissionKey: { type: string, minLength: 1, maxLength: 160 }
+                content: { type: string, minLength: 1, maxLength: 12000 }
+                selection:
+                  type: object
+                  additionalProperties: false
+                  required: [kind, id, versionId]
+                  properties:
+                    kind: { type: string, enum: [skill, workflow] }
+                    id: { type: string, minLength: 1, maxLength: 160 }
+                    versionId: { type: string, minLength: 1, maxLength: 160 }
+                sources:
+                  type: array
+                  maxItems: 8
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [kind, id]
+                    properties:
+                      kind: { type: string, enum: [file] }
+                      id: { type: string, minLength: 1, maxLength: 160 }
+      responses:
+        "200":
+          description: data为{action:reply或clarify,message}，或{action:execute,run:{runId,sessionId,status,eventCursor}}
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GenericOkResponse" }
+        "401": { description: JWT缺失或无效 }
+        "403": { description: 当前身份或能力权限已变化 }
+        "404": { description: 会话或能力不存在或不可用 }
+        "409": { description: 提交键冲突、版本或会话变化 }
+        "413": { description: 材料或上下文超限 }
+        "422": { description: 请求或模型决策无效，或执行输入不符合契约 }
+        "429": { description: 请求过于频繁 }
+        "503": { description: 功能未开启、模型或基础设施不可用 }
+        "504": { description: 模型理解超时 }
+
   /api/v1/ai-executions/recommendations:
     post:
       tags: [AIRuns]

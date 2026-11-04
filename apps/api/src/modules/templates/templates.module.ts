@@ -8,3 +8,5 @@ export {
   importTemplateJson,
   importTemplateExcel
 } from "./templates.controller";
+
+export { loadTemplate } from './templates.repository';

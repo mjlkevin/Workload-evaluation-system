@@ -1,8 +1,7 @@
 import { performance } from 'node:perf_hooks';
 import type { AuthUser, RequirementSystemConfig } from '../../types';
 import type { ModelProvider } from '../../ai/provider/model-provider';
-import { resolveScenarioConfig } from '../system/model-providers';
-import { createSkillModelAdapter } from './skills.runtime';
+import { prepareWorkbenchModel } from './skills.workbench-model';
 import { createExecutionCatalogService } from './skills.workbench';
 import { SkillError } from './skills.types';
 
@@ -33,24 +32,7 @@ function project(items: CatalogEntry[]) {
     throw new SkillError('EXECUTION_RECOMMENDATION_CATALOG_LIMIT', '可用目录超过推荐上限，请手动选择 Skill 或工作流。', 413);
   return projected;
 }
-async function prepareModel(ports: ModelPorts, guard: () => void) {
-  guard();
-  const active = await (ports.loadSettings ?? (async () => (await (await import('../system/system.repository')).loadRequirementSystemConfigStore()).active))();
-  guard();
-  const scenario = resolveScenarioConfig(active, 'generation', { model: '', baseUrl: '' });
-  const configured = active.modelProviders?.find(provider => provider.id === scenario.providerId);
-  // Recommendation uses the actual configured generation binding; never substitute another scenario or fake Skill.
-  if (scenario.modelSource !== 'binding' || !configured?.enabled || configured.protocol !== 'openai-compatible'
-    || !configured.models.some(model => model.id === scenario.model)) throw unavailable();
-  const apiKey = await (ports.loadCredential ?? (async scope => {
-    await (await import('../system/credentials.store')).warmCredentialScopes([scope]);
-    guard();
-    return (await import('../system/system.repository')).resolveActiveApiKeyForScope(scope).apiKey;
-  }))(scenario.credentialScope);
-  guard();
-  if (!apiKey.trim()) throw unavailable();
-  return createSkillModelAdapter({ scenario, apiKey, referenceContent: '', provider: ports.provider, strictProviderMode: true });
-}
+
 export function createExecutionRecommendationService(options: Options = {}) {
   const catalog = options.catalog ?? createExecutionCatalogService();
   return { async recommend(user: AuthUser, body: unknown): Promise<ExecutionRecommendations> {
@@ -75,7 +57,7 @@ export function createExecutionRecommendationService(options: Options = {}) {
           const initial = await readCatalog(), projection = project(initial);
           if (!initial.length) return noMatch();
           let complete;
-          try { complete = await prepareModel(options.model ?? {}, guard); } catch { guard(); throw unavailable(); }
+          try { complete = await prepareWorkbenchModel(options.model ?? {}, guard, unavailable); } catch { guard(); throw unavailable(); }
           guard();
           const allowed = new Map(initial.map(item => [key(item), item]));
           let response;

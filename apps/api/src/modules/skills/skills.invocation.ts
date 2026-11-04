@@ -67,7 +67,7 @@ export function createSkillInvocationService(options: Options = {}) {
   const repository = options.repository ?? createInvocationPgRepository();
   const queue = options.queue ?? createHarnessRuntimeRepository();
   const authority = options.authority ?? createExecutionEmergencyRepository();
-  return { async submitInvocation(initialUser: AuthUser, sessionId: string, body: unknown): Promise<AiRunsSubmitResult> {
+  return { async submitInvocation(initialUser: AuthUser, sessionId: string, body: unknown, conversation?: { conversationFingerprint: string; expectedVersionId: string }): Promise<AiRunsSubmitResult> {
     try {
       const user = structuredClone(initialUser);
       const request = parse(body, sessionId);
@@ -93,7 +93,8 @@ export function createSkillInvocationService(options: Options = {}) {
         resolveExecutionConfig: tx => queueCheck(async () => {
           if (!prepared || !baseline) fail('INVOCATION_CONTEXT_CHANGED');
           const manifest = await prepared.resolveInTransaction(tx);
-          return { ...executionConfig, executionManifest: manifest, executionAuthority: await authority.capture(tx, manifest, user, baseline) };
+          if (conversation && manifest.target.versionId !== conversation.expectedVersionId) fail('INVOCATION_CONTEXT_CHANGED');
+          return { ...executionConfig, ...(conversation ? { conversationFingerprint: conversation.conversationFingerprint } : {}), executionManifest: manifest, executionAuthority: await authority.capture(tx, manifest, user, baseline) };
         }),
         userMessageFact: runId => buildWorkbenchUserMessageFact({ runId, fact, content: request.content }),
       });
