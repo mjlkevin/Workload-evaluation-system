@@ -6,6 +6,34 @@ import type { AuthUser } from "../types";
 import type { Capability } from "../rbac/permissions";
 import { permittedSkillTools, skillToolContract } from "../modules/skills/skills.context";
 import { skillDefinitionHash } from "../modules/skills/skills.hash";
+import { buildSandboxTool } from "./tools/sandbox.tools";
+import { toToolDefinition } from "./agent.types";
+import { KimiProvider } from "../ai/provider/kimi-provider";
+
+test("sandbox enums reach the Kimi request with explicit string types and unchanged allowed values", async () => {
+  const originalFetch = globalThis.fetch;
+  let requests = 0;
+  globalThis.fetch = async (_url, init) => {
+    requests++;
+    const body = JSON.parse(String(init?.body));
+    const parameters = body.tools.find((tool: any) => tool.function.name === "sandbox_execute").function.parameters;
+    assert.equal(parameters.properties.language.type, "string");
+    assert.deepEqual(parameters.properties.language.enum, ["python", "node"]);
+    const format = parameters.properties.outputs.items.properties.format;
+    assert.equal(format.type, "string");
+    assert.deepEqual(format.enum, ["html", "docx", "xlsx"]);
+    return new Response(JSON.stringify({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] }), { status: 200 });
+  };
+  try {
+    await new KimiProvider({ apiKey: "test-key" }).chatCompletion({
+      messages: [{ role: "user", content: "生成HTML报告" }],
+      tools: [toToolDefinition(buildSandboxTool())],
+    });
+    assert.equal(requests, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 
 const fakeUser: AuthUser = {
   id: "u-test",

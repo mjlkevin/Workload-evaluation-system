@@ -54,7 +54,7 @@ export function buildSandboxTool(
       required: ["title", "language", "code", "inputs", "outputs"],
       properties: {
         title: { type: "string", maxLength: 160 },
-        language: { enum: ["python", "node"] },
+        language: { type: "string", enum: ["python", "node"] },
         code: { type: "string", maxLength: 131072 },
         inputs: {
           type: "array",
@@ -79,7 +79,7 @@ export function buildSandboxTool(
             required: ["path", "format", "title"],
             properties: {
               path: { type: "string", description: "当前工作目录下的独立输出文件名；脚本必须实际写入该文件，而非仅创建同名ZIP成员或内存对象" },
-              format: { enum: ["html", "docx", "xlsx"] },
+              format: { type: "string", enum: ["html", "docx", "xlsx"] },
               title: { type: "string" },
             },
           },
