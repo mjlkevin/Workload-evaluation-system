@@ -1,0 +1,220 @@
+{
+  "id": "BE-2026-11-04-artifact-card-ui",
+  "date": "2026-11-04",
+  "type": "implementation",
+  "issueId": "ISS-2026-11-04-004",
+  "relatedRequirements": [
+    "RP-067"
+  ],
+  "relatedIssues": [
+    "ISS-2026-11-04-001"
+  ],
+  "dedup": "命中ISS-2026-11-04-004 / RP-067，补充既有文件交付卡片的UI范围；关联工作台体验问题001，不新增编号。",
+  "originalFeedback": "用ui skills root优化一下这里的产物卡（需求解析报告）",
+  "disposition": "requirement",
+  "priority": "P2",
+  "scope": "工作台消息中的沙箱产物卡",
+  "summary": "产物卡文件信息层级、操作主次、加载与预览收起反馈优化。",
+  "status": "本地实现及专项/浏览器验证完成；全量失败保留，用户验收待回填",
+  "pages": [
+    "issues",
+    "requirements",
+    "plan",
+    "testing",
+    "monitoring",
+    "changes"
+  ],
+  "additionalPages": [
+    "design"
+  ],
+  "roots": [
+    {
+      "state": "confirmed",
+      "problem": "文件卡只有标题和低对比元信息，文件名未呈现；下载与预览同权。",
+      "contract": "用户1281×945截图批注；现有文件交付契约保留标题、格式、大小与保留期。",
+      "runtime": "3006已登录页面当前截图；MessageBubble→SandboxArtifacts→Artifact。",
+      "owner": "ChatArea/SandboxArtifacts.jsx"
+    },
+    {
+      "state": "confirmed / fixed",
+      "problem": "预览忙态落在下载按钮，展开缺少同入口收起；真实内嵌浏览器的Blob预览为空白。",
+      "contract": "反馈当前操作，保留授权/CSP及严格iframe隔离。",
+      "runtime": "RED 3项失败；实际Blob iframe body为空，而下载文件5739字节、含h1且无script。相同授权响应改为srcDoc后实际h1与7条需求摘要可见。",
+      "owner": "SandboxArtifacts.jsx的本地状态及预览文档输入"
+    }
+  ],
+  "plan": [
+    "先补文件名、预览忙态、同入口收起与焦点、过期/非HTML回归。",
+    "仅修改SandboxArtifacts组件；现有JWT请求、Blob下载与iframe隔离保持。",
+    "专项/全Web、模块安全库、构建和UI范围检查；真实文件预览与1440/760布局取证。"
+  ],
+  "acceptance": [
+    "标题与文件名可区分，格式、大小、保留期保留。",
+    "HTML预览为主操作，其他格式仅下载；长文本和窄屏动作可达。",
+    "预览忙态标记正确按钮；收起无需再次请求，关闭恢复触发按钮焦点。",
+    "失败可重试，过期不可操作；iframe sandbox空值与referrerPolicy保持。"
+  ],
+  "boundaries": [
+    "仅现有React和已批准Tailwind tokens桥接；不新增依赖或全局CSS。",
+    "不改变文件生成、存储、API、权限、有效期与HTML隔离；不重新生成用户报告。",
+    "保留左栏、中央聊天区和其他既有dirty改动。"
+  ],
+  "implementationPerformed": true,
+  "uiSkills": {
+    "category": "craft",
+    "selected": [
+      "ibelick/baseline-ui"
+    ],
+    "commands": [
+      "npx ui-skills start",
+      "npx ui-skills list --category craft",
+      "npx ui-skills get baseline-ui"
+    ],
+    "network": "目录成功；首次get失败，重试成功，内容与上一轮已读取版本一致。",
+    "architecture": "既有React与AGENTS.md已批准的Tailwind tokens桥接；无新依赖/全局CSS。"
+  },
+  "verification": {
+    "red": "初始3项失败/5项通过；精确CSP文档srcdoc回归1项失败/10项通过，均为预期缺失。",
+    "focused": "4文件39/39通过，零跳过；覆盖文件名、忙态、收起/焦点、CSP全文、严格隔离、原下载名、过期、非HTML及原消息与工具记录。",
+    "web": "106文件105通过/1失败；1018/1036通过，18失败、零跳过；均为assessment-frozen-basis，既有评估源码与断言未改。",
+    "buildWeb": "通过；/tmp/wes-artifact-card-build.log",
+    "uiScope": "No new deterministic UI findings；/tmp/wes-artifact-card-scope.log",
+    "modules": "隔离测试库1241/1243通过、2失败、零跳过；late post-prepare checker after cancel cannot complete model 与 resolveKek 环境变量缺省警告断言失败。本次未改后端；保留日志。",
+    "logs": [
+      "/tmp/wes-artifact-card-red.log",
+      "/tmp/wes-artifact-preview-red.log",
+      "/tmp/wes-artifact-card-verified.log",
+      "/tmp/wes-artifact-card-web.log",
+      "/tmp/wes-artifact-card-modules.log",
+      "/tmp/wes-artifact-card-db/test:modules.log"
+    ],
+    "webBaseline": "/tmp/wes-rail-baseline.log 已记录同一assessment-frozen-basis的18项失败。",
+    "diffCheck": "组件及测试diff --check通过；看板testing.html/changes.html既有dirty区域存在空行尾空格，本轮section未引入，保留未清理。"
+  },
+  "previewCompatibility": {
+    "before": "原Blob导航在IAB里iframe body空白，下载内容有效。",
+    "after": "srcDoc直接使用既有JWT预览端点返回的完整HTML，保留CSP原文；实际frame h1可见。",
+    "downloadUnchanged": true,
+    "securityBoundary": [
+      "iframe sandbox为空字符串，无allow-scripts/allow-same-origin。",
+      "referrerPolicy=no-referrer；服务端CSP全文保留（script/connect/frame/form均禁用，style仅内联、img仅data）。",
+      "未把HTML插入父页面，未改后端鉴权、文件内容或响应。"
+    ],
+    "resourceLifecycle": "预览只保留文档字符串，收起清空并恢复焦点，无多余Blob URL；下载URL沿用定时释放。",
+    "reviewScope": "仅预览信任边界实取核对；不宣称全项目安全审计。"
+  },
+  "browserEvidence": {
+    "url": "http://127.0.0.1:3006/",
+    "account": "mjlkevin",
+    "previewHeading": "需求解析报告",
+    "previewSummary": "共7条需求条目",
+    "strictSandbox": true,
+    "policyPreserved": true,
+    "collapse": {
+      "frameRemoved": true,
+      "focusRestored": "预览 需求解析报告"
+    },
+    "download": {
+      "path": "/Users/kevin/Downloads/report (1).html",
+      "bytes": 5739,
+      "html": true,
+      "h1": "需求解析报告",
+      "scriptCount": 0
+    },
+    "desktop": {
+      "viewport": 1440,
+      "pageWidth": 1440,
+      "cardWidth": 768,
+      "contentWidth": 766,
+      "actionHeight": 36
+    },
+    "narrow": {
+      "viewport": 760,
+      "pageWidth": 760,
+      "cardWidth": 582,
+      "contentWidth": 582,
+      "cardRight": 689,
+      "downloadRight": 672
+    },
+    "mobile": {
+      "viewport": 360,
+      "pageWidth": 360,
+      "cardWidth": 198,
+      "contentWidth": 198,
+      "cardRight": 297,
+      "downloadRight": 280,
+      "actionHeight": 36
+    },
+    "screenshots": [
+      "artifact-preview.png",
+      "artifact-1440.png",
+      "artifact-760.png",
+      "artifact-360.png",
+      "artifact-final.png"
+    ],
+    "path": "/Users/kevin/.codex/visualizations/2026/11/04/01a1a670-524f-7c90-9f7d-d83601fdcac1",
+    "viewportReset": true,
+    "newBusinessMutation": false
+  },
+  "evidence": [
+    {
+      "ref": "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/ChatArea/SandboxArtifacts.jsx",
+      "summary": "文件层级、主次操作、准确忙态和隔离预览"
+    },
+    {
+      "ref": "ui/V2_PROTOTYPE/src/__tests__/SandboxArtifacts.test.jsx",
+      "result": "11/11",
+      "summary": "组件行为、原下载与预览隔离回归"
+    }
+  ],
+  "integrationState": "唯一活动目录main的本地未提交改动；未推送。",
+  "review": "五轴自查：单组件owner，原JWT API与文件不变；srcDoc保留授权响应CSP且严格sandbox；忙态互斥；折叠恢复焦点；下载URL释放和卸载abort保持。",
+  "boardValidation": {
+    "build": "21页面构建通过",
+    "consistency": "21页面，0错误，0警告",
+    "event": "Board event OK",
+    "logs": [
+      "/tmp/wes-artifact-card-board-build.log",
+      "/tmp/wes-artifact-card-board-check.log"
+    ]
+  },
+  "densityFeedback": {
+    "original": "产物卡太大了",
+    "disposition": "requirement",
+    "dedup": "命中 ISS-2026-11-04-004 / RP-067 原卡片范围，不新增编号",
+    "status": "本地实现与专项/浏览器验证完成，用户验收待回填",
+    "root": "默认卡片106px高且占满700px消息列；图标44px、信息三行、内边距16px使单文件占位过重。",
+    "owner": "SandboxArtifacts.jsx",
+    "plan": "改为最大576px、标题与一行可换行元信息，缩小图标与间距；保留现有操作和预览逻辑。",
+    "acceptance": "默认1281宽闭合卡片高度≤72px、宽度≤576px；760窄屏动作可达，无卡内横向溢出。",
+    "implementation": "卡片宽度上限576px、图标32px、内边距12/10px；信息由三行收为标题+一行元信息，操作逻辑不变。",
+    "verification": {
+      "componentTests": "11/11通过，零跳过",
+      "build": "通过",
+      "scope": "No new deterministic UI findings",
+      "desktop": {
+        "viewport": 1281,
+        "width": 576,
+        "height": 60,
+        "contentWidth": 574,
+        "scrollWidth": 574
+      },
+      "narrow": {
+        "viewport": 760,
+        "width": 576,
+        "height": 60,
+        "contentWidth": 574,
+        "scrollWidth": 574,
+        "downloadRight": 668
+      },
+      "screenshot": "artifact-compact-1281.png",
+      "narrowScreenshot": "artifact-compact-760.png",
+      "viewportReset": true,
+      "behaviorChanged": false,
+      "newTests": "纯尺寸样式调整，复用现有行为测试；不新增样式类镜像断言。",
+      "modules": "隔离模块1243/1244通过，1失败（既有resolveKek环境缺省警告断言），零跳过；未修改后端。",
+      "moduleLog": "/tmp/wes-artifact-compact-db/test:modules.log",
+      "board": "21页，0错误/0警告，事件校验通过"
+    }
+  }
+}

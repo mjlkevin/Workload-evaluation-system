@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { fetchSandboxArtifact } from "../api/sandboxArtifacts";
 import ToolCallChip from "../pages/AiHomeWorkbench/components/ChatArea/ToolCallChip.jsx";
 import { reduceToolCallTrail, mapSessionMessages } from "../pages/AiHomeWorkbench/utils/messageFormatter.js";
@@ -18,6 +18,72 @@ const file = {
   expiresAt: "2099-01-01T00:00:00Z",
 };
 describe("Sandbox artifact delivery", () => {
+  it("renders the exact authorized preview document including its CSP inside the isolated frame", async () => {
+    vi.stubGlobal("URL", { createObjectURL: vi.fn(() => "blob:preview"), revokeObjectURL: vi.fn() });
+    const html = '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; script-src \'none\'"><h1>报告正文</h1>';
+    fetchSandboxArtifact.mockResolvedValueOnce(new Blob([html], { type: "text/html" }));
+    render(<SandboxArtifacts artifacts={[file]} />);
+    fireEvent.click(screen.getByRole("button", { name: "预览 需求报告" }));
+    const frame = await screen.findByTitle("预览 需求报告");
+    expect(frame).toHaveAttribute("srcdoc", html);
+    expect(frame).toHaveAttribute("sandbox", "");
+    expect(frame).toHaveAttribute("referrerpolicy", "no-referrer");
+    expect(screen.queryByRole("heading", { name: "报告正文" })).not.toBeInTheDocument();
+  });
+  it("keeps non-HTML files download-only", () => {
+    render(<SandboxArtifacts artifacts={[{ ...file, format: "xlsx", name: "estimate.xlsx" }]} />);
+    expect(screen.getByText("estimate.xlsx")).toBeVisible();
+    expect(screen.getByRole("button", { name: "下载 需求报告" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: /预览/ })).not.toBeInTheDocument();
+  });
+  it("downloads through the existing request with the original filename", async () => {
+    vi.stubGlobal("URL", { createObjectURL: vi.fn(() => "blob:download"), revokeObjectURL: vi.fn() });
+    const anchors = [];
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function () {
+      anchors.push({ name: this.download, href: this.href });
+    });
+    render(<SandboxArtifacts artifacts={[file]} />);
+    fireEvent.click(screen.getByRole("button", { name: "下载 需求报告" }));
+    await waitFor(() => expect(anchors).toEqual([{ name: "report.html", href: "blob:download" }]));
+    expect(fetchSandboxArtifact).toHaveBeenLastCalledWith(file.id, expect.objectContaining({ preview: false }));
+  });
+  it("shows the actual filename alongside the report title", () => {
+    render(<SandboxArtifacts artifacts={[file]} />);
+    expect(screen.getByRole("heading", { name: "需求报告" })).toBeVisible();
+    expect(screen.getByText("report.html")).toBeVisible();
+    expect(screen.getByText("HTML")).toBeVisible();
+  });
+  it("marks the preview action busy without mislabeling the download action", async () => {
+    let finish;
+    fetchSandboxArtifact.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    vi.stubGlobal("URL", { createObjectURL: vi.fn(() => "blob:preview"), revokeObjectURL: vi.fn() });
+    render(<SandboxArtifacts artifacts={[file]} />);
+    const preview = screen.getByRole("button", { name: "预览 需求报告" });
+    const download = screen.getByRole("button", { name: "下载 需求报告" });
+    fireEvent.click(preview);
+    expect(preview).toHaveAttribute("aria-busy", "true");
+    expect(preview).toHaveTextContent("加载预览");
+    expect(download).toHaveTextContent("下载");
+    expect(download).toBeDisabled();
+    await act(async () => finish(new Blob(["<html>safe</html>"])));
+  });
+  it("collapses the open preview from the same action, clears the document and restores focus", async () => {
+    const fetchCount = fetchSandboxArtifact.mock.calls.length;
+    const create = vi.fn();
+    vi.stubGlobal("URL", { createObjectURL: create, revokeObjectURL: vi.fn() });
+    render(<SandboxArtifacts artifacts={[file]} />);
+    const preview = screen.getByRole("button", { name: "预览 需求报告" });
+    fireEvent.click(preview);
+    await screen.findByTitle("预览 需求报告");
+    expect(preview).toHaveAttribute("aria-expanded", "true");
+    expect(preview).toHaveTextContent("收起预览");
+    fireEvent.click(preview);
+    expect(screen.queryByTitle("预览 需求报告")).not.toBeInTheDocument();
+    expect(preview).toHaveAttribute("aria-expanded", "false");
+    expect(preview).toHaveFocus();
+    expect(create).not.toHaveBeenCalled();
+    expect(fetchSandboxArtifact.mock.calls.length).toBe(fetchCount + 1);
+  });
   it("exposes saved file and isolated preview without scripts or same origin", async () => {
     vi.stubGlobal("URL", {
       createObjectURL: vi.fn(() => "blob:preview"),
@@ -29,7 +95,9 @@ describe("Sandbox artifact delivery", () => {
     const frame = await screen.findByTitle("预览 需求报告");
     expect(frame).toHaveAttribute("sandbox", "");
     expect(frame).not.toHaveAttribute("allow-scripts");
-    expect(frame).toHaveAttribute("src", "blob:preview");
+    expect(frame).toHaveAttribute("srcdoc", "<html>safe</html>");
+    expect(frame).not.toHaveAttribute("src");
+    expect(frame).toHaveAttribute("referrerpolicy", "no-referrer");
   });
   it("blocks expired artifact", async () => {
     render(
