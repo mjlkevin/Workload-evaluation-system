@@ -67,7 +67,7 @@
       <h1>变更记录</h1>
       <p class="meta">
         <span><b>这页回答</b> 最近做了什么、结果如何、依据是什么、还有哪些事项未关闭</span>
-        <span><b>当前基线</b> 需求池共 52 项（主台账 53 行按 ID 去重，RP-043 重复登记 1 行）：23 项已交付、20 项已交付·待验收回填、7 项待规划/待确认/待验收、2 项暂缓；已验证能力进入业务主线，未完成人工验收的事项仍保持开放</span>
+        <span><b>当前基线</b> 需求池共 53 项（主台账 54 行按 ID 去重，RP-043 重复登记 1 行）：23 项已交付、20 项已交付·待验收回填、8 项待规划/待确认/待验收、2 项暂缓；已验证能力进入业务主线，未完成人工验收的事项仍保持开放</span>
         <span><b>本轮重点</b> 2026-09-23 看板对账：补登批次 10b 与 09-23 三笔合入，全板统计统一为主台账 51 项实取口径</span>
         <span><b>最近更新</b> 2026-09-23</span>
       </p>
@@ -87,6 +87,7 @@
   </header>
 
   <main class="doc-wrap">
+<section data-board-event-id="BE-2026-11-04-wes-sandbox-invocation-design"><div class="wrap"><div class="sec-head"><div class="num">2026-11-04 · RP-067</div><h2>2026-11-04 · 沙箱调用设计草案</h2><p>新增ISS-2026-11-04-004 → RP-067，关联旧可行性问题与RP-050；完成代码现状核对、三路线比较、权限/恢复/文件交付设计。仅设计和看板留痕，实施及真实文档验收未开始。<a href="events/2026-11-04-wes-sandbox-invocation-design.json">原文与证据</a>。</p></div></div></section>
 <section data-board-event-id="BE-2026-11-04-message-timeline-core:changes"><h2>消息流实现与浏览器补验</h2><p>mjlkevin已登录，新消息流业务补验完成；Web974与构建通过，模块2个取消/超时竞态用例待复核，用户验收待回填。</p><details data-tech-collapse><summary>实现、运行与剩余边界</summary><p>按用户明确授权，仅在3006隔离预览库新增mjlkevin，复用当前认证信息与角色；主库零写入、原4个临时账号保留，实际页面登录成功。新消息流Run c6683fe0-36de-4f7e-aab1-eabf06e8b0c4完成15步，需求补充、需求确认、范围参数确认、写入批准均经普通UI操作；真实原生回执仅1条，正式工期5天，草稿087f00f2-286d-4bfe-b74f-a6ca727af3b7详情为两项2+3天。单Skill 5ec9fe33-19ef-4641-8f0f-f53230377e15与普通聊天e398fca5-bda5-41b5-90dc-619cbba82b70均完成，后者仍走workbench_chat_v1，回复与复制可用。1440/760、键盘Tab/Enter/Escape、未保存保护、回焦、摘要定位、刷新问答和滚动保持已实际复验。f65d22b仅修来源编号折行，真实RED591/677到GREEN591/591，窄屏647/647无整页溢出；定向16/16，SPEC与QUALITY通过。最新Web99文件974/974和build:web通过；最新模块1157/1159，2个既有取消/超时用例返回TOTAL_TIMEOUT而非CANCELLED，隔离文件66/66通过，原配置与失败证据均保留。此前完整模块1159/1159、Harness679/679、AI286/286、Agent254/254及API构建通过，不混称本轮模块全绿。integration空活动模板基线仍在。完整待办只读实测20568ms，曾出现等待卡片延迟和短暂不可用；之后正常加载，性能待分析优化，未宣称已修复。3004/3006已恢复健康200且仍为mjlkevin登录；最终用户验收另记，未合入主线或推送。</p></details></section>
     <div class="toc">
       <h5>导航</h5>

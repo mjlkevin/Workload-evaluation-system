@@ -1,0 +1,137 @@
+{
+  "eventId": "BE-2026-11-04-wes-sandbox-invocation-design",
+  "date": "2026-11-04",
+  "issueId": "ISS-2026-11-04-004",
+  "requirementId": "RP-067",
+  "title": "WES受控沙箱调用机制设计",
+  "originalRequest": "接下来设计wes中调用沙箱的机制",
+  "userScopeAnswer": "受控的通用代码执行：LLM 按任务编写代码，首期验收 HTML／Word／Excel（推荐）",
+  "triage": {
+    "disposition": "requirement",
+    "priority": "P1",
+    "dedup": "相关但独立；旧ISS-2026-08-27-004是可行性疑问，RP-050是Skill机制；本项新增生产执行和文件交付能力",
+    "related": [
+      "ISS-2026-08-27-004",
+      "RP-050"
+    ],
+    "idCollisionAvoided": "RP-066已被SKU控件需求使用"
+  },
+  "status": "设计中 / 待用户评审",
+  "design": "docs/superpowers/specs/2026-11-04-wes-sandbox-invocation-design.md",
+  "proposals": [
+    "单一sandbox_execute原生工具与正式Harness工作流",
+    "逐次外发确认绑定代码和材料hash",
+    "每任务专属实例，禁止复用手工实例",
+    "受限网络和预置依赖，无密钥注入",
+    "文件校验后保存WES私有产物，建议保留30天",
+    "创建/执行状态未知先核对，禁止盲目重放",
+    "A托管执行 / B产物服务 / C工作台集成"
+  ],
+  "verifiedCodeFacts": [
+    "Skill理解阶段tools为空",
+    "Skill正式执行拒绝外发并冻结参数映射",
+    "试运行只读执行器不允许云写入",
+    "exfiltrates=true无条件逐次确认",
+    "Harness任务与凭据已使用PostgreSQL，凭据AES-GCM加密"
+  ],
+  "priorEvidence": "events/2026-11-04-aliyun-sandbox-api-smoke.json",
+  "validationBoundary": "本轮仅设计；未修改运行代码，未新增云资源；文档生成与WES集成真实验收待执行",
+  "nextStep": "用户评审设计后编制实施计划；不自动实现或启动Loop",
+  "boardAudit": {
+    "requirements": {
+      "rawRows": 54,
+      "uniqueIds": 53,
+      "buckets": {
+        "paused": 2,
+        "done": 23,
+        "acceptance": 20,
+        "pending": 8
+      },
+      "bucketIds": {
+        "paused": [
+          "RP-001",
+          "RP-012"
+        ],
+        "done": [
+          "RP-002",
+          "RP-003",
+          "RP-004",
+          "RP-005",
+          "RP-006",
+          "RP-007",
+          "RP-008",
+          "RP-009",
+          "RP-010",
+          "RP-011",
+          "RP-014",
+          "RP-013",
+          "RP-015",
+          "RP-016",
+          "RP-017",
+          "RP-021",
+          "RP-022",
+          "RP-023",
+          "RP-025",
+          "RP-031",
+          "RP-056",
+          "RP-020",
+          "RP-019"
+        ],
+        "acceptance": [
+          "RP-018",
+          "RP-026",
+          "RP-027",
+          "RP-028",
+          "RP-029",
+          "RP-030",
+          "RP-033",
+          "RP-036",
+          "RP-043",
+          "RP-046",
+          "RP-047",
+          "RP-048",
+          "RP-052",
+          "RP-053",
+          "RP-054",
+          "RP-055",
+          "RP-057",
+          "RP-058",
+          "RP-032",
+          "RP-065"
+        ],
+        "pending": [
+          "RP-024",
+          "RP-034",
+          "RP-035",
+          "RP-049",
+          "RP-050",
+          "RP-051",
+          "RP-059",
+          "RP-067"
+        ]
+      }
+    },
+    "issues": {
+      "rawRows": 45,
+      "uniqueIds": 42,
+      "buckets": {
+        "requirement": 10,
+        "defect": 22,
+        "pending": 4,
+        "other": 9
+      },
+      "grouping": "逐行按分流列归桶；历史待架构裁决标签保留，未改历史定性。"
+    },
+    "sources": {
+      "rawRows": 99,
+      "uniquePrimaryRefs": 98
+    }
+  },
+  "boardValidation": {
+    "build": "21页生成成功",
+    "consistency": "21页 / 0错误 / 0警告",
+    "productTests": "设计文档变更，无运行代码改动，未运行产品测试",
+    "visual": "截图发现历史长状态导致列宽挤压；未改共享样式。首次需求/来源行误入thead已修正入tbody；尚不主张表格视觉验收通过。",
+    "evidenceDirectory": "/Users/kevin/.codex/visualizations/2026/11/04/01a1a4db-1dd5-7c33-9b3d-2077e4e7ccb4"
+  }
+}

@@ -51,7 +51,7 @@
           <span><b>流转</b> Issue → triage → Defect / Requirement / Risk / Close</span>
           <span><b>更新日期</b> 2026-11-04</span>
         </div>
-        <div class="pill-row" style="margin-top:18px"><span class="pill brand">44 问题（41 个编号，历史撞号3次保留）</span><span class="pill warn">4 待分诊/待裁决</span><span class="pill warn">22 转缺陷</span><span class="pill brand">9 转需求</span><span class="pill">9 不转/关闭/治理</span></div>
+        <div class="pill-row" style="margin-top:18px"><span class="pill brand">45 问题（42 个编号，历史撞号3次保留）</span><span class="pill warn">4 待分诊/待裁决</span><span class="pill warn">22 转缺陷</span><span class="pill brand">10 转需求</span><span class="pill">9 不转/关闭/治理</span></div>
       </div>
     </div>
 
@@ -90,6 +90,7 @@
             <col style="width:11%">
           </colgroup>
           <tr><th>ID</th><th>日期</th><th>标题</th><th>来源</th><th>原始反馈</th><th>证据</th><th>分析状态</th><th>分流</th><th>下一步</th></tr>
+<tr data-board-event-id="BE-2026-11-04-wes-sandbox-invocation-design:issues"><td class="mono">ISS-2026-11-04-004</td><td>2026-11-04</td><td>WES 受控沙箱执行与文档产物</td><td>用户 / API验证后设计</td><td>设计WES调用沙箱机制；已选择LLM通用代码执行，首期验收HTML、Word、Excel。</td><td><a href="events/2026-11-04-wes-sandbox-invocation-design.json">原文与分诊</a>；<a href="../../../docs/superpowers/specs/2026-11-04-wes-sandbox-invocation-design.md">设计草案</a></td><td><span class="status warn">待评审</span></td><td>requirement · RP-067</td><td>P1；与旧沙箱可行性问题相关但范围独立；评审后再编实施计划。</td></tr>
 <tr data-board-event-id="BE-2026-11-04-composer-clear-on-dispatch:issues"><td class="mono">ISS-2026-11-04-003</td><td>2026-11-04</td><td>Skill消息发送后编辑框残留原文</td><td>用户截图 / 3006</td><td>用户问：为什么消息已发送，编辑框里还残留消息？中央已出现用户原文和等待占位。</td><td><a href="events/2026-11-04-composer-clear-on-dispatch.json">清空时机、回归与截图</a></td><td><span class="status run">本地修复</span></td><td>转缺陷 · DEF-2026-11-04-002</td><td>P2；等待模型时立即清空，失败安全恢复；真实等待态已验证，待用户验收。</td></tr>
 <tr data-board-event-id="BE-2026-11-04-skill-capability-input-misinterpretation:issues"><td class="mono">ISS-2026-11-04-002</td><td>2026-11-04</td><td>询问技能用途被误拆成业务需求</td><td>用户实测 / AI工作台</td><td>选中验收Skill询问“这个skill能做什么？”，被生成查询和导出两条需求。</td><td><a href="events/2026-11-04-skill-capability-input-misinterpretation.json">实际Run、发布指令与截图</a></td><td><span class="status run">本地修复</span></td><td>转缺陷 · DEF-2026-11-04-001</td><td>P1；LLM先理解再决定回答/追问/执行；真实反例已回归，待用户验收。</td></tr>
             <tr data-board-event-id="BE-2026-10-21-system-controls-polish:issues">
@@ -459,7 +460,7 @@
               <td><code class="inline">apps/api/src/modules/harness/*（6333 源码 + 7201 测试行，durable run/attempt 租约/checkpoint/outbox/recovery/projector）</code> <code class="inline">apps/api/src/agent/orchestrator.ts（tool-calling 循环 + list_tools 按需发现，对位 deferred_tool_filter_middleware）</code> <code class="inline">github.com/bytedance/deer-flow（MIT，8.1 万 star，harness 包 501 个 py 文件，最近推送 2026-08-27）</code> <code class="inline">requirements.html RP-050（skill manifest 驱动级联匹配，当前仅详细登记未开工）</code></td>
               <td><span class="status warn">已分析待决策</span></td>
               <td>待架构侧裁决（预期产出为范围排除项而非需求；已建底座不主张重构迁移）</td>
-              <td>2026-11-04：阿里云沙箱文档生成可行性已分析；接入范围、产物保存及资源配置待决策。本轮不实施，不创建云资源。</td>
+              <td>2026-11-04：阿里云沙箱文档生成可行性已分析；接入范围、产物保存及资源配置待决策。本轮不实施，不创建云资源。；新生产调用设计见 <a href="requirements.html">RP-067</a>（ISS-2026-11-04-004）。</td>
             </tr>
             <tr>
               <td class="mono">ISS-2026-08-27-005</td>
