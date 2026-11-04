@@ -1,0 +1,84 @@
+{
+  "id": "BE-2026-11-03-skills-c2c2c-retry-delete",
+  "date": "2026-11-03",
+  "type": "implementation",
+  "scope": "RP-050 C2c.2c 手动重试授权与会话删除并发",
+  "summary": "内部手动重试已保留原版本和输入并重新授权；会话删除与提交、重试及等待恢复的并发保护通过。公开业务重试、生产宿主和工作台仍待后续。",
+  "status": "自动检查与独立复核通过 / 内部能力",
+  "pages": [
+    "index",
+    "requirements",
+    "plan",
+    "testing",
+    "monitoring",
+    "risks",
+    "changes"
+  ],
+  "additionalBoardPages": [
+    "runtime",
+    "design"
+  ],
+  "evidence": [
+    {
+      "kind": "user",
+      "ref": "2026-11-03 continue after C2c.2b",
+      "summary": "继续"
+    },
+    {
+      "kind": "git",
+      "ref": "b5ff77f",
+      "summary": "逐次执行权限已验证，沿用既有隔离分支；原模型状态文件禁止读取或修改。"
+    },
+    {
+      "kind": "plan",
+      "ref": "docs/superpowers/plans/2026-11-02-wes-business-skills.md",
+      "summary": "新Run保留原版本输入并重新授权，公开generic business retry关闭；DELETE同tx真实active查询，生产入队Session SHARE。"
+    },
+    {
+      "kind": "test",
+      "ref": "/tmp/wes-c2c2c-baseline/test:execution-authority.log",
+      "summary": "父基线154/154、0skip。"
+    },
+    {
+      "kind": "test",
+      "ref": "/tmp/wes-c2c2c-parent-final",
+      "summary": "首轮模块929/931、重试96/97、逐次权限144/154、Harness409/415失败保留；紧停42、存储194、AI286绿色。最终四套件见parent-recheck。"
+    },
+    {
+      "kind": "review",
+      "ref": "/tmp/wes-c2c2c-spec-uuid; /tmp/wes-c2c2c-spec-focused; /tmp/wes-c2c2c-quality-final-pg; /tmp/wes-c2c2c-quality-final-pure",
+      "summary": "规格先审后fresh五轴质量安全APPROVE；最终独立PG25、纯测216，均0skip。UUID幂等缺陷已RED/GREEN关闭。"
+    },
+    {
+      "kind": "risk",
+      "ref": "/tmp/wes-c2c2c-audit.json",
+      "summary": "45项既有依赖风险；通用集成仍缺模板/分配0/1。无生产/真实模型/业务工具/MVP验收声明。"
+    },
+    {
+      "kind": "build",
+      "ref": "/tmp/wes-c2c2c-build-api.log",
+      "summary": "父最终API build exit0。"
+    },
+    {
+      "kind": "build",
+      "ref": "/tmp/wes-c2c2c-build-web.log",
+      "summary": "父最终Web build exit0。"
+    },
+    {
+      "kind": "test",
+      "ref": "/tmp/wes-c2c2c-parent-recheck",
+      "summary": "原命令模块931、重试98、逐次权限154、Harness416均0fail/0skip；首轮失败另目录保留。"
+    },
+    {
+      "kind": "risk",
+      "ref": "/tmp/wes-c2c2c-integration-fixture-counts.json",
+      "summary": "受守卫测试库活动模板0、活动分配0，通用集成0/1保留；未迁移或更新预览。"
+    },
+    {
+      "kind": "ui-check",
+      "ref": "/Users/kevin/.codex/visualizations/2026/11/02/01a19a18-92f8-7bf1-b70c-df3fd911608f/c2c2c-2026-11-03-board-requirements.png",
+      "summary": "浏览器实读最终标题与RP-050 C实施中、下一步；原窄列/P2换行保留，无共享样式优化声明。"
+    }
+  ],
+  "next": "下一步完成持久工具确认、写入幂等与跨调用预算（C2c.3），再接统一视图、生产宿主、工作台及D验收。"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "BE-2026-11-04-preview-account-alignment",
+  "date": "2026-11-04",
+  "issueId": "ISS-2026-11-02-004",
+  "type": "question",
+  "status": "operational fix verified",
+  "dedup": "Matched original preview-account issue; no new RP or defect",
+  "userFeedback": "你起的这个3006 我登录的密码都不一样",
+  "userApproval": "同步 mjlkevin，沿用当前密码（推荐）",
+  "rootCause": "mjlkevin exists in main; absent from isolated preview users",
+  "operation": {
+    "previewRowsInserted": 1,
+    "sourceWrites": 0,
+    "passwordReset": false,
+    "sameIdentityAndPasswordHash": true,
+    "sameRoleAndStatus": true,
+    "originalPreviewUsersPreserved": 4
+  },
+  "browserLogin": "actual login succeeded using existing form password",
+  "proof": "mjlkevin-preview-login-success.jpg",
+  "verification": "/tmp/wes-preview-final/account-alignment-verification.json",
+  "productCodeChanges": false
+}

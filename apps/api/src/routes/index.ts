@@ -3,6 +3,10 @@
 // ============================================================
 
 import { Router } from "express";
+import { createAiExecutionsRouter } from "./ai-executions.routes";
+import executionSourcesRoutes from "./execution-sources.routes";
+import { createSkillsRouter } from "./skills.routes";
+import { createWorkflowsRouter } from "./workflows.routes";
 
 import authRoutes from "./auth.routes";
 import versionsRoutes from "./versions.routes";
@@ -13,6 +17,7 @@ import aiRoutes from "./ai.routes";
 import { createAiSessionsRouter } from "./ai-sessions.routes";
 import { createAiRunsRouter } from "./ai-runs.routes";
 import projectEvaluationsRoutes from "./project-evaluations.routes";
+import businessAssessmentsRoutes from "./business-assessments.routes";
 import sessionsRoutes from "./sessions.routes";
 import exportsRoutes from "./exports.routes";
 import teamRoutes from "./team.routes";
@@ -39,7 +44,12 @@ import { getKnowledgeRepository } from "../modules/knowledge/knowledge.module";
 import { createMasterDataRouter } from "./master-data.routes";
 import { getIndustryRepository, getProductMasterDataRepository } from "../modules/master-data/master-data.module";
 
+import { createSandboxRouter } from "./sandbox.routes";
+
 const router = Router();
+router.use(createSandboxRouter());
+router.use('/skills', createSkillsRouter());
+router.use('/workflows', createWorkflowsRouter());
 
 // RP-047 Batch C：异步 Run API 接线（flag 读取点收敛于此，D2）
 const durableRunsEnabled = isDurableRunsEnabledFromEnv();
@@ -66,9 +76,12 @@ router.use("/templates", templatesRoutes);
 router.use("/rule-sets", rulesRoutes);
 router.use("/estimates", estimatesRoutes);
 router.use("/ai", aiRoutes);
+router.use("/ai-sessions", executionSourcesRoutes);
 router.use("/ai-sessions", aiSessionsRoutes);
 router.use("/ai-runs", aiRunsRoutes);
+router.use("/ai-executions", createAiExecutionsRouter({ enabled: durableRunsEnabled }));
 router.use("/project-evaluations", projectEvaluationsRoutes);
+router.use("/business-assessments", businessAssessmentsRoutes);
 router.use("/sessions", sessionsRoutes);
 router.use("/exports", exportsRoutes);
 router.use("/teams", teamRoutes);

@@ -30,6 +30,7 @@ export function buildProjectListTool(listProjects: ProjectListFn): AgentTool {
     },
     capability: "estimates:read",
     mutates: false,
+    sandboxReadSafe: true,
     category: "project",
     discoverable: false,
     async execute(args) {
@@ -53,6 +54,7 @@ export function buildEstimateHistoryTool(listHistory: EstimateHistoryFn): AgentT
     },
     capability: "estimates:read",
     mutates: false,
+    sandboxReadSafe: true,
     category: "estimate",
     discoverable: true,
     async execute(args) {
@@ -98,6 +100,7 @@ export function buildRuleLookupTool(loadRules: RuleLookupFn): AgentTool {
     parameters: { type: "object", properties: {} },
     capability: "estimates:read",
     mutates: false,
+    sandboxReadSafe: true,
     category: "rule",
     discoverable: true,
     async execute() {

@@ -5,12 +5,14 @@ import { useBackgroundRuns } from '../../hooks/useBackgroundRuns.jsx'
 import { sessionRuntimeStore } from '../../hooks/useSessionRuntimeStore.js'
 import useChatMessages from './hooks/useChatMessages.js'
 import useHarnessRun from './hooks/useHarnessRun.js'
+import useBusinessExecution from './hooks/useBusinessExecution.js'
+import useComposerBusinessTask from './hooks/useComposerBusinessTask.js'
+import { buildBusinessConversationEntries, groupBusinessConversationEntries } from './utils/businessMessageTimeline.js'
 import useWorkbenchState from './hooks/useWorkbenchState.js'
 import ChatArea from './components/ChatArea/index.jsx'
 import BackgroundRunsPanel from './components/ChatArea/BackgroundRunsPanel.jsx'
 import WorkflowTemplates from './components/ChatArea/WorkflowTemplates.jsx'
 import ConfirmDialog from './components/ConfirmDialog.jsx'
-import WorkspacePanel from './components/WorkspacePanel/index.jsx'
 
 /**
  * AI 工作台入口：纯布局组装。状态与行为全部收敛在 hooks/ 与 components/。
@@ -28,6 +30,15 @@ export default function AiHomeWorkbench({ currentUser }) {
   // RP-047 Batch D（G4 明确停止）：活跃 Run 按 sessionId 映射到会话行；
   // cancel 唯一入口仅由用户显式点击停止并经二次确认后触发。
   const backgroundRuns = useBackgroundRuns()
+  const business = useBusinessExecution(workbench.activeSession?.sessionId)
+  const invocation = useComposerBusinessTask({ workbench, userId: currentUser?.id || currentUser?.userId, onStarted: () => {
+    business.refresh()
+    workbench.refreshUnifiedView?.()
+    backgroundRuns.notifyRunsChanged?.()
+  } })
+  const conversation = useMemo(() => groupBusinessConversationEntries(buildBusinessConversationEntries(
+    [...chat.messages, ...invocation.pendingMessages], business.runs, { sessionId: workbench.activeSession?.sessionId || '' },
+  )), [chat.messages, invocation.pendingMessages, business.runs, workbench.activeSession?.sessionId])
   const sessionRuns = useMemo(() => {
     const map = {}
     backgroundRuns.runs.forEach((run) => { if (run.sessionId) map[run.sessionId] = run })
@@ -36,6 +47,20 @@ export default function AiHomeWorkbench({ currentUser }) {
   const [stopTargetRun, setStopTargetRun] = useState(null)
   const [stoppingRun, setStoppingRun] = useState(false)
   const [stopError, setStopError] = useState('')
+
+  // Business polling already reads authoritative Run snapshots. Reconcile the other
+  // summaries only when run membership/status changes, never on every poll/render.
+  const businessStatusesRef = useRef({ sessionId: null, signature: '' })
+  useEffect(() => {
+    const sessionId = workbench.activeSession?.sessionId || ''
+    const signature = JSON.stringify(business.runs.map(run => [run.runId, run.status]).sort())
+    const previous = businessStatusesRef.current
+    businessStatusesRef.current = { sessionId, signature }
+    if (!sessionId || (previous.sessionId === sessionId && previous.signature === signature)) return
+    if (previous.sessionId !== sessionId && !business.runs.length) return
+    workbench.refreshUnifiedView?.()
+    backgroundRuns.notifyRunsChanged?.()
+  }, [business.runs, workbench.activeSession?.sessionId, workbench.refreshUnifiedView, backgroundRuns.notifyRunsChanged])
 
   // ISS-2026-08-09-003 C3（离页返回旧缓存渲染、AI 回复不显示）：「后台任务」角标
   // 接入统一视图 runs 的活跃/已完成计数——O5 接口已一次取齐 runs，不再只看活跃数。
@@ -141,7 +166,7 @@ export default function AiHomeWorkbench({ currentUser }) {
   }
 
   return (
-    <div className={`ai-home-workbench${workbench.workspacePanelCollapsed ? ' ai-home-workbench--inspector-collapsed' : ''}`} data-testid="ai-home-workbench" style={{ display: 'grid', gap: 16, height: '100%', minHeight: 0, overflow: 'hidden', padding: '12px 16px' }}>
+    <div className="ai-home-workbench" data-testid="ai-home-workbench" style={{ display: 'grid', gap: 16, height: '100%', minHeight: 0, overflow: 'hidden', padding: '12px 16px' }}>
       <h1 className="sr-only">AI 工作台</h1>
       <aside className="ai-home-rail" style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
         <BackgroundRunsPanel runs={backgroundRuns.runs} runCounts={runCounts} onStopRun={requestStopRun} />
@@ -162,18 +187,8 @@ export default function AiHomeWorkbench({ currentUser }) {
         />
       </aside>
 
-      <ChatArea preset={workbench.preset} workbench={{ ...workbench, backgroundRuns }} chat={{ ...chat, sendMessage: sendMessageWithRunsNotify }} harness={harness} />
+      <ChatArea preset={workbench.preset} workbench={{ ...workbench, backgroundRuns }} chat={{ ...chat, sendMessage: sendMessageWithRunsNotify }} harness={harness} conversation={conversation} business={business} invocation={invocation} />
 
-      <WorkspacePanel
-        collapsed={workbench.workspacePanelCollapsed}
-        onToggle={workbench.toggleWorkspacePanel}
-        session={workbench.activeSession}
-        sending={chat.sending}
-        onConfirmAction={harness.confirmPendingAction}
-        confirmingActionId={harness.confirmingActionId}
-        messageCount={chat.messages.length}
-        outputState={workbench.outputState}
-      />
 
       {workbench.deleteTargetSession && (
         <ConfirmDialog

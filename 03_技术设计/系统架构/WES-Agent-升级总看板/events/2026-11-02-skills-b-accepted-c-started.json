@@ -1,0 +1,57 @@
+{
+  "id": "BE-2026-11-02-skills-b-accepted-c-started",
+  "date": "2026-11-02",
+  "type": "implementation",
+  "scope": "RP-050 B验收与C工作台接入",
+  "summary": "用户确认手动验证完成，B批验收关闭。C批从执行快照与恢复接缝开始，后接AI工作台；3006保留B冻结预览，D未启动，主线未合入、未推送。",
+  "status": "B已验收 / C1实施中",
+  "pages": [
+    "index",
+    "issues",
+    "defects",
+    "requirements",
+    "plan",
+    "testing",
+    "monitoring",
+    "risks",
+    "changes"
+  ],
+  "evidence": [
+    {
+      "kind": "user",
+      "ref": "2026-11-02 user acceptance",
+      "summary": "手动验证完了，下一步"
+    },
+    {
+      "kind": "plan",
+      "ref": "docs/superpowers/plans/2026-11-02-wes-business-skills.md",
+      "summary": "C1清单、C2Harness、C3工作台、C4验收顺序及文件/测试工单"
+    },
+    {
+      "kind": "git",
+      "ref": "9422d2a",
+      "summary": "原示例断言修正与真实模型证据已归档，C分支基线"
+    }
+  ],
+  "deduplication": {
+    "matched": [
+      "ISS-2026-08-06-002",
+      "ISS-2026-11-02-005",
+      "ISS-2026-11-02-006",
+      "ISS-2026-11-02-007"
+    ],
+    "requirement": "RP-050",
+    "newIssue": false,
+    "closedDefects": [
+      "DEF-2026-11-02-003",
+      "DEF-2026-11-02-004"
+    ]
+  },
+  "next": "C1先按RED-GREEN-REFACTOR及独立规格/质量复核；C尚无工作台运行能力，不标MVP完成。",
+  "boundaries": [
+    "不改3006冻结B预览与用户模型配置",
+    "不执行Skill审核发布或回滚",
+    "不创建第二Run/消息库",
+    "主目录既有改动保留，未合入或推送"
+  ]
+}

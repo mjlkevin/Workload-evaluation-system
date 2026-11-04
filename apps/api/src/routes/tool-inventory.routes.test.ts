@@ -54,7 +54,7 @@ test("GET /system/ai-tools: 无 system:manage 的普通用户返回 403", { skip
   assert.equal(res.body.data, undefined, "拒绝时不得带出任何清单数据");
 });
 
-test("GET /system/ai-tools: admin 取到 11 个工具（批次 9 起含 ask_user、批次 4 起含 describe_capabilities），其中写数据恰 3 个", { skip: !testDatabaseUrl }, async () => {
+test("GET /system/ai-tools: admin 取到 18 个工具（含六个 MVP 原生读工具），其中写数据恰 4 个", { skip: !testDatabaseUrl }, async () => {
   const res = await setupApp().get("/system/ai-tools").set("Authorization", `Bearer ${await tokenFor("admin")}`);
 
   assert.equal(res.status, 200);
@@ -62,7 +62,10 @@ test("GET /system/ai-tools: admin 取到 11 个工具（批次 9 起含 ask_user
 
   const items = res.body.data.items as ToolItem[];
   // 批次 9 · §9.8.5 印证：清单从代码派生，注册即自动多出一行，无需任何同步动作
-  assert.equal(items.length, 11);
+  assert.equal(items.length, 18);
+  for (const name of ['requirement_sources', 'requirement_normalize', 'requirement_clarify', 'requirement_confirm', 'assessment_catalog', 'assessment_match_validate']) {
+    assert.ok(items.some(item => item.name === name && item.mutates === false));
+  }
   assert.ok(items.some((item) => item.name === "ask_user"), "清单须含 ask_user（无独立登记表可漏同步）");
   // 批次 4 判据②：能力词表退役为工具后，端点清单必须真的出现它——这是「模型调得到」的前提
   assert.ok(
@@ -71,15 +74,15 @@ test("GET /system/ai-tools: admin 取到 11 个工具（批次 9 起含 ask_user
   );
   assert.deepEqual(
     items.filter((item) => item.mutates).map((item) => item.name).sort(),
-    ["create_project", "export_report", "generate_wbs"],
+    ["create_assessment_draft", "create_project", "export_report", "generate_wbs"],
   );
   for (const item of items) {
     assert.ok(item.capability, `${item.name} 应带所需能力位`);
     assert.equal(typeof item.discoverable, "boolean");
     assert.equal(typeof item.callable, "boolean");
   }
-  // ADMIN 持有全部能力位，故对其本人而言 11 个工具都可调用
-  assert.equal(items.filter((item) => item.callable).length, 11);
+  // ADMIN 持有全部能力位，清单上的 18 个工具均通过能力位检查；执行仍须可信运行证明。
+  assert.equal(items.filter((item) => item.callable).length, 18);
 });
 
 test("GET /system/ai-tools: 响应不含参数 schema 与执行实现", { skip: !testDatabaseUrl }, async () => {

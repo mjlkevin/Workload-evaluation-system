@@ -1,0 +1,136 @@
+{
+  "id": "BE-2026-11-04-message-sender-distinction",
+  "date": "2026-11-04",
+  "type": "requirement",
+  "issueId": "ISS-2026-11-04-001",
+  "relatedRequirements": [
+    "RP-050",
+    "RP-056"
+  ],
+  "dedup": "命中工作台Codex交互ISS-2026-11-04-001 / RP-050，扩大到消息来源识别；原复制与时间戳RP-056继续保持",
+  "originalFeedback": "给当前AI工作台中，模型回复的消息汽配与用户发送的消息汽配，做前端的优化。1、用户能区分出哪些是他发出去的消息，哪些是模型回复的消息；",
+  "status": "本地实现并验证 / 待用户验收",
+  "surface": "AI工作台中央消息流",
+  "rootIssue": "用户消息和模型回复缺少稳定的角色标识和背景差异",
+  "owner": "MessageBubble.jsx",
+  "acceptance": [
+    "用户消息靠右、浅色底且标记你",
+    "模型消息靠左且标记AI",
+    "复制时间戳、富文本及长文本在1440/760可用"
+  ],
+  "pages": [
+    "issues",
+    "requirements",
+    "design",
+    "plan",
+    "testing",
+    "changes"
+  ],
+  "verification": {
+    "web": {
+      "files": 101,
+      "passed": 992,
+      "failed": 0
+    },
+    "modules": {
+      "passed": 1174,
+      "total": 1176,
+      "failed": 2,
+      "skipped": 0,
+      "failures": [
+        "late authority after cancel cannot prepare model",
+        "late post-prepare checker after cancel cannot complete model"
+      ]
+    },
+    "focused": {
+      "conversationUnit": 13,
+      "persistence": 5,
+      "routesWithRecommendationRegression": 7
+    },
+    "buildApi": "passed",
+    "buildWeb": "passed",
+    "uiScope": "No new deterministic UI findings",
+    "audit": {
+      "existing": {
+        "moderate": 32,
+        "high": 12,
+        "critical": 1
+      },
+      "dependenciesChanged": false
+    },
+    "secretScan": "既有skills.recommendations.test.ts:L187占位夹具被inline-secret规则命中；未修改该测试或豁免",
+    "earlierFailuresPreserved": [
+      "/tmp/wes-skill-chat-web-final.log（并发负载时5例超时；单独复跑990通过，最终气泡新增后991通过）",
+      "/tmp/wes-skill-chat-modules.log（初次含新测试未接CI守卫及5例时序失败；已接CI，最终剩2例）"
+    ]
+  },
+  "browserVerification": {
+    "url": "http://127.0.0.1:3006/",
+    "api": "http://127.0.0.1:3004",
+    "sessionId": "e912ccd3-3157-4567-b414-30110176c537",
+    "user": "mjlkevin",
+    "model": "kimi-k3",
+    "cases": [
+      {
+        "input": "这个skill能做什么？",
+        "actual": "自然语言用途介绍，无需求明细结果，无新增任务"
+      },
+      {
+        "input": "帮我拆解一下",
+        "actual": "请提供需要拆解的原始文本内容，我会将其拆解为独立的需求条目。无新增任务"
+      },
+      {
+        "input": "销售主管需要按客户查询销售订单，并将查询结果导出为Excel。",
+        "runId": "497b9f1e-34c3-4f57-a55e-6a0829d89091",
+        "actual": [
+          "销售主管需要按客户查询销售订单",
+          "销售主管需要将查询结果导出为Excel"
+        ]
+      },
+      {
+        "input": "请拆解这段需求：仓库管理员按日期查询入库单，并将查询结果导出。",
+        "runId": "a3551a8f-c04a-431a-9ba1-78738bf23188",
+        "actual": [
+          "仓库管理员按日期查询入库单",
+          "仓库管理员将查询结果导出"
+        ]
+      }
+    ],
+    "refresh": "用途和追问恢复；标签恢复；执行后原始用户消息完整且只出现一次；验收会话最终2个completed Run、6条普通消息",
+    "projectionRepair": "首次真实任务发现混合历史回落漏用户正文；从原canonical user/message事件幂等补投影；第二次真实任务自动路径验证通过",
+    "viewports": {
+      "desktop": 1440,
+      "narrow": 760,
+      "narrowPageWidth": 760,
+      "narrowComposerWidth": 647,
+      "nativeRestored": 1543
+    },
+    "senderStyles": {
+      "user": "右侧 / 浅品牌色底 / 你",
+      "assistant": "左侧 / 表面色底 / AI"
+    },
+    "screenshots": [
+      "message-senders-final.png",
+      "message-senders-1440.png",
+      "message-senders-760.png",
+      "skill-conversation-clarify.png"
+    ],
+    "screenshotDirectory": "/Users/kevin/.codex/visualizations/2026/11/04/01a1a4db-1dd5-7c33-9b3d-2077e4e7ccb4"
+  },
+  "evidence": "docs/superpowers/evidence/2026-11-04-skill-conversation-and-message-senders.json",
+  "followup": {
+    "feedback": "任务输入不是用户又发送的信息，执行标题是否写死？",
+    "scope": "用户原话与实际执行参数区分；名称来自发布配置，执行记录来自Run，不修改模型行为或任务结果",
+    "implementation": "初始input记录改为执行参数，左侧中性底色、默认折叠；实际用户answer/decision继续保留各自记录",
+    "red": "工作台参数显示1失败23通过",
+    "focused": "消息与实际中央流36/36",
+    "web": 992,
+    "screenshot": "execution-parameters-neutral.png"
+  },
+  "localCommits": {
+    "backend": "47609f5",
+    "workbench": "1bab599",
+    "systemNavigation": "6c8cc5c"
+  },
+  "deliveryState": "隔离预览已加载，本地提交；未合并主线、未推送，待用户验收"
+}

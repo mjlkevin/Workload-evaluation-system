@@ -16,3 +16,9 @@ export * from "./harness.regression";
 export * from "./harness.repository";
 export * from "./harness.types";
 export * from "./harness.usecase";
+export { createConversationEventHistorySource } from './conversation-event-history';
+export { attachWorkbenchConversationFact, buildWorkbenchUserMessageFact, workbenchUserProjectionSource } from './workbench-conversation-fact';
+
+export { BUSINESS_SKILLS_WORKFLOW_ID, BUSINESS_SKILLS_WORKFLOW_VERSION, BUSINESS_SKILLS_EXECUTE_STEP } from './business-skills.identity';
+
+export { readBusinessSkillsRun } from './business-skills.workflow';

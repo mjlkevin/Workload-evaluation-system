@@ -1,0 +1,178 @@
+{
+  "id": "BE-2026-11-02-business-skill-batch-a",
+  "date": "2026-11-02",
+  "type": "implementation",
+  "scope": "ISS-2026-08-06-002 / RP-050 / Skill A批定义与版本",
+  "summary": "用户授权开工后完成Skill管理、独立PG仓储和版本保护；本地检查及浏览器流程通过，未合主线",
+  "status": "A批已实现并验证 / 待主线集成与用户验收",
+  "pages": [
+    "index",
+    "issues",
+    "requirements",
+    "plan",
+    "testing",
+    "monitoring",
+    "risks",
+    "changes",
+    "sources"
+  ],
+  "additionalBoardPages": [
+    "design"
+  ],
+  "source": {
+    "raw": "开始实施",
+    "dedup": "沿用ISS-2026-08-06-002、RP-050；关联RP-012，不新增需求编号"
+  },
+  "workspace": {
+    "branch": "codex/wes-skills-a",
+    "base": "6a30bec",
+    "path": "/Users/kevin/.codex/worktrees/wes-skills-a/Workload-evaluation-system",
+    "mainMerged": false,
+    "remotePushed": false
+  },
+  "implemented": [
+    "管理员全定义清单与维护",
+    "独立PG三表、revision并发与审计",
+    "检出检入、撤销、升版、强制解锁、启停归档及历史只读",
+    "真实Registry原生参数契约校验",
+    "发布失败关闭与12条管理路径（13个HTTP操作）"
+  ],
+  "evidence": [
+    {
+      "kind": "command",
+      "ref": "test:modules / verify-local-db-tests.sh",
+      "result": "pass",
+      "summary": "隔离库630/630、0skip；进程级移除本机凭据回退干扰"
+    },
+    {
+      "kind": "command",
+      "ref": "test:integration",
+      "result": "pass",
+      "summary": "补齐测试库产品目录后1/1、0skip；初次失败保留"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:web",
+      "result": "pass",
+      "summary": "隔离分支85文件710/710；与主目录SKU测试数不混计"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:api / npm run build:web",
+      "result": "pass"
+    },
+    {
+      "kind": "review",
+      "ref": "A1/A2/A3独立规格与五轴代码复核",
+      "result": "pass",
+      "summary": "历史直写保护、Schema约束组合、请求级编译释放及详情并发问题已补RED/GREEN"
+    },
+    {
+      "kind": "browser",
+      "ref": "docs/superpowers/plans/2026-11-02-wes-business-skills.md#5-每批验证与交付记录",
+      "result": "pass",
+      "summary": "真实登录、创建、检出保存检入刷新、升版历史、非法JSON、撤销与归档；1440/760、键盘及拖拽"
+    }
+  ],
+  "migration": {
+    "files": [
+      "0024_spooky_violations.sql",
+      "0025_skills_history_guards.sql"
+    ],
+    "database": "workload_eval_test only",
+    "oldTablesChanged": false,
+    "mainEnvironmentChanged": false,
+    "recovery": "正式迁移前备份及验证恢复；应用回退保留新表与审计，不执行删表回滚"
+  },
+  "browser": {
+    "web": "127.0.0.1:3006",
+    "api": "127.0.0.1:3004",
+    "flow": "A.0创建→检出保存→A.1检入→刷新保留→B.0升版→A.1历史只读→归档刷新可查",
+    "sizes": [
+      1440,
+      760
+    ],
+    "overflow": false,
+    "keyboardAndDrag": "Tab约束、Escape关闭与焦点返回、标题空白拖拽通过",
+    "humanAcceptance": "待用户执行"
+  },
+  "limits": [
+    "主环境3000/3002与开发库未替换或迁移",
+    "发布统一SKILL_RELEASE_GATE_PENDING；没有试运行、流程或工作台调用",
+    "B/C/D未启动，不自动调度",
+    "基线依赖审计45项保留；本批未新增依赖",
+    "未合并、未推送；不标MVP验收通过"
+  ],
+  "board": {
+    "change": {
+      "stage": "Skill A批 · 定义与版本",
+      "result": "隔离验证通过 / 待集成验收"
+    },
+    "testing": [
+      {
+        "command": "Skill A / test:modules",
+        "result": "630/630，0skip",
+        "summary": "含真实PG并发、回滚、历史保护；双URL指向测试库"
+      },
+      {
+        "command": "Skill A / test:integration",
+        "result": "1/1，0skip",
+        "summary": "测试库目录播种后复跑通过；初次空目录失败保留"
+      },
+      {
+        "command": "Skill A / test:web + 双构建",
+        "result": "710/710；构建通过",
+        "summary": "隔离分支，不混入主目录SKU修改；独立规格及质量复核通过"
+      },
+      {
+        "command": "Skill A / 真实浏览器",
+        "result": "执行通过 / 用户验收待执行",
+        "summary": "创建至检入刷新、升版历史、错误恢复及归档；1440/760无溢出，键盘与拖拽通过"
+      }
+    ]
+  },
+  "boardNotes": {
+    "index": [
+      "Skill A批 · 管理能力已实现并验证",
+      "定义维护、版本锁和历史已完成；630项模块、710项Web及浏览器流程通过。代码在独立分支，主线未合入，B/C/D未启动。"
+    ],
+    "issues": [
+      "Skill实施授权 · 沿用既有问题",
+      "用户回复开始实施，沿用ISS-2026-08-06-002与RP-050；A批已实现并独立复核，后续批次及用户验收仍开放。"
+    ],
+    "requirements": [
+      "RP-050 · A批已实现，整体仍在推进",
+      "清单、全定义与版本管理已通过隔离验证；发布、流程和工作台调用尚未实现。保持处理中，不关闭需求、不新增编号。"
+    ],
+    "design": [
+      "Skill定义与版本 · 设计已落地至隔离分支",
+      "独立PG仓储、管理员管理、真实工具契约及版本保护已实现；发布后端拒绝。运行快照与流程固定依赖仍属后续设计。"
+    ],
+    "plan": [
+      "Skill A批 · 验证完成，待集成与用户验收",
+      "A1仓储、A2接口与校验、A3管理表面已完成本地检查；B测试发布、C工作台、D业务MVP均未启动。不自动领取下一批。"
+    ],
+    "monitoring": [
+      "Skill A批 · 本地验证快照",
+      "模块630/630、集成1/1、Web710/710和双构建通过；浏览器验证检入刷新及归档历史。仅测试库，不等同CI或用户验收。"
+    ],
+    "risks": [
+      "Skill A批 · 主环境启用和发布仍有门槛",
+      "迁移仅在测试库执行；主线集成后须备份目标库再迁移。B批完成前发布保持拒绝。45项依赖审计为既有基线，本批无新增依赖。"
+    ],
+    "sources": [
+      "Skill设计与计划 · 实施证据已回填",
+      "沿用已登记的两份文档，计划新增A批验证、迁移恢复和浏览器截图依据；资料主台账仍98行、97个去重名称，不新增计数。"
+    ]
+  },
+  "next": "将A批作为一次性候选保留在独立分支，进行主线集成与用户验收；B批另行安排",
+  "finalChecks": {
+    "openApiLocalRefs": 658,
+    "uiScope": "pass",
+    "boardBuild": "pass",
+    "boardConsistency": "0 errors / 0 warnings",
+    "privateSessionCleaned": true,
+    "isolatedServicesStopped": true,
+    "committed": false
+  }
+}

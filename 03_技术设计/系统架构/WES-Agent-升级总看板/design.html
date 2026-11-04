@@ -99,7 +99,8 @@
       </ol>
     </div>
 
-    <section data-board-event-id="BE-2026-10-25-system-unification-submit:design"><h2>状态目录口径纠正 · 以执行路径区分能力</h2><p>复核区分值域、业务标签和实际前态约束：简报/协作/评审/版本主状态允许回退，知识archived不可恢复；记忆已有归档/恢复，AI会话/产物现行入口仅创建/追加。目录与静态快照同步，业务代码无改动；防漂移测试覆盖已核实能力但不自动解析全部源码守卫。</p></section>
+    <section data-board-event-id="BE-2026-11-04-wes-sandbox-implementation:design"><div class="wrap"><div class="sec-head"><div class="num">2026-11-04 · RP-067</div><h2>沙箱方案已实施，采用平台隔离边界</h2><p>LLM理解用途后选择执行，逐次确认代码与材料。禁止公网，只保留用户确认的两个固定系统OSS内网通道。 <a href="../../../docs/superpowers/evidence/2026-11-04-wes-sandbox-implementation.md">验证记录</a> · <a href="events/2026-11-04-wes-sandbox-implementation.json">结构化证据</a>。</p></div></div></section>
+<section data-board-event-id="BE-2026-10-25-system-unification-submit:design"><h2>状态目录口径纠正 · 以执行路径区分能力</h2><p>复核区分值域、业务标签和实际前态约束：简报/协作/评审/版本主状态允许回退，知识archived不可恢复；记忆已有归档/恢复，AI会话/产物现行入口仅创建/追加。目录与静态快照同步，业务代码无改动；防漂移测试覆盖已核实能力但不自动解析全部源码守卫。</p></section>
     <section data-board-event-id="BE-2026-10-21-system-unification-batch4:design"><h2>审计与诊断 · 保留任务差异，统一结果浏览</h2><p>会话保留唯一服务端筛选，默认最多返回200条，消息明确为截断摘要；测试结果按20条分批加载并独立推进offset；诊断保留本地试查、预算、耗时与完整返回内容。<a href="../../../02_产品设计/系统管理统一化重构调研-2026-10-21/调研与重构方案.md">统一方案与最终验证</a></p><p>三页结果均复用10行列表和只读详情；测试结果创建/删除采用明确目标、候选取消及忙时保护。共享组件仅增加可关闭本地搜索的参数，避免把服务端搜索混成第二搜索框。</p></section>
     <section data-board-event-id="BE-2026-10-21-system-unification-batch3:design"><h2>AI 配置与记忆 · 列表与候选编辑分离</h2><p>模型保留供应商/场景两个列表，接线与草稿差异改详情；知识库以档案列表和连接摘要为主，共享参数进弹窗；记忆以类型可辨的统一列表呈现。<a href="../../../02_产品设计/系统管理统一化重构调研-2026-10-21/调研与重构方案.md">方案与第三批证据</a></p><p>模型两接口读取错误显式呈现且禁止保存/生效，避免默认参数覆盖。记忆按后端两类独立总数加载，搜索仅限已加载范围；确认/归档固定详情目标且防重。</p></section>
     <section data-board-event-id="BE-2026-10-21-system-unification-batch2:design"><h2>规则与资产目录 · 统一列表和领域详情</h2><p>四页复用首批搜索、分页和 Dialog，移出父页卡片与表单；状态机保留轴、流转、守卫及源码，RateCard 明示默认参考来源，模板保留真实版本且不再提示虚假套用成功。<a href="../../../02_产品设计/系统管理统一化重构调研-2026-10-21/调研与重构方案.md">方案与第二批实施证据</a></p><p>DSL 保留组合字段，区分本地编辑、服务端草稿和完整生效配置；差异比较包含互斥规则，保存仅提交本页拥有的 rules。较旧请求不覆盖本地编辑。</p></section>
@@ -486,7 +487,14 @@
     <footer class="footer">
       <a href="index.html">返回总览</a> · 设计说明 · WES 项目管理 · 2026-08-02
     </footer>
-  </main>
+  <section class="section" data-board-event-id="BE-2026-11-04-composer-skill-invocation:design"><h2>工作台 / 技能调用 · 技术验证完成</h2><p>命中 ISS-2026-11-04-001，扩展 RP-050。/ 搜索、单项可移除标签、提示词与附件统一发送已实现；缺参补齐，失败保留草稿，切会话隔离。</p><p>Web 988/988、定向36及构建通过；实际Skill完成两条需求拆解。模块1157/1159，既有取消/超时2例保留，隔离66/66；目录性能观察保留。</p><p>1440/760浏览器验证完成，用户验收待回填。<a href="events/2026-11-04-composer-skill-invocation.json">验证证据与边界</a> · <a href="../../../docs/superpowers/specs/2026-11-04-composer-skill-invocation-design.md">批准设计</a> · <a href="../../../docs/superpowers/plans/2026-11-04-composer-skill-invocation.md">实施计划</a>。本地候选，未合主线、未推送。</p></section>
+<section class="section" data-board-event-id="BE-2026-11-04-workbench-remove-inspector:design"><h2>工作台移除右侧摘要 · 本地实现</h2><p>命中 ISS-2026-11-04-001 / RP-050。按用户指定方案移除整个右侧工作区及折叠空列；执行、确认、结果统一在中央，旧会话确认、材料、产物和关联仍可访问。</p><p>Web990/990、构建和UI范围检查通过；模块1156/1159及隔离65/66，取消/超时时序失败保留，未改后端逻辑或测试预算。</p><p><a href="events/2026-11-04-workbench-remove-inspector.json">实取验证与浏览器证据</a>；左下角色快捷提问保持原样。本地候选，未合主线、未推送；用户验收待回填。</p></section>
+<section class="section" data-board-event-id="BE-2026-11-04-skill-conversation:design"><h2>Skill作为对话上下文 · 执行入口分离</h2><p>新conversation入口读取授权发布能力、会话历史和原文；LLM返回自然语言回答、追问或执行意图。对话不套业务结果Schema，执行仍校验输入/版本/权限并保留写入确认。单一消息流表面、两个根问题，无新UI依赖。</p><p><a href="events/2026-11-04-skill-capability-input-misinterpretation.json">原问题与回归</a> · <a href="events/2026-11-04-message-sender-distinction.json">消息来源优化</a> · <a href="../../../docs/superpowers/evidence/2026-11-04-skill-conversation-and-message-senders.json">完整验证证据</a></p></section>
+<section class="section" data-board-event-id="BE-2026-11-04-remove-system-page-nav:design"><h2>系统管理菜单独立页面 · 本地实现</h2><p>命中ISS-2026-10-21-001 / RP-065。按用户要求移除正文内两层分类导航；左侧菜单直接进入页面，原路由、书签跳转及业务内容保留。</p><p>导航专项13/13，完整Web992/992、构建和两个表面分别UI范围检查通过。实际Skill/模型/Workflow入口及1440/760已验证，分类导航0处。<a href="events/2026-11-04-remove-system-page-nav.json">证据与截图</a>；候选待用户验收，未合主线未推送。</p></section>
+</main>
+<section class="section" data-board-event-id="BE-2026-11-04-composer-clear-on-dispatch:design"><h2>消息归属随发送切换</h2><p>提交原文保存在请求快照；进入消息流即清空。失败仅在同会话且编辑框仍空时恢复；迟到成功不再触碰正文。</p><p><a href="events/2026-11-04-composer-clear-on-dispatch.json">清空时机、回归与截图</a>；用户验收待回填。</p></section>
+<section class="section" data-board-event-id="BE-2026-11-04-aliyun-sandbox-feasibility:design"><h2>阿里云沙箱文档生成 · 可行性分析</h2><p>命中ISS-2026-08-27-004，补充外部执行工具方案。LLM理解任务，沙箱生成文件，WES取回并保存后在消息流展示；不替换业务后端。依赖、字体、网络和产物归属待方案确认，未实施、未创建云资源。</p><p><a href="events/2026-11-04-aliyun-sandbox-feasibility.json">官方依据与范围边界</a>；保持question，不新增实现需求。</p></section>
+<section class="section" data-board-event-id="BE-2026-11-04-aliyun-sandbox-api-smoke:design"><h2>沙箱API验证通过 · 工作台工具尚未接入</h2><p>SDK通过原生sandboxID连接；控制台百炼ID需要先映射。平台继续负责鉴权和产物归属，当前没有新增WES接口或工具。</p><p><a href="events/2026-11-04-aliyun-sandbox-api-smoke.json">API实取、失败路径与凭据边界</a>；本次不宣称工作台文档生成已交付。</p></section>
   <script src="assets/board-ui.js" defer></script>
 </body>
 </html>

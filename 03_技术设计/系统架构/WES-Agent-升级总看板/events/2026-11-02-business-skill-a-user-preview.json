@@ -1,0 +1,18 @@
+{
+  "id": "BE-2026-11-02-business-skill-a-user-preview",
+  "date": "2026-11-02",
+  "type": "verification",
+  "scope": "RP-050 / A批界面用户验证准备",
+  "summary": "为用户开启独立Skill管理预览，管理员页面已打开；用户验收待回填",
+  "status": "预览已就绪 / 待用户验证",
+  "pages": ["index", "plan", "testing", "monitoring", "changes"],
+  "evidence": [
+    {"kind": "browser", "ref": "http://127.0.0.1:3006/system/ai/skills", "result": "ready", "summary": "真实登录成功，Skill管理与新建按钮可用；已保留浏览器页面供用户操作"},
+    {"kind": "runtime", "ref": "API 127.0.0.1:3004 / workload_eval_test", "result": "isolated", "summary": "使用A批分支及测试库；当前主环境3000/3002未替换，无新增迁移"}
+  ],
+  "board": {
+    "testing": [{"command": "Skill A 用户预览", "result": "已准备 / 用户验收待执行", "summary": "管理员已登录独立3006页面；可验证创建、检出保存检入、刷新、升版历史及归档"}],
+    "change": {"stage": "Skill A批 · 用户预览", "result": "预览就绪 / 待用户验证"}
+  },
+  "next": "用户在已打开的管理员页面验证A批管理流程；发布仍关闭，B/C/D未启动"
+}

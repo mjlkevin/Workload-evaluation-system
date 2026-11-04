@@ -1,0 +1,78 @@
+{
+  "id": "BE-2026-11-02-skills-b3-browser-verified",
+  "date": "2026-11-02",
+  "type": "verification",
+  "scope": "RP-050 / B3 Skill界面 / 隔离预览升级",
+  "summary": "Skill试运行发布界面通过独立规格与质量复核，真实浏览器验证隔离边界及版本交互；B4流程界面复核中",
+  "status": "Skill界面已验证 / B整批未验收",
+  "pages": [
+    "index",
+    "requirements",
+    "plan",
+    "testing",
+    "monitoring",
+    "risks",
+    "changes"
+  ],
+  "additionalBoardPages": [
+    "design"
+  ],
+  "source": {
+    "dedup": "沿用RP-050，不新增需求；401门槛沿用ISS-2026-11-02-005"
+  },
+  "evidence": [
+    {
+      "kind": "git",
+      "ref": "398fd0b / 4f4eedd",
+      "summary": "Skill证明展示与复核发布回滚界面；修复过期标识、嵌套确认键盘和处理中误报冲突"
+    },
+    {
+      "kind": "command",
+      "ref": "/tmp/wes-skills-b3-busy-green.log",
+      "result": "35/35",
+      "summary": "规格与质量复核通过；额外独立键盘/请求竞态/忙碌失败探针通过"
+    },
+    {
+      "kind": "browser",
+      "ref": "3006 / Skill729a4d0e-e428-4d44-8338-2fee5f97f2e2",
+      "summary": "创建、模拟无发布资格、实际模型失败持久化、草稿保护、检出保存检入、升版、历史只读、Escape焦点恢复、拖拽实测"
+    },
+    {
+      "kind": "screenshot",
+      "ref": "/Users/kevin/.codex/visualizations/2026/11/02/01a19a18-92f8-7bf1-b70c-df3fd911608f/wes-b-skill-760.png",
+      "summary": "1440与760视口均无页面或弹窗横向溢出；截图已打开检查"
+    },
+    {
+      "kind": "database",
+      "ref": "workload_eval_skills_preview_a_saved_20261102",
+      "summary": "升级前A预览备份；迁移0026至0029仅预览库，原2Skill/4版本/16历史/4用户摘要一致，新增验收样例独立"
+    },
+    {
+      "kind": "command",
+      "ref": "/tmp/wes-skills-b-ai.log / agent.log / rules.log / integration.log",
+      "result": "AI286/agent240/rules8/integration1",
+      "summary": "均零失败零跳过；测试库独立于预览"
+    }
+  ],
+  "board": {
+    "testing": [
+      {
+        "command": "B3 Skill界面",
+        "result": "35/35，双复核通过",
+        "summary": "实际浏览器1440/760、模型失败和模拟不放行通过；成功真实模型发布及Skill回滚未执行"
+      },
+      {
+        "command": "B拓展回归",
+        "result": "286 +240 +8 +1通过",
+        "summary": "AI/Agent/规则/集成全通过，零跳过；不替代真实模型业务验收"
+      }
+    ]
+  },
+  "limits": [
+    "原用户需求拆解分析skill未被本次验收编辑",
+    "真实模型认证401，发布happy path待有效模型凭据",
+    "B4界面已实现正在规格复核；B5整体回填未完成，C/D未启动",
+    "主目录现场保留，未合入主线或推送"
+  ],
+  "next": "补齐B4规格问题后质量复核，再实际浏览器验证流程配置发布回滚；完成B5回填"
+}

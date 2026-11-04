@@ -1,0 +1,69 @@
+{
+  "id": "BE-2026-11-03-skills-c2c3b-operation-decisions",
+  "date": "2026-11-03",
+  "type": "implementation",
+  "scope": "RP-050 C2c.3b 持久确认决定与当前内容权限绑定",
+  "summary": "明确批准/拒绝决定现已持久保存并绑定当前操作内容、Run与权限。同一有效上下文重复决定幂等，相反选择冲突；重试或配置权限变化需要新确认。真实工具执行仍关闭。",
+  "status": "自动检查与独立复核通过 / 内部能力",
+  "pages": [
+    "index",
+    "requirements",
+    "plan",
+    "testing",
+    "monitoring",
+    "risks",
+    "changes"
+  ],
+  "additionalBoardPages": [
+    "runtime",
+    "design"
+  ],
+  "evidence": [
+    {
+      "kind": "user",
+      "ref": "2026-11-03 continue after d490238",
+      "summary": "继续已批准Skill机制与3b确认绑定工作。"
+    },
+    {
+      "kind": "git",
+      "ref": "d490238",
+      "summary": "3a持久pending登记与稳定重试身份已验证，原模型状态文件禁止读取或暂存。"
+    },
+    {
+      "kind": "plan",
+      "ref": "docs/superpowers/plans/2026-11-02-wes-business-skills.md",
+      "summary": "独立read/decide内部服务，复用ToolEvents唯一约束；批准不是执行grant，不松开实际工具门禁。"
+    },
+    {
+      "kind": "test",
+      "ref": "/tmp/wes-c2c3b-baseline/test:execution-operations.log",
+      "summary": "父基线111/111、0skip，受守卫测试库。"
+    },
+    {
+      "kind": "test",
+      "ref": "/tmp/wes-c2c3b-parent-final; /tmp/wes-c2c3b-build-api.log; /tmp/wes-c2c3b-build-web.log",
+      "summary": "父独立确认专项86、模块931、Harness462、AI286及API/Web双构建通过，均0skip。"
+    },
+    {
+      "kind": "review",
+      "ref": "/tmp/wes-c2c3b-spec; /tmp/wes-c2c3b-quality-pg; /tmp/wes-c2c3b-quality-pure",
+      "summary": "规格21、质量PG21/纯测41，0skip，APPROVE。"
+    },
+    {
+      "kind": "risk",
+      "ref": "/tmp/wes-c2c3b-audit.json",
+      "summary": "audit45既有风险；通用集成缺活动模板/分配0/1保留。无实际写入、预算或MVP验收声明。"
+    },
+    {
+      "kind": "board",
+      "ref": "/tmp/wes-c2c3b-board-build-final.log; /tmp/wes-c2c3b-board-check-final.log; /Users/kevin/.codex/visualizations/2026/11/02/01a19a18-92f8-7bf1-b70c-df3fd911608f/c2c3b-2026-11-03-board-requirements.png",
+      "summary": "21页构建与一致性0错误0警告；IAB核验RP-050仍C实施中，next含实际写幂等/预算和工作台。未改板布局，表格既有短列换行/空白保留。"
+    },
+    {
+      "kind": "test",
+      "ref": "/tmp/wes-c2c3b-parent-final/test:integration.log; /tmp/wes-c2c3b-integration-fixture-counts.json",
+      "summary": "通用集成0/1 templates_status_not_200；只读测试库活动模板/有效分配均0，不seed造绿。"
+    }
+  ],
+  "next": "下一步将获准操作与本地业务写入纳入同一事务，完成实际写入幂等（C2c.3c）；再做跨调用预算（3d）、统一视图、生产宿主和工作台。"
+}

@@ -81,11 +81,11 @@ function slugId(prefix: string, name: string): string {
 }
 
 /** 从 product 主数据表派生 Template。 */
-export async function deriveTemplateFromProductTables(dbInstance: DbLike): Promise<Template> {
+export async function deriveTemplateFromProductTables(dbInstance: Pick<Database, "select">, templateId?: string): Promise<Template> {
   const metaRows = await dbInstance
     .select()
     .from(productTemplates)
-    .where(eq(productTemplates.isActive, true))
+    .where(templateId ? and(eq(productTemplates.isActive, true), eq(productTemplates.templateId, templateId)) : eq(productTemplates.isActive, true))
     // 取**最近**生效的那份：asc 会选到最旧的活动行
     .orderBy(desc(productTemplates.updatedAt), asc(productTemplates.templateId))
     .limit(1);

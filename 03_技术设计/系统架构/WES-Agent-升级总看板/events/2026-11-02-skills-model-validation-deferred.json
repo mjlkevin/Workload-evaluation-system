@@ -1,0 +1,29 @@
+{
+  "id": "BE-2026-11-02-skills-model-validation-deferred",
+  "date": "2026-11-02",
+  "type": "process_change",
+  "scope": "ISS-2026-11-02-005 / RP-050 / 模型验收暂缓",
+  "summary": "用户确认暂时没有可用模型密钥，保持Skill发布关闭，真实模型补验暂缓",
+  "status": "发布保持关闭 / 待密钥补齐",
+  "pages": [
+    "issues",
+    "plan",
+    "testing",
+    "monitoring",
+    "risks",
+    "changes"
+  ],
+  "source": {
+    "raw": "暂时没有可用密钥，先保持发布关闭",
+    "dedup": "命中ISS-2026-11-02-005，补充用户决策；不新增需求或缺陷"
+  },
+  "evidence": [
+    {
+      "kind": "database",
+      "ref": "workload_eval_skills_preview_20261102只读核查",
+      "result": "activeSkills=0,publishedSkillVersions=0",
+      "summary": "本次未调用模型、未修改业务配置或发布记录"
+    }
+  ],
+  "next": "保留B候选界面供验证；真实模型成功试运行及Skill审核发布/回滚待密钥准备好后再安排，C批不启动"
+}

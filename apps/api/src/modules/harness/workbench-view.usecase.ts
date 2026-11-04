@@ -7,6 +7,7 @@
 // 数据源复用既有 repository（sessions / runs / artifacts），
 // 不得新建重复存储。数据隔离：仅返回本人数据。
 
+import type { BusinessWorkbenchViewService } from "../skills/skills.workbench-unified";
 import type { AuthUser } from "../../types";
 import { listAiSessions, getAiSession } from "../ai-sessions/ai-sessions.usecase";
 import { deriveSessionMessages } from "../ai-sessions/session-history";
@@ -37,6 +38,8 @@ export type WorkbenchRunViewItem = {
   title: string;
   status: string;
   latestEventKind: string;
+  hasBusinessExecution?: boolean;
+  businessExecution?: { kind: string; target: { id: string; versionId: string; name: string; description: string } };
   failedReason?: string;
   createdAt: string;
   updatedAt: string;
@@ -50,6 +53,7 @@ export type WorkbenchFailedRunItem = {
 };
 
 export type WorkbenchTaskViewItem = {
+  runId?: string;
   actionId: string;
   actionType: string;
   title: string;
@@ -60,6 +64,7 @@ export type WorkbenchTaskViewItem = {
 };
 
 export type WorkbenchArtifactViewItem = {
+  runId?: string;
   artifactId: string;
   type: string;
   title: string;
@@ -108,6 +113,7 @@ export type WorkbenchViewRepoPort = {
 
 export type WorkbenchViewUsecaseDeps = {
   repo: WorkbenchViewRepoPort;
+  business?: BusinessWorkbenchViewService;
 };
 
 export type WorkbenchViewUsecase = ReturnType<typeof createWorkbenchViewUsecase>;
@@ -274,13 +280,14 @@ export function createWorkbenchViewUsecase(deps: WorkbenchViewUsecaseDeps) {
       }
     }
 
-    return {
+    const view = {
       sessions: sessionViewItems,
       runs: runViewItems,
       tasks: taskItems,
       artifacts: artifactItems,
       failedRuns: failedRunItems,
     };
+    return deps.business ? deps.business.extend(user, view) : view;
   }
 
   return {

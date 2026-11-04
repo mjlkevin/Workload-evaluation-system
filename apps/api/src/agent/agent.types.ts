@@ -17,6 +17,8 @@ export interface AgentTool {
   description: string;
   /** JSON Schema 参数对象 */
   parameters: Record<string, unknown>;
+  /** Optional code-owned result contract; absence preserves opaque legacy results. */
+  outputSchema?: Record<string, unknown>;
   /** 所需 RBAC 能力位；调用前校验 */
   capability: Capability;
   /** 是否写操作（true 需用户确认） */
@@ -31,6 +33,17 @@ export interface AgentTool {
    * ——每次外发的内容都不同，批准过一次不等于批准下一次。
    */
   exfiltrates?: boolean;
+  /** Code-owned assertion of local, read-only trial safety. Default false; never an admin policy override. */
+  sandboxReadSafe?: boolean;
+  /** Code-owned execution restriction. False allows only an explicitly assembled production adapter; it never grants trial writes. */
+  simulationOnly?: boolean;
+  /**
+   * Code-owned conversation visibility restriction. True excludes the tool from model
+   * injection and discovery; the raw catalog and explicit business host execution remain.
+   * Defaults false. This never grants execution authority or overrides admin policy;
+   * the implementation must still validate its trusted business execution context.
+   */
+  businessExecutionOnly?: boolean;
   /** SP-2026-007 MS3：工具分类（发现/分组用）；内置发现工具为 "discovery" */
   category?: string;
   /** SP-2026-007 MS3：true 时默认不注入 tools 参数，经 list_tools 发现后进入当轮注入集 */
@@ -49,6 +62,8 @@ export interface AgentTool {
    */
   mcpAllowedRoles?: readonly V2Role[];
   /** 真正执行：调用底层 usecase；runtime 为可信运行上下文（O2 · A4 注入） */
+  /** Server-only plan freezing before persistent approval. Never exposed in provider schemas. */
+  prepareForApproval?(args: Record<string, unknown>, user: AgentUser, runtime?: RuntimeContext): Promise<Record<string, unknown>>;
   execute(args: Record<string, unknown>, user: AgentUser, runtime?: RuntimeContext): Promise<unknown>;
 }
 
@@ -66,7 +81,7 @@ export interface ToolResult {
 // tool_result 补可选 `toolCallId`。审批闸门与 UI 事件按 callId 对账——审批请求
 // 只带 callId、参数以 tool.call.started 那一份为唯一来源，事件里就必须带得上这个 id。
 export type AgentEvent =
-  | { kind: "tool_call"; name: string; arguments: Record<string, unknown>; toolCallId?: string }
+  | { kind: "tool_call"; name: string; arguments: Record<string, unknown>; toolCallId?: string; preparedForApproval?: boolean }
   | { kind: "tool_result"; name: string; ok: boolean; data?: unknown; error?: string; toolCallId?: string }
   | { kind: "need_confirm"; name: string; arguments: Record<string, unknown> }
   | { kind: "final"; content: string };

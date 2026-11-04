@@ -43,7 +43,11 @@ type FactRow = {
  * （drizzle 的 inArray 会展开成 $n 列表，万级会话时须换 anyOf/临时表——已登记为观察项，
  * 今天 101 条会话远未触及）。
  */
-export function createConversationEventHistorySource(dbInstance: Database = db): SessionConversationFactSource {
+export function createConversationEventHistorySource(
+  dbInstance: Pick<Database, 'select'> = db,
+  ownerUserId?: string,
+  lock = false,
+): SessionConversationFactSource {
   return {
     async loadConversationFacts(
       sessionIds: readonly string[],
@@ -53,7 +57,7 @@ export function createConversationEventHistorySource(dbInstance: Database = db):
       // 空集合不查库：`= any(array[])` 这种形状让 PG 去赌没意思，也省一次往返
       if (ids.length === 0) return grouped;
 
-      const rows = await dbInstance
+      const query = dbInstance
         .select({
           aiSessionId: harnessRuns.aiSessionId,
           runId: harnessRuns.harnessRunId,
@@ -68,12 +72,14 @@ export function createConversationEventHistorySource(dbInstance: Database = db):
         .where(
           and(
             inArray(harnessRuns.aiSessionId, ids),
+            ownerUserId === undefined ? undefined : eq(harnessRuns.ownerUserId, ownerUserId),
             inArray(harnessRunEvents.eventType, [...SESSION_CONVERSATION_FACT_EVENT_TYPES]),
           ),
         )
         // 排序口径与 resolveSessionHistory 一致（跨 Run 按 Run 创建时刻、Run 内按序号）。
         // 这里排一次是为了让「按到达顺序分组」直接成立；判定侧仍会自己排，两处不冲突。
         .orderBy(asc(harnessRuns.createdAt), asc(harnessRuns.harnessRunId), asc(harnessRunEvents.sequence));
+      const rows = await (lock ? query.for('share', { of: harnessRunEvents }) : query);
 
       for (const row of rows as unknown as FactRow[]) {
         const sessionId = row.aiSessionId;

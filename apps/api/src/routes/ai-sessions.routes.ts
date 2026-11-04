@@ -11,6 +11,7 @@
 //   - default 导出保持 Router 实例兼容既有注册方式。
 
 import { Router } from "express";
+import { createBusinessSkillsWorkbenchService, type BusinessSkillsWorkbenchService } from "../modules/skills/skills.module";
 
 import * as AiSessionsModule from "../modules/ai-sessions/ai-sessions.module";
 import { getAiSession } from "../modules/ai-sessions/ai-sessions.usecase";
@@ -27,6 +28,7 @@ import { requireCapability } from "../rbac/middleware";
 
 export type AiSessionsRouterDeps = {
   repo?: HarnessRuntimeRepository;
+  business?: BusinessSkillsWorkbenchService;
   enabled?: boolean;
   heartbeatMs?: number;
   pollMs?: number;
@@ -43,7 +45,7 @@ export function createAiSessionsRouter(deps: AiSessionsRouterDeps = {}): Router 
     enabled,
     findSession: async (user, sessionId) => getAiSession(user, sessionId),
   });
-  const runsHandlers = createAiRunsHandlers({ usecase: runsUsecase });
+  const runsHandlers = createAiRunsHandlers({ usecase: runsUsecase, business: enabled ? deps.business ?? createBusinessSkillsWorkbenchService({ repo }) : undefined });
 
   const router = Router();
   router.get("/", requireCapability("estimates:read"), AiSessionsModule.listSessions);

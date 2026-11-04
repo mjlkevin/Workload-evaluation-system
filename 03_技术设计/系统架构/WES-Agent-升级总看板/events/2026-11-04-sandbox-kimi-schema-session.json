@@ -1,0 +1,162 @@
+{
+  "eventId": "BE-2026-11-04-sandbox-kimi-schema-session",
+  "date": "2026-11-04",
+  "originalRequest": "看下我刚刚测试的session是什么情况：33782966-44d4-476f-b38e-6af1a96856cc",
+  "sessionId": "33782966-44d4-476f-b38e-6af1a96856cc",
+  "issueId": "ISS-2026-11-04-004",
+  "requirementId": "RP-067",
+  "defectId": "DEF-2026-11-04-003",
+  "triage": {
+    "dedup": "命中既有沙箱文件交付ISS-004/RP-067，不新增Issue或需求；本次补充Kimi实际验收缺陷",
+    "disposition": "defect",
+    "priority": "P1",
+    "severity": "S2",
+    "status": "fixed_manual_pending",
+    "scope": "User authorized two-field fix, independent encrypted acceptance connection and same-session validation"
+  },
+  "environment": {
+    "ui": "http://127.0.0.1:3006/",
+    "apiPort": 3004,
+    "checkout": "codex/wes-skills-c",
+    "head": "62a11a7",
+    "database": "workload_eval_skills_preview_20261102",
+    "queryMode": "read-only transactions, only supplied session"
+  },
+  "runs": [
+    {
+      "id": "9227fb4d-d90c-4328-a3a4-a053c6fa5257",
+      "workflow": "workbench_chat_v1",
+      "status": "completed",
+      "purpose": "greeting"
+    },
+    {
+      "id": "11d2a2ea-6c90-4b00-9812-46d081882f86",
+      "workflow": "business_skills_v1",
+      "status": "completed",
+      "requirementsCount": 7,
+      "startedAtCST": "2026-11-04 18:11:44",
+      "completedAtCST": "2026-11-04 18:12:07"
+    },
+    {
+      "id": "e5cb8cb6-12c2-45ee-90d8-5adda4814787",
+      "workflow": "sandbox-task-v1",
+      "status": "failed",
+      "createdAtCST": "2026-11-04 18:12:09",
+      "failedAtCST": "2026-11-04 18:12:11",
+      "errorCode": "WORKER_STEP_FAILED",
+      "providerError": "HTTP 400; properties.language: type is not defined"
+    }
+  ],
+  "rootCause": {
+    "file": "apps/api/src/agent/tools/sandbox.tools.ts",
+    "fields": [
+      "properties.language",
+      "properties.outputs.items.properties.format"
+    ],
+    "observed": "两个enum节点未显式声明type；本次上游错误首先指向language。注册器原样转交parameters。",
+    "suggestedFix": "两个字段补type:string，并增加实际出站工具定义的Kimi兼容回归，再用独立生产连接验收。"
+  },
+  "effects": {
+    "sandboxJobCount": 0,
+    "artifactCount": 0,
+    "approvalReached": false,
+    "cloudExecutionReached": false,
+    "upstreamResultRetained": true
+  },
+  "separatePrerequisite": {
+    "sandboxConnectionRows": 0,
+    "causedThis400": false,
+    "temporaryKeySaved": false
+  },
+  "priorAcceptanceBoundary": "此前qwen-plus合成闭环通过，不能替代这次实际Kimi工具Schema验收。",
+  "tests": "只读运行记录和源码核对；未调用模型/云，未运行产品测试，未修改会话或重试任务。",
+  "nextStep": "用户在原会话复核HTML；原长提示超时与后续上下文衔接单独留待优化",
+  "boardAudit": {
+    "defectRawRows": 32,
+    "defectUniqueIds": 32,
+    "buckets": {
+      "manual": 14,
+      "pending": 7,
+      "done": 11
+    },
+    "requirementsCountChanged": false,
+    "issueCountChanged": false,
+    "sourceAssetCountChanged": false
+  },
+  "boardValidation": {
+    "build": "21 pages in candidate and main",
+    "consistency": "0 errors / 0 warnings in candidate and main",
+    "productCodeChanged": true,
+    "sessionOrRunMutated": "new authorized retry/follow-up and approval; original runs and 7-item result preserved"
+  },
+  "repair": {
+    "authorization": "先修复这两个参数定义，再把沙箱连接配置好，继续用这个会话验证HTML报告生成",
+    "independentKeyAuthorization": "创建独立验收Key并加密保存",
+    "commit": "9df45d7",
+    "codeFiles": [
+      "apps/api/src/agent/tools/sandbox.tools.ts",
+      "apps/api/src/agent/default-registry.test.ts"
+    ],
+    "tests": {
+      "red": "outbound Kimi language.type undefined; expected string",
+      "targetedPassed": 43,
+      "modulesPassed": 1236,
+      "modulesFailed": 0,
+      "modulesSkipped": 0,
+      "moduleMode": "original file list, explicit serial, isolated *_test database",
+      "apiBuild": "passed"
+    },
+    "connection": {
+      "scope": "local acceptance only",
+      "enabled": true,
+      "providerKeyId": "8524328",
+      "description": "WES-sandbox-acceptance-20261104",
+      "encrypted": true,
+      "keyVersion": 1,
+      "readonlyCheckHTTP": 200,
+      "qoderworkKeyPersisted": false,
+      "productionEnabled": false
+    },
+    "validation": {
+      "sessionId": "33782966-44d4-476f-b38e-6af1a96856cc",
+      "sameInputRetryRunId": "f0e8d887-7a73-4546-ac90-eaecedd8aae5",
+      "sameInputRetryOutcome": "kimi_request_timeout at existing 120s, no cloud job; failure retained",
+      "followup": "Added concise HTML instruction in same session. Understanding asked for structured results; copied original 7-item JSON from owned final output into prompt, no new analysis.",
+      "successfulRunId": "c3c351df-ce67-4b26-80fa-53ebfb22be84",
+      "status": "completed",
+      "model": "kimi-k3",
+      "firstToolFailure": "invented source reference denied before cloud creation; model repaired to inline original JSON",
+      "approval": "actual UI click by Codex under user authorization, after script input equality and AST review",
+      "planDigest": "aec48578b519f6bae92bcd09147e1d51754e230a65c2b964418c255ce5481624",
+      "cloudInstancesCreated": 1,
+      "cloudInstancesReleased": 1,
+      "exitCode": 0,
+      "artifactId": "e9f02c30-d91a-4eaf-a8c0-65141edd8584",
+      "fileName": "report.html",
+      "bytes": 5739,
+      "sha256": "caf05024670650bbfa8e485b37cd514a9ae4cb9c54c44cdabf412a0bcaf853bc",
+      "ownerDownloadHTTP": 200,
+      "browserDownloadHashMatches": true,
+      "htmlPreview": {
+        "iframeSandbox": "",
+        "blobURL": true,
+        "renderedHeading": "REQ-001 门店店长实时查看库存及安全库存预警"
+      },
+      "content": {
+        "requirements": 7,
+        "openQuestions": 30,
+        "missingFields": 0,
+        "exactTitleDescriptionSourceAndQuestions": true
+      },
+      "upstreamOutputUnchanged": true
+    },
+    "remaining": [
+      "User manual acceptance",
+      "Full original long prompt may still hit Kimi 120s timeout",
+      "Follow-up understanding does not automatically include structured business output; this test supplied exact JSON",
+      "Remaining attachment/Word/Excel production scenarios"
+    ],
+    "merged": false,
+    "pushed": false
+  }
+}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { apiClient } from '../../../api/client.js'
 import { unwrap } from '../../../api/utils.js'
 import { submitRun, getRunToolEvents, confirmRunAction, rejectRunAction, submitRunInputs } from '../../../api/aiRuns.js'
@@ -195,12 +195,6 @@ export default function useChatMessages(workbench) {
     setMessages([])
     prevSessionIdRef.current = ''
   }
-
-  useLayoutEffect(() => {
-    const pane = messagePaneRef.current
-    if (!pane || typeof pane.scrollTo !== 'function') return
-    pane.scrollTo({ top: pane.scrollHeight, behavior: 'smooth' })
-  }, [messages.length, sending])
 
   useEffect(() => {
     if (!workbench.activeSession) return

@@ -55,6 +55,7 @@ export function __getMcpStoreForTest() {
 }
 
 export const handlers = [
+  http.get(`${BASE}/ai-executions/runs`, () => HttpResponse.json({ data: { items: [] } })),
   http.get(`${BASE}/versions`, ({ request }) => {
     const url = new URL(request.url)
     const type = url.searchParams.get('type')
@@ -917,6 +918,8 @@ export const handlers = [
   http.get(`${BASE}/templates`, () => HttpResponse.json({ success: true, data: [{ templateId: 'T1', templateName: '实施评估标准版', description: '标准模板', tags: ['标准'] }] })),
   http.post(`${BASE}/system/version-code-rules/:id/activate`, () => HttpResponse.json({ success: true, data: {} })),
 
+  // Existing detail fixtures are ordinary historical assessments, explicitly classified by the server.
+  http.get(`${BASE}/business-assessments/:id/basis`, () => HttpResponse.json({ code: 0, data: { kind: 'legacy' } })),
   http.post(`${BASE}/versions/:id/checkout`, () => HttpResponse.json({ success: true, data: { checkoutStatus: 'checked_out' } })),
   http.post(`${BASE}/versions/:id/checkin`, () => HttpResponse.json({ success: true, data: { checkoutStatus: 'checked_in' } })),
   http.post(`${BASE}/versions/:id/promote`, () => HttpResponse.json({ success: true, data: {} })),

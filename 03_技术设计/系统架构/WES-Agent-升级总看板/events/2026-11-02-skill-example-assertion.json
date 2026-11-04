@@ -1,0 +1,186 @@
+{
+  "id": "BE-2026-11-02-skill-example-assertion",
+  "date": "2026-11-02",
+  "type": "verification",
+  "scope": "RP-050 原需求拆解示例断言修正",
+  "summary": "原需求拆解示例仅补13项业务断言并检入VB.2；真实kimi-k3试运行通过（11458ms），原失败记录保留。离线6组错误反例仍被拒绝。未复核、未发布，B待用户验收。",
+  "status": "已修正 / 待用户复核",
+  "pages": [
+    "issues",
+    "defects",
+    "requirements",
+    "plan",
+    "testing",
+    "changes",
+    "index",
+    "monitoring",
+    "risks"
+  ],
+  "evidence": [
+    {
+      "kind": "trial",
+      "ref": "5591c9ae-2c76-4810-b6dd-46031d05e61e",
+      "result": "pass",
+      "summary": "真实kimi-k3，VB.2，252输出Tokens，11458ms，0工具"
+    },
+    {
+      "kind": "trial",
+      "ref": "9427d4c8-0ff1-4109-93a3-d5493cbe06be",
+      "result": "failed-preserved",
+      "summary": "原expected精确比较失败，历史保留"
+    },
+    {
+      "kind": "offline",
+      "ref": "stored-output-replay",
+      "result": "pass",
+      "summary": "原输出补断言通过，6组错误反例仍失败"
+    },
+    {
+      "kind": "screenshot",
+      "ref": "/Users/kevin/.codex/visualizations/2026/11/02/01a19a18-92f8-7bf1-b70c-df3fd911608f/wes-skill-original-model-pass.png",
+      "summary": "3006显示新证明通过、旧证明过期、未发布"
+    }
+  ],
+  "configurationEvidence": {
+    "skillId": "767c8165-961a-40be-baca-b1f5029a6574",
+    "versionCode": "SK-767c8165-VB.2",
+    "revision": 13,
+    "definitionHash": "542a2cc4664caab7144a6e8d80a739260f5af9be8fdbd402619e3d71c9d90a21",
+    "onlyChange": "examples[0].assertions",
+    "assertions": [
+      {
+        "op": "equals",
+        "path": "$.requirements.length",
+        "value": 2
+      },
+      {
+        "op": "equals",
+        "path": "$.requirements.0.id",
+        "value": "REQ-001"
+      },
+      {
+        "op": "equals",
+        "path": "$.requirements.1.id",
+        "value": "REQ-002"
+      },
+      {
+        "op": "equals",
+        "path": "$.requirements.0.sourceText",
+        "value": "销售主管需要按客户查询订单"
+      },
+      {
+        "op": "equals",
+        "path": "$.requirements.1.sourceText",
+        "value": "并将查询结果导出为 Excel"
+      },
+      {
+        "op": "contains",
+        "path": "$.requirements.0.title",
+        "value": "客户"
+      },
+      {
+        "op": "contains",
+        "path": "$.requirements.0.title",
+        "value": "查询"
+      },
+      {
+        "op": "contains",
+        "path": "$.requirements.1.title",
+        "value": "导出"
+      },
+      {
+        "op": "contains",
+        "path": "$.requirements.0.description",
+        "value": "销售主管"
+      },
+      {
+        "op": "contains",
+        "path": "$.requirements.0.description",
+        "value": "订单"
+      },
+      {
+        "op": "contains",
+        "path": "$.requirements.1.description",
+        "value": "导出"
+      },
+      {
+        "op": "contains",
+        "path": "$.requirements.1.description",
+        "value": "Excel"
+      },
+      {
+        "op": "minItems",
+        "path": "$.requirements.1.openQuestions",
+        "value": 1
+      }
+    ],
+    "activeVersionId": null,
+    "checkoutStatus": "checked_in",
+    "releaseReviewCount": 0,
+    "releaseEventCount": 0,
+    "runs": [
+      {
+        "id": "9427d4c8-0ff1-4109-93a3-d5493cbe06be",
+        "hash": "01967ce0de545964992b62c1e8060950fb0e4a4f4b362a592226899e80e8dfd5",
+        "mode": "model",
+        "modelExecuted": true,
+        "passed": false,
+        "cases": [
+          {
+            "title": "混合需求拆成查询与导出两个条目",
+            "passed": false,
+            "failures": [
+              {
+                "code": "BUSINESS_ASSERTION_FAILED",
+                "category": "assertion"
+              }
+            ]
+          }
+        ],
+        "usage": {
+          "elapsedMs": 13986,
+          "toolCalls": 0,
+          "outputTokens": 240,
+          "modelAttempts": 1
+        }
+      },
+      {
+        "id": "5591c9ae-2c76-4810-b6dd-46031d05e61e",
+        "hash": "542a2cc4664caab7144a6e8d80a739260f5af9be8fdbd402619e3d71c9d90a21",
+        "mode": "model",
+        "modelExecuted": true,
+        "passed": true,
+        "cases": [
+          {
+            "title": "混合需求拆成查询与导出两个条目",
+            "passed": true,
+            "failures": []
+          }
+        ],
+        "usage": {
+          "elapsedMs": 11458,
+          "toolCalls": 0,
+          "outputTokens": 252,
+          "modelAttempts": 1
+        }
+      }
+    ],
+    "counterexamplesRejected": [
+      "missingExport",
+      "fabricatedSource",
+      "wrongId",
+      "mergedAction",
+      "missingExcel",
+      "missingClarification"
+    ]
+  },
+  "issueId": "ISS-2026-11-02-007",
+  "defectId": "DEF-2026-11-02-004",
+  "boundaries": [
+    "仅预览原Skill样例断言配置",
+    "未修改代码、模型凭据或通用比较语义",
+    "未复核发布、未合入主线、未推送",
+    "B待用户验收，C/D未启动"
+  ],
+  "next": "用户在3006刷新，检查VB.2真实试运行证据并继续手动验收。"
+}

@@ -1,0 +1,62 @@
+{
+  "id": "BE-2026-11-02-kimi-k3-real-trial",
+  "date": "2026-11-02",
+  "type": "verification",
+  "scope": "ISS-2026-11-02-005 / DEF-2026-11-02-003 / RP-050",
+  "summary": "Kimi凭据已有效，修复K3采样参数兼容后真实需求拆解试运行通过；按用户决定保持未审核未发布",
+  "status": "真实试运行通过 / 发布暂缓",
+  "pages": [
+    "index",
+    "issues",
+    "requirements",
+    "plan",
+    "testing",
+    "monitoring",
+    "risks",
+    "changes"
+  ],
+  "additionalBoardPages": [
+    "defects"
+  ],
+  "source": {
+    "raw": "kimi供应商已经配置好了",
+    "dedup": "命中ISS-2026-11-02-005并扩展证据，派生DEF-2026-11-02-003，不新增RP"
+  },
+  "evidence": [
+    {
+      "kind": "git",
+      "ref": "4f19ea2",
+      "summary": "仅精确kimi-k3省略不兼容temperature；普通/流式/模型验证共用规则，保留其他模型行为"
+    },
+    {
+      "kind": "api",
+      "ref": "/tmp/wes-kimi-config-probe-safe.log",
+      "result": "models200;temperature400;omitted200",
+      "summary": "只读预览配置诊断，不记录密钥或原始供应商响应；同模型省略temperature返回200"
+    },
+    {
+      "kind": "command",
+      "ref": "/tmp/wes-kimi-k3-{red,green,modules,agent,ai,build}.log",
+      "result": "RED3fail;GREEN21;modules685;Agent242;AI286;APIbuild pass",
+      "summary": "GREEN及回归零失败零跳过；独立复核及301项差分断言通过，未改变其他模型和请求预算"
+    },
+    {
+      "kind": "runtime",
+      "ref": "c77ae071-9207-445b-9263-81bb1aee2154",
+      "result": "modelExecuted=true;passed=true;releaseEligible=true",
+      "summary": "实际kimi-k3，需求拆为查询与Excel导出两条；1次模型调用、22输出Tokens、2366ms、无工具调用，结果已入库"
+    },
+    {
+      "kind": "screenshot",
+      "ref": "/Users/kevin/.codex/visualizations/2026/11/02/01a19a18-92f8-7bf1-b70c-df3fd911608f/wes-kimi-skill-real-pass.png",
+      "summary": "实际浏览器通过结果已打开核查，发布门槛仍需复核"
+    },
+    {
+      "kind": "database",
+      "ref": "workload_eval_skills_preview_20261102只读核对",
+      "result": "activeSkills=0",
+      "summary": "仅新增独立验收样例测试证明，未编辑用户原样例；未审核、未发布、未进入C"
+    }
+  ],
+  "next": "用户继续验收真实拆解结果；按此前决定保持发布关闭，审核发布/回滚及固定Skill流程补验待另行确认"
+}

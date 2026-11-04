@@ -356,8 +356,7 @@ input, button, select, textarea { font-family: inherit; }
 }
 
 .ai-home-workbench {
-  grid-template-columns: 260px minmax(0, 1fr) 300px;
-  transition: grid-template-columns 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  grid-template-columns: 260px minmax(0, 1fr);
 }
 
 .sr-only {
@@ -370,10 +369,6 @@ input, button, select, textarea { font-family: inherit; }
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
-}
-
-.ai-home-workbench--inspector-collapsed {
-  grid-template-columns: 260px minmax(0, 1fr) 44px;
 }
 
 /* RP-047 Batch D（Step 5）：SessionRail 会话运行状态七态徽标（文本+图标+颜色三通道） */
@@ -695,7 +690,7 @@ input, button, select, textarea { font-family: inherit; }
 
 @media (max-width: 1180px) {
   .ai-home-workbench {
-    grid-template-columns: minmax(0, 1fr) 300px;
+    grid-template-columns: minmax(0, 1fr);
     height: auto !important;
     overflow: auto !important;
   }
@@ -705,9 +700,6 @@ input, button, select, textarea { font-family: inherit; }
     overflow: visible !important;
   }
 
-  .ai-home-workbench--inspector-collapsed {
-    grid-template-columns: minmax(0, 1fr) 44px;
-  }
 }
 
 @media (max-width: 760px) {

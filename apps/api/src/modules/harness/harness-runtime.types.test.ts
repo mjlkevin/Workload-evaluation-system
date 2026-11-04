@@ -23,6 +23,39 @@ import {
 } from "./harness-runtime.types";
 import { HARNESS_RUN_STATUSES } from "./harness.types";
 
+
+const workflowWaitEvents = ['workflow.awaiting_input', 'workflow.awaiting_confirmation', 'workflow.answer_recorded'] as const;
+// Historical guards still freeze all 25 old slots; exclude only these three declared additions.
+const legacyEventTypes = HARNESS_RUN_EVENT_TYPES.filter(type => !(workflowWaitEvents as readonly string[]).includes(type));
+const legacyFrozen25 = [
+  'run_queued', 'run_claimed', 'run_status_changed', 'checkpoint_committed', 'output_updated',
+  'outbox_enqueued', 'cancel_requested', 'run_completed', 'run_failed', 'recovery_started',
+  'recovery_completed', 'run_cancelled', 'run_inputs_submitted', 'run_action_confirmed',
+  'text.delta', 'thought', 'tool.call.started', 'tool.call.progress', 'tool.call.completed',
+  'tool.call.failed', 'tool.call.awaiting_approval', 'tool.call.rejected', 'tool.call.awaiting_input',
+  'user/message', 'assistant/message',
+];
+function assertWorkflowWaitVocabulary(events: readonly string[]) {
+  assert.equal(events.length, 28, 'C2c.1 adds exactly three events to the frozen legacy 25');
+  assert.deepEqual(events.slice(0, 25), legacyFrozen25, 'legacy event slots must remain unchanged');
+  assert.deepEqual(events.slice(25), workflowWaitEvents, 'Workflow wait events must be appended in the declared order');
+  assert.equal(new Set(events).size, 28, 'all event names must be unique');
+  assert.deepEqual(events.filter(type => type.startsWith('workflow.')), workflowWaitEvents);
+}
+test('C2c.1 freezes exact 28 event vocabulary with unchanged legacy prefix and three appended names', () => {
+  assertWorkflowWaitVocabulary(HARNESS_RUN_EVENT_TYPES);
+  assert.deepEqual(legacyEventTypes, legacyFrozen25);
+});
+test('C2c.1 vocabulary guard rejects removed, renamed, duplicated or unknown event names', () => {
+  const valid = [...legacyFrozen25, ...workflowWaitEvents];
+  for (const name of workflowWaitEvents) {
+    assert.throws(() => assertWorkflowWaitVocabulary(valid.filter(type => type !== name)));
+    assert.throws(() => assertWorkflowWaitVocabulary(valid.map(type => type === name ? 'workflow.unknown' : type)));
+  }
+  assert.throws(() => assertWorkflowWaitVocabulary([...valid, 'workflow.unknown']));
+  assert.throws(() => assertWorkflowWaitVocabulary([...valid.slice(0, -1), valid[25]]));
+});
+
 test("durable run states distinguish active and terminal lifecycles", () => {
   assert.deepEqual(HARNESS_RUN_STATUSES, [
     "queued",
@@ -82,7 +115,7 @@ test("Batch B adds recovery and cancellation event types additively (E1)", () =>
   assert.ok((HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("recovery_completed"));
   assert.ok((HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("run_cancelled"));
   assert.equal(
-    HARNESS_RUN_EVENT_TYPES.length,
+    legacyEventTypes.length,
     25,
     "Batch B 词汇 12 类 + Batch C/ISS-004/批次0.5/批次1a/批次9/批次2b-1 additive 追加 2+2+4+2+1+2 类 = 25",
   );
@@ -109,7 +142,7 @@ test("Batch C adds inputs and confirmation event types additively (E1)", () => {
   assert.ok((HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("run_inputs_submitted"));
   assert.ok((HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("run_action_confirmed"));
   assert.equal(
-    HARNESS_RUN_EVENT_TYPES.length,
+    legacyEventTypes.length,
     25,
     "Batch C + ISS-004/批次0.5/批次1a/批次9/批次2b-1 additive 追加 2+4+2+1+2 类事件 = 25",
   );
@@ -150,7 +183,7 @@ test("ISS-2026-08-10-004 adds streaming text.delta/thought event types additivel
   assert.ok((HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("text.delta"), "逐字流式事件类型必须入白名单");
   assert.ok((HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("thought"), "模型思考事件类型必须入白名单");
   assert.equal(
-    HARNESS_RUN_EVENT_TYPES.length,
+    legacyEventTypes.length,
     25,
     "ISS-004 之后的词汇 + 批次0.5/批次1a/批次9/批次2b-1 additive 追加 4+2+1+2 类（16 → 23 → 25）",
   );
@@ -193,7 +226,7 @@ test("批次0.5 adds tool.call.* event types additively", () => {
   assert.ok((HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("tool.call.progress"), "工具执行进度必须入白名单");
   assert.ok((HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("tool.call.completed"), "工具调用成功必须入白名单");
   assert.ok((HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("tool.call.failed"), "工具调用失败必须入白名单");
-  assert.equal(HARNESS_RUN_EVENT_TYPES.length, 25, "批次0.5 追加 4 类 + 批次1a 追加 2 类 + 批次9 追加 1 类 + 批次2b-1 追加 2 类（16 → 25）");
+  assert.equal(legacyEventTypes.length, 25, "批次0.5 追加 4 类 + 批次1a 追加 2 类 + 批次9 追加 1 类 + 批次2b-1 追加 2 类（16 → 25）");
 
   // 点号命名族必须恰好是这 7 条：不得夹带其他 tool.* 变体（防词汇漂移）。
   // 批次 0.5 登记 4 条，批次 1a（写操作审批闸门）additive 追加 2 条，
@@ -254,12 +287,12 @@ test("批次1a adds tool approval gate event types additively", () => {
     "tool.call.failed",
   ];
   assert.deepEqual(
-    [...HARNESS_RUN_EVENT_TYPES].slice(0, 20),
+    [...legacyEventTypes].slice(0, 20),
     preApprovalFrozen20,
     "前 20 类必须逐位不变——批次 1a 起不得重排、删除或改名既有词汇",
   );
   assert.deepEqual(
-    [...HARNESS_RUN_EVENT_TYPES].slice(20, 22),
+    [...legacyEventTypes].slice(20, 22),
     ["tool.call.awaiting_approval", "tool.call.rejected"],
     "本批新增的两类审批事件名与顺序必须精确一致（后续批次只能继续往后加，不得插入本批槽位）",
   );
@@ -275,7 +308,7 @@ test("批次1a adds tool approval gate event types additively", () => {
 
 test("批次9 adds the ask_user awaiting-input event type additively", () => {
   assert.deepEqual(
-    [...HARNESS_RUN_EVENT_TYPES].slice(0, 23),
+    [...legacyEventTypes].slice(0, 23),
     [
       "run_queued",
       "run_claimed",
@@ -325,17 +358,17 @@ test("批次9 adds the ask_user awaiting-input event type additively", () => {
 test("批次2b-1 adds the conversation-body event types additively", () => {
   // 批次 9 之前冻结的 22 类 + 批次 9 的 1 类，槽位不得被本批顶掉
   assert.deepEqual(
-    [...HARNESS_RUN_EVENT_TYPES].slice(22, 23),
+    [...legacyEventTypes].slice(22, 23),
     ["tool.call.awaiting_input"],
     "批次 9 的槽位必须仍在原位——本批只能往后加",
   );
   assert.deepEqual(
-    [...HARNESS_RUN_EVENT_TYPES].slice(23),
+    [...legacyEventTypes].slice(23),
     ["user/message", "assistant/message"],
     "本批新增的两类必须按「用户先、助手后」落在末位，名称精确一致",
   );
   assert.equal(
-    HARNESS_RUN_EVENT_TYPES.length,
+    legacyEventTypes.length,
     23 + 2,
     "批次 2b-1 只允许在批次 9 的 23 类之上 additive 追加 2 类",
   );

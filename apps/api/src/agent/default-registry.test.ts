@@ -4,6 +4,36 @@ import assert from "node:assert/strict";
 import { createDefaultRegistry } from "./default-registry";
 import type { AuthUser } from "../types";
 import type { Capability } from "../rbac/permissions";
+import { permittedSkillTools, skillToolContract } from "../modules/skills/skills.context";
+import { skillDefinitionHash } from "../modules/skills/skills.hash";
+import { buildSandboxTool } from "./tools/sandbox.tools";
+import { toToolDefinition } from "./agent.types";
+import { KimiProvider } from "../ai/provider/kimi-provider";
+
+test("sandbox enums reach the Kimi request with explicit string types and unchanged allowed values", async () => {
+  const originalFetch = globalThis.fetch;
+  let requests = 0;
+  globalThis.fetch = async (_url, init) => {
+    requests++;
+    const body = JSON.parse(String(init?.body));
+    const parameters = body.tools.find((tool: any) => tool.function.name === "sandbox_execute").function.parameters;
+    assert.equal(parameters.properties.language.type, "string");
+    assert.deepEqual(parameters.properties.language.enum, ["python", "node"]);
+    const format = parameters.properties.outputs.items.properties.format;
+    assert.equal(format.type, "string");
+    assert.deepEqual(format.enum, ["html", "docx", "xlsx"]);
+    return new Response(JSON.stringify({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] }), { status: 200 });
+  };
+  try {
+    await new KimiProvider({ apiKey: "test-key" }).chatCompletion({
+      messages: [{ role: "user", content: "生成HTML报告" }],
+      tools: [toToolDefinition(buildSandboxTool())],
+    });
+    assert.equal(requests, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 
 const fakeUser: AuthUser = {
   id: "u-test",
@@ -15,7 +45,7 @@ const fakeUser: AuthUser = {
   lastLoginAt: "2026-01-01T00:00:00.000Z",
 };
 
-/** 全能力位视图（覆盖全部 8 个工具所需能力位） */
+/** 全能力位视图（覆盖全部代码工具所需能力位） */
 const FULL_CAPS: Capability[] = ["estimates:read", "estimates:create", "estimates:write"];
 
 function visibleNames(registry: ReturnType<typeof createDefaultRegistry>, caps: Capability[]): string[] {
@@ -25,11 +55,11 @@ function visibleNames(registry: ReturnType<typeof createDefaultRegistry>, caps: 
     .sort();
 }
 
-test("createDefaultRegistry: 注册数 ≥11 且工具名单快照（含内置 list_tools）", () => {
+test("createDefaultRegistry: 普通会话保留 11 个工具快照（含内置 list_tools）", () => {
   const registry = createDefaultRegistry(fakeUser);
   const names = visibleNames(registry, FULL_CAPS);
 
-  assert.ok(names.length >= 11, `注册数应 ≥11，实际 ${names.length}`);
+  assert.equal(names.length, 11);
   assert.deepEqual(names, [
     "ask_user",
     "create_project",
@@ -49,7 +79,7 @@ test("createDefaultRegistry: 注册数 ≥11 且工具名单快照（含内置 l
 test("createDefaultRegistry: 能力位 → 工具映射快照", () => {
   const registry = createDefaultRegistry(fakeUser);
 
-  // estimates:read：4 个查询工具 + 批次 4 的能力清单 + 批次 9 的 ask_user + 内置发现工具 list_tools
+  // estimates:read：原 7 个普通会话只读工具
   // （ask_user 用只读档是裁决：凡能用工作台的人都可被提问）
   assert.deepEqual(visibleNames(registry, ["estimates:read"]), [
     "ask_user",
@@ -102,7 +132,7 @@ test("MS3: 默认注册表含内置 list_tools（发现类，核心注入）", (
   assert.notEqual(tool.discoverable, true, "list_tools 本身应常驻核心注入集");
 });
 
-test("MS3: 全量回退注入与旧行为逐字节一致（原 8 工具、原顺序、无 list_tools；批次 9 起末尾追加 ask_user）", () => {
+test("MS3: 全量注入保留原 10 工具名单和顺序", () => {
   const registry = createDefaultRegistry(fakeUser);
   const names = registry
     .listFullToolsFor({ id: fakeUser.id, capabilities: FULL_CAPS })
@@ -384,4 +414,36 @@ test("批次4·describe_capabilities：可经 list_tools 按意图发现", async
     { id: fakeUser.id, capabilities: FULL_CAPS },
   )) as { tools: Array<{ name: string }> };
   assert.ok(found.tools.map((t) => t.name).includes("describe_capabilities"), `实取 ${JSON.stringify(found.tools)}`);
+});
+
+
+test("MVP contracts remain in the raw catalog while every conversation discovery surface excludes them", async () => {
+  const registry = createDefaultRegistry(fakeUser);
+  const user = { id: fakeUser.id, capabilities: FULL_CAPS };
+  const businessNames = ["requirement_sources", "requirement_normalize", "requirement_clarify", "requirement_confirm",
+    "assessment_catalog", "assessment_match_validate", "create_assessment_draft"];
+  assert.equal(registry.allTools().length, 18);
+  for (const name of businessNames) {
+    const tool = registry.get(name);
+    assert.ok(tool);
+    assert.equal(tool.businessExecutionOnly, true);
+    assert.ok(registry.allTools().includes(tool));
+  }
+  const skillTools = permittedSkillTools(registry.allTools(), { ...fakeUser, role: 'admin' }, { schemaVersion: 1, policies: {} });
+  assert.ok(businessNames.every(name => skillTools.some(tool => tool.name === name)));
+  for (const name of businessNames) {
+    const tool = registry.get(name)!;
+    const { businessExecutionOnly: _visibility, ...beforeVisibility } = tool;
+    const contract = skillToolContract(tool);
+    assert.deepEqual(contract, skillToolContract(beforeVisibility));
+    assert.equal(skillDefinitionHash(contract), skillDefinitionHash(skillToolContract(beforeVisibility)));
+  }
+  const manuals = await registry.execute("list_tools", {}, user) as { tools: Array<{ name: string }> };
+  assert.ok(manuals.tools.length > 0);
+  assert.ok(manuals.tools.every(tool => !businessNames.includes(tool.name)));
+  assert.deepEqual(registry.listDiscoveredToolDefinitionsFor(user, businessNames), []);
+  await assert.rejects(registry.execute("requirement_sources", {}, user),
+    (error: any) => error.code === "MVP_EXECUTION_PROOF_INVALID");
+  await assert.rejects(registry.execute("create_assessment_draft", {}, user),
+    (error: any) => error.code === "confirmedlocaladapterrequired");
 });

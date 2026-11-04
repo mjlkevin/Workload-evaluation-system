@@ -1,0 +1,134 @@
+{
+  "id": "BE-2026-11-02-skills-b-release-closure",
+  "date": "2026-11-02",
+  "type": "verification",
+  "scope": "RP-050 / ISS-2026-11-02-005 / DEF-2026-11-02-003",
+  "summary": "真实Kimi样例复核发布VB.0，升版重测发布VC.1后回滚VB.0；流程固定VB.0未变，刷新持久化及权限定向11项通过。B技术验证齐备，待用户最终验收；C/D未启动，主线未合入或推送。",
+  "status": "B技术验证完成 / 待用户最终验收",
+  "pages": [
+    "index",
+    "requirements",
+    "plan",
+    "testing",
+    "monitoring",
+    "risks",
+    "changes"
+  ],
+  "additionalBoardPages": [
+    "issues",
+    "defects"
+  ],
+  "source": {
+    "raw": "进入下一步",
+    "decision": "继续隔离预览中的发布及回滚补验；不代表远端推送或MVP验收"
+  },
+  "evidence": [
+    {
+      "kind": "runtime",
+      "ref": "a6f8f7ee-6ab7-4834-8417-7a051bbf5773",
+      "result": "kimi-k3;modelExecuted=true;passed=true;21outputTokens;3682ms;0tools",
+      "summary": "新版本修改指令后重新真实试运行，旧证明不被复用"
+    },
+    {
+      "kind": "database",
+      "ref": "workload_eval_skills_preview_20261102",
+      "result": {
+        "guard": {
+          "db": "workload_eval_skills_preview_20261102",
+          "read_only": "on"
+        },
+        "catalog": {
+          "allowedRoleCount": 1,
+          "disallowedRoleCount": 0,
+          "versionCode": "SK-729a4d0e-VB.0",
+          "safeProjection": true,
+          "layer": "service + live readonly PG; not browser nonadmin sign-in"
+        },
+        "versions": [
+          {
+            "version_code": "SK-729a4d0e-VA.1",
+            "status": "draft",
+            "checkout_status": "checked_in",
+            "hash": "261527a8e41f070d999cc7ee30a3eea1f49264237a19a858f7479206d1f984c5"
+          },
+          {
+            "version_code": "SK-729a4d0e-VB.0",
+            "status": "published",
+            "checkout_status": "checked_in",
+            "hash": "261527a8e41f070d999cc7ee30a3eea1f49264237a19a858f7479206d1f984c5"
+          },
+          {
+            "version_code": "SK-729a4d0e-VC.1",
+            "status": "published",
+            "checkout_status": "checked_in",
+            "hash": "989ede8fa927e0bad5354912aae1dc814b736ac7b833b4d8dd9806fd60fe429d"
+          }
+        ],
+        "releases": [
+          {
+            "kind": "publish",
+            "version_id": "fd1af881-5689-4c81-b322-cf3b4bb30ab1",
+            "previous_version_id": null,
+            "created_at": "2026-11-02T07:25:55.004Z"
+          },
+          {
+            "kind": "publish",
+            "version_id": "f17fa780-bed4-4b66-9103-a02bf47f8c99",
+            "previous_version_id": "fd1af881-5689-4c81-b322-cf3b4bb30ab1",
+            "created_at": "2026-11-02T07:29:27.761Z"
+          },
+          {
+            "kind": "rollback",
+            "version_id": "fd1af881-5689-4c81-b322-cf3b4bb30ab1",
+            "previous_version_id": "f17fa780-bed4-4b66-9103-a02bf47f8c99",
+            "created_at": "2026-11-02T07:30:02.537Z"
+          }
+        ],
+        "workflows": [
+          {
+            "workflow_id": "2f075c2e-bbc8-41aa-9508-4c88a60469cb",
+            "name": "B批验收_固定需求拆解版本流程",
+            "version_code": "WF-2f075c2e-VA.0",
+            "status": "published",
+            "frozen_skill_version": "fd1af881-5689-4c81-b322-cf3b4bb30ab1",
+            "reference_table_skill": "fd1af881-5689-4c81-b322-cf3b4bb30ab1"
+          }
+        ],
+        "original": {
+          "revision": 8,
+          "version_code": "SK-767c8165-VB.1",
+          "active_version_id": null
+        },
+        "checkedAt": "2026-11-02T07:34:11.426Z"
+      },
+      "summary": "只读核对版本、发布事件、固定依赖和目录角色过滤；无普通用户浏览器登录声明"
+    },
+    {
+      "kind": "command",
+      "ref": "/tmp/wes-b-release-acceptance-focused.log",
+      "result": "11/11;0failed;0skipped",
+      "summary": "发布与目录服务、JWT管理边界和伪造证明防护定向检查，使用专用测试库"
+    },
+    {
+      "kind": "screenshot",
+      "ref": "/Users/kevin/.codex/visualizations/2026/11/02/01a19a18-92f8-7bf1-b70c-df3fd911608f/wes-b-skill-rollback-persisted.png",
+      "summary": "回滚及三条审计刷新后保留"
+    },
+    {
+      "kind": "screenshot",
+      "ref": "/Users/kevin/.codex/visualizations/2026/11/02/01a19a18-92f8-7bf1-b70c-df3fd911608f/wes-b-workflow-fixed-persisted.png",
+      "summary": "已发布流程固定VB.0快照保留；仅配置，未执行业务"
+    },
+    {
+      "kind": "screenshot",
+      "ref": "/Users/kevin/.codex/visualizations/2026/11/02/01a19a18-92f8-7bf1-b70c-df3fd911608f/wes-b-skill-rollback-760.png",
+      "summary": "760px页面及弹窗无横向溢出；Workflow同尺寸已核对"
+    },
+    {
+      "kind": "screenshot",
+      "ref": "/Users/kevin/.codex/visualizations/2026/11/02/01a19a18-92f8-7bf1-b70c-df3fd911608f/wes-b-release-closure.png",
+      "summary": "刷新后当前工作VC.1、生效VB.0及真实试运行通过可见"
+    }
+  ],
+  "next": "用户最终验收B；后续C工作台调用、快照与恢复，D业务MVP均未开始；候选未合入或推送"
+}

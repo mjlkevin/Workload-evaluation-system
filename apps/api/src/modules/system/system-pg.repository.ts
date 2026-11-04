@@ -146,6 +146,20 @@ export interface SystemPgRepository extends SystemStoreRepository {
   __dbForTest(): Database;
 }
 
+export async function readVersionCodeRules(dbInstance: Pick<Database, "select">): Promise<VersionCodeRulesStore> {
+  try {
+    // JSON 数组顺序对 UI 可见：必须按 sort_order 读取（ruleId 兜底确定性）
+    const rows = await dbInstance
+      .select()
+      .from(versionCodeRules)
+      .orderBy(asc(versionCodeRules.sortOrder), asc(versionCodeRules.ruleId));
+    return { rules: rows.map(toRule) };
+  } catch (err) {
+    throw toSafeError(err);
+  }
+}
+
+
 export function createSystemPgRepository(dbInstance: Database = db): SystemPgRepository {
   async function loadConfigRow(configKey: string) {
     const [row] = await dbInstance
@@ -177,18 +191,7 @@ export function createSystemPgRepository(dbInstance: Database = db): SystemPgRep
 
     // ── version_code_rules：行式表，sort_order 保序 ──
 
-    async loadVersionCodeRulesStore() {
-      try {
-        // JSON 数组顺序对 UI 可见：必须按 sort_order 读取（ruleId 兜底确定性）
-        const rows = await dbInstance
-          .select()
-          .from(versionCodeRules)
-          .orderBy(asc(versionCodeRules.sortOrder), asc(versionCodeRules.ruleId));
-        return { rules: rows.map(toRule) };
-      } catch (err) {
-        throw toSafeError(err);
-      }
-    },
+    loadVersionCodeRulesStore: () => readVersionCodeRules(dbInstance),
 
     async saveVersionCodeRulesStore(store) {
       try {

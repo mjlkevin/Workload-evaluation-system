@@ -115,11 +115,12 @@ export class KimiProvider implements ModelProvider {
       });
     }
 
-    const model = normalizeKimiModelName(asString(req.model) || this.defaultModel);
+    if (req.frozenExecution && (typeof req.model !== 'string' || !req.model.trim())) throw new Error('FROZEN_MODEL_REQUIRED');
+    const model = req.frozenExecution ? req.model! : normalizeKimiModelName(asString(req.model) || this.defaultModel);
     const preferredTemperature =
       typeof req.temperature === "number" && Number.isFinite(req.temperature) ? req.temperature : 0.3;
     const timeoutMs = clampTimeout(req.timeoutMs ?? this.defaultTimeoutMs);
-    const maxAttempts = resolveMaxAttempts(req.maxAttempts, this.defaultMaxAttempts);
+    const maxAttempts = req.frozenExecution ? 1 : resolveMaxAttempts(req.maxAttempts, this.defaultMaxAttempts);
 
     let body: Record<string, unknown> = {
       model,
@@ -152,13 +153,13 @@ export class KimiProvider implements ModelProvider {
       }
       const response = responseOrRetryableError;
       if (response.ok) {
-        const result = await parseSuccess(response, model, attempts);
+        const result = await parseSuccess(response, model, attempts, req.frozenExecution);
         aiProviderRequestsTotal.inc({ provider: PROVIDER_NAME, status: "success" });
         return result;
       }
 
       let errorText = await safeReadText(response);
-      if (isKimiTemperatureMustBeOneError(response.status, errorText) && Number(body.temperature) !== 1) {
+      if (!req.frozenExecution && isKimiTemperatureMustBeOneError(response.status, errorText) && Number(body.temperature) !== 1) {
         body = { ...body, temperature: 1 };
         const retriedOrRetryableError = await fetchAttemptOrRetryableError(
           credentials.endpoint,
@@ -209,6 +210,7 @@ export class KimiProvider implements ModelProvider {
   }
 
   private async *_streamChatCompletion(req: ChatCompletionRequest): AsyncIterable<ChatCompletionStreamChunk> {
+    if (req.frozenExecution) throw new Error('FROZEN_STREAM_UNSUPPORTED');
     const credentials = this.resolveCredentials(req.credentialsOverride);
     if (!credentials.apiKey) {
       throw new ProviderError("api_key_missing", "Kimi API Key 未配置", {
@@ -369,7 +371,7 @@ function applyCommonKimiOptions(
   model: string,
   preferredTemperature: number,
 ): void {
-  const temperature = resolveKimiCompletionTemperatureParam(model, preferredTemperature);
+  const temperature = req.frozenExecution ? req.temperature : resolveKimiCompletionTemperatureParam(model, preferredTemperature);
   if (temperature !== undefined) body.temperature = temperature;
 
   const maxCompletionTokens = normalizePositiveInteger(req.maxCompletionTokens);
@@ -509,11 +511,12 @@ async function parseSuccess(
   response: globalThis.Response,
   model: string,
   attempts: number,
+  frozenExecution = false,
 ): Promise<ChatCompletionResponse> {
   const json = (await response.json()) as { choices?: RawChoice[]; usage?: RawUsage };
   const choice = json?.choices?.[0] ?? {};
-  const { content, toolCalls, finishReason, reasoningContent } = parseChoiceMessage(choice);
-  if (!content && !reasoningContent && (!toolCalls || toolCalls.length === 0)) {
+  const { content, toolCalls, finishReason, reasoningContent } = parseChoiceMessage(choice, frozenExecution);
+  if (!frozenExecution && !content && !reasoningContent && (!toolCalls || toolCalls.length === 0)) {
     throw new ProviderError("empty_response", "model_empty_response", {
       providerName: PROVIDER_NAME,
       retryable: false,
@@ -529,8 +532,13 @@ async function parseSuccess(
     finishReason,
     toolCalls,
     reasoningContent,
-    usage: extractUsage(json?.usage),
+    usage: frozenExecution ? { promptTokens: 0, totalTokens: 0, completionTokens: typeof json?.usage?.completion_tokens === 'number' ? json.usage.completion_tokens : NaN } : extractUsage(json?.usage),
   };
+}
+
+// SSE 文本和工具参数按原样拼接；逐片 trim 会破坏词间空格与代码缩进。
+function asStreamFragment(value: unknown): string {
+  return typeof value === "string" ? value : "";
 }
 
 async function* parseStream(
@@ -624,8 +632,8 @@ async function* parseStream(
             continue;
           }
           const choice = json.choices?.[0];
-          const delta = asString(choice?.delta?.content || choice?.message?.content);
-          const reasoningDelta = asString(
+          const delta = asStreamFragment(choice?.delta?.content || choice?.message?.content);
+          const reasoningDelta = asStreamFragment(
             choice?.delta?.reasoning_content ||
               choice?.delta?.reasoningContent ||
               choice?.message?.reasoning_content ||
@@ -637,7 +645,7 @@ async function* parseStream(
             toolCallParts.set(key, {
               id: prev.id || asString(frag?.id) || undefined,
               name: prev.name || asString(frag?.function?.name) || undefined,
-              arguments: prev.arguments + asString(frag?.function?.arguments),
+              arguments: prev.arguments + asStreamFragment(frag?.function?.arguments),
             });
           }
           finishReason = asString(choice?.finish_reason) || finishReason;
@@ -762,7 +770,7 @@ function parseToolArguments(raw: string | undefined): Record<string, unknown> {
 }
 
 /** 纯函数：把厂商 choice 解析为 { content, toolCalls, finishReason, reasoningContent } */
-export function parseChoiceMessage(choice: RawChoice): {
+export function parseChoiceMessage(choice: RawChoice, frozenExecution = false): {
   content: string;
   toolCalls?: ToolCall[];
   finishReason?: string;
@@ -775,13 +783,24 @@ export function parseChoiceMessage(choice: RawChoice): {
   ) || undefined;
   const finishReason = asString(choice?.finish_reason) || undefined;
   const rawCalls = choice?.message?.tool_calls;
+  if (frozenExecution && rawCalls !== undefined && !Array.isArray(rawCalls)) return { content, reasoningContent, finishReason,
+    toolCalls: [{ id: '', name: '', arguments: undefined as unknown as Record<string, unknown> }] };
   if (!Array.isArray(rawCalls) || rawCalls.length === 0) {
     return { content, reasoningContent, finishReason };
   }
   const toolCalls: ToolCall[] = rawCalls.map((c, i) => ({
-    id: asString(c?.id) || `call_${i}`,
-    name: asString(c?.function?.name),
-    arguments: parseToolArguments(c?.function?.arguments),
+    // Missing type is tolerated for compatible suppliers; an explicit different type
+    // must not be normalized into a valid function call by dropping its discriminator.
+    id: frozenExecution ? (c?.type !== undefined && c.type !== 'function' ? '' : c?.id ?? '') : asString(c?.id) || `call_${i}`,
+    name: frozenExecution ? (c?.function?.name ?? '') : asString(c?.function?.name),
+    arguments: frozenExecution ? strictToolArguments(c?.function?.arguments) : parseToolArguments(c?.function?.arguments),
   }));
   return { content, toolCalls, finishReason, reasoningContent };
+}
+/** Preserve malformed native payload as invalid rather than silently granting an empty-argument call. */
+function strictToolArguments(raw: unknown): Record<string, unknown> {
+  try { const value = typeof raw === 'string' ? JSON.parse(raw) : undefined;
+    if (value && typeof value === 'object' && !Array.isArray(value)) return value;
+  } catch { /* Validation in the execution loop reports a fixed code and retains received usage. */ }
+  return undefined as unknown as Record<string, unknown>;
 }

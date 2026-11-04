@@ -1,0 +1,56 @@
+import assert from 'node:assert/strict';
+import { before, after, test } from 'node:test';
+import { randomUUID } from 'node:crypto';
+import { eq } from 'drizzle-orm';
+import { Pool } from 'pg';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import * as schema from '../../db/schema';
+import { closeDb } from '../../db/client';
+import { resolveExecutionTestDatabaseUrl } from '../../test-helpers/execution-database-guard';
+import { createSkillConversationRepository } from './skills.conversation.repository';
+import { createSkillsPgRepository } from './skills-pg.repository';
+import { getAiSession } from '../ai-sessions/ai-sessions.usecase';
+import type { AuthUser } from '../../types';
+import type { SkillDefinition } from './skills.types';
+const pool = new Pool({ connectionString: resolveExecutionTestDatabaseUrl(process.env),max: 2 });
+const database = drizzle(pool,{schema});
+const user = {id:randomUUID(),username:`skill-chat-${randomUUID()}`,role:'admin',businessRole:'pre_sales',status:'active'} as AuthUser;
+const other = {...user,id:randomUUID(),username:`skill-chat-${randomUUID()}`};
+let sessionId: string, request: any, root: any;
+const definition: SkillDefinition = {name:'拆解',description:'拆分业务需求',category:'fixture',instructions:'拆分原文',roles:['pre_sales'],inputSchema:{type:'object'},outputSchema:{type:'object'},references:[],tools:[],examples:[],model:{scenario:'generation',temperature:0,maxTokens:100,timeoutMs:1000}};
+const repository = createSkillConversationRepository(database,{catalog:{list:async()=>[{...request.selection,name:'拆解',description:'拆分业务需求',inputSchema:definition.inputSchema}]}});
+before(async()=>{
+ for(const u of [user,other]) await database.insert(schema.users).values({userId:u.id,username:u.username,role:u.role,businessRole:'pre_sales',status:'active',passwordHash:randomUUID(),createdAt:new Date()});
+ root=await createSkillsPgRepository(database).create(definition,{id:user.id,username:user.username});
+ root=await createSkillsPgRepository(database).mutate(root.skillId,root.revision,{id:user.id,username:user.username},'publish',r=>{r.versions[0].status='published';r.activeVersionId=r.currentVersionId});
+ sessionId=randomUUID();await database.insert(schema.aiSessions).values({sessionId,ownerUserId:user.id,ownerUsername:user.username,title:'技能对话',domain:'business_evaluation',workflowKey:'free_chat',businessRole:'pre_sales',status:'temporary_chat',summary:'',messages:[],attachments:[],artifacts:[],pendingActions:[],linkedRecords:{},createdAt:new Date(),updatedAt:new Date()});
+ request={submissionKey:'first',content:'这个技能能做什么？',selection:{kind:'skill',id:root.skillId,versionId:root.currentVersionId},sources:[]};
+});
+after(async()=>{await database.delete(schema.harnessRuns).where(eq(schema.harnessRuns.ownerUserId,user.id));for(const u of [user,other]){await database.delete(schema.aiSessions).where(eq(schema.aiSessions.ownerUserId,u.id));await database.delete(schema.users).where(eq(schema.users.userId,u.id));}await pool.end();await closeDb()});
+test('对话成对原子保存，并发重放不重复，刷新经统一历史恢复',async()=>{
+ const context=await repository.read(user,sessionId,request,'fingerprint');
+ const reply={action:'clarify' as const,message:'请给出原始需求。'};
+ await Promise.all([repository.saveReply(user,sessionId,request,'fingerprint',context,reply,'model'),repository.saveReply(user,sessionId,request,'fingerprint',context,reply,'model')]);
+ const stored=await getAiSession(user,sessionId);assert.equal(stored?.messages.length,2);assert.equal(stored?.messages[0].content,request.content);assert.equal(stored?.messages[1].content,reply.message);
+ assert.deepEqual((await repository.read(user,sessionId,request,'fingerprint')).existing,reply);
+ const next=await repository.read(user,sessionId,{...request,submissionKey:'next',content:'销售查询订单'},'next');assert.equal(next.history.length,2);
+ assert.equal((stored?.messages[1].metadata?.skillConversation as any).selection.id,root.skillId);
+ assert.equal((await database.select().from(schema.harnessRuns).where(eq(schema.harnessRuns.aiSessionId,sessionId))).length,0);
+});
+test('相同提交键不同内容拒绝，不覆盖历史',async()=>{await assert.rejects(repository.read(user,sessionId,request,'different'),/变化/)});
+test('其他用户不可读取会话、保存答复或获取材料',async()=>{await assert.rejects(repository.read(other,sessionId,request,'fingerprint'),/不存在/);const context=await repository.read(user,sessionId,request,'fingerprint');await assert.rejects(repository.saveReply(other,sessionId,request,'fingerprint',context,{action:'reply',message:'x'},'model'),/不存在/)});
+test('执行用户消息从已落库事实幂等投影，混合历史不丢正文',async()=>{
+ const runId=randomUUID(),messageId=randomUUID();
+ await database.insert(schema.harnessRuns).values({harnessRunId:runId,ownerUserId:user.id,ownerUsername:user.username,mode:'interactive',stage:'completed',status:'completed',title:'original',aiSessionId:sessionId});
+ await database.insert(schema.harnessRunEvents).values({harnessRunEventId:randomUUID(),harnessRunId:runId,sequence:1,eventType:'user/message',payload:{messageId,role:'user',content:'补充的完整需求原文',createdAt:new Date().toISOString(),metadata:{projectionSource:{deduplicationKey:`${runId}:user:1`,runId,eventType:'user_message'}}}});
+ await repository.projectExecutionUser(user,sessionId,runId);await repository.projectExecutionUser(user,sessionId,runId);
+ const restored=await getAiSession(user,sessionId);assert.equal(restored?.messages.filter(m=>m.messageId===messageId).length,1);assert.equal(restored?.messages.at(-1)?.content,'补充的完整需求原文');
+ await assert.rejects(repository.projectExecutionUser(other,sessionId,runId),/不存在/);
+});
+test('会话变化和权限撤销均使迟到回复失效',async()=>{
+ const next={...request,submissionKey:'late'};const context=await repository.read(user,sessionId,next,'late');
+ await database.update(schema.aiSessions).set({messages:[]}).where(eq(schema.aiSessions.sessionId,sessionId));
+ await assert.rejects(repository.saveReply(user,sessionId,next,'late',context,{action:'reply',message:'late'},'model'),/变化/);
+ await database.update(schema.users).set({status:'disabled'}).where(eq(schema.users.userId,user.id));
+ await assert.rejects(repository.read(user,sessionId,next,'late'),/权限/);
+});

@@ -1,0 +1,1 @@
+ALTER TABLE "harness_sandbox_jobs" ADD COLUMN "execution" jsonb DEFAULT '{}'::jsonb NOT NULL;

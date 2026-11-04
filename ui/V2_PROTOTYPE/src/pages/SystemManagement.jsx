@@ -1,3 +1,5 @@
+import WorkflowsSection from './system/WorkflowsSection.jsx'
+import SkillsSection from './system/SkillsSection.jsx'
 import TestResultsSection from './system/TestResultsSection.jsx'
 import ModelConfigurationSection from './system/ModelConfigurationSection.jsx'
 import TemplatesSection from './system/TemplatesSection.jsx'
@@ -14,7 +16,6 @@ import MemoryManagementPanel from '../components/system/MemoryManagementPanel.js
 import AiToolInventoryPanel from '../components/system/AiToolInventoryPanel.jsx'
 import { SYSTEM_MANAGEMENT_SECTIONS, getSystemManagementSectionById } from '../config/systemManagementSections.js'
 import StateMachinesSection from './system/StateMachinesSection.jsx'
-import SystemManagementNav from './system/SystemManagementNav.jsx'
 import useSystemManagement from '../hooks/useSystemManagement.js'
 import { useToast } from '../hooks/useToast.jsx'
 
@@ -598,9 +599,7 @@ export default function SystemManagement({ sectionId }) {
         </button>,
       ]}
     >
-      <SystemManagementNav activeSection={activeSection} ruleCount={rules.length} />
-
-      <div className="min-w-0 pt-5">
+      <div className="min-w-0">
         {activeSectionId === 'rules' && (
           <CodeRulesSection rules={rules} loading={rulesLoading} error={rulesError} onRetry={actions.loadRules} actions={actions} actionLoading={actionLoading} />
         )}
@@ -703,6 +702,9 @@ export default function SystemManagement({ sectionId }) {
         {activeSectionId === 'memory' && (
           <MemoryManagementPanel />
         )}
+
+        {activeSectionId === 'workflows' && <WorkflowsSection />}
+        {activeSectionId === 'skills' && <SkillsSection />}
 
         {activeSectionId === 'tools' && (
           <AiToolInventoryPanel />

@@ -1,0 +1,152 @@
+{
+  "date": "2026-11-04",
+  "status": "本地实现并验证 / 待用户验收",
+  "branch": "codex/wes-skills-c",
+  "base": "b0c2030",
+  "issueIds": [
+    "ISS-2026-11-04-001",
+    "ISS-2026-11-04-002"
+  ],
+  "relatedRequirements": [
+    "RP-050",
+    "RP-056"
+  ],
+  "defectId": "DEF-2026-11-04-001",
+  "verification": {
+    "web": {
+      "files": 101,
+      "passed": 992,
+      "failed": 0
+    },
+    "modules": {
+      "passed": 1174,
+      "total": 1176,
+      "failed": 2,
+      "skipped": 0,
+      "failures": [
+        "late authority after cancel cannot prepare model",
+        "late post-prepare checker after cancel cannot complete model"
+      ]
+    },
+    "focused": {
+      "conversationUnit": 13,
+      "persistence": 5,
+      "routesWithRecommendationRegression": 7
+    },
+    "buildApi": "passed",
+    "buildWeb": "passed",
+    "uiScope": "No new deterministic UI findings",
+    "audit": {
+      "existing": {
+        "moderate": 32,
+        "high": 12,
+        "critical": 1
+      },
+      "dependenciesChanged": false
+    },
+    "secretScan": "既有skills.recommendations.test.ts:L187占位夹具被inline-secret规则命中；未修改该测试或豁免",
+    "earlierFailuresPreserved": [
+      "/tmp/wes-skill-chat-web-final.log（并发负载时5例超时；单独复跑990通过，最终气泡新增后991通过）",
+      "/tmp/wes-skill-chat-modules.log（初次含新测试未接CI守卫及5例时序失败；已接CI，最终剩2例）"
+    ],
+    "ai": {
+      "passed": 286,
+      "failed": 0,
+      "skipped": 0
+    },
+    "integration": {
+      "passed": 0,
+      "failed": 1,
+      "reason": "templates_status_not_200，既有活动模板环境缺口保留"
+    },
+    "invocationAndHttpRegression": {
+      "passed": 28,
+      "failed": 0
+    },
+    "finalConversationFocus": {
+      "passed": 21,
+      "failed": 0
+    }
+  },
+  "browser": {
+    "url": "http://127.0.0.1:3006/",
+    "api": "http://127.0.0.1:3004",
+    "sessionId": "e912ccd3-3157-4567-b414-30110176c537",
+    "user": "mjlkevin",
+    "model": "kimi-k3",
+    "cases": [
+      {
+        "input": "这个skill能做什么？",
+        "actual": "自然语言用途介绍，无需求明细结果，无新增任务"
+      },
+      {
+        "input": "帮我拆解一下",
+        "actual": "请提供需要拆解的原始文本内容，我会将其拆解为独立的需求条目。无新增任务"
+      },
+      {
+        "input": "销售主管需要按客户查询销售订单，并将查询结果导出为Excel。",
+        "runId": "497b9f1e-34c3-4f57-a55e-6a0829d89091",
+        "actual": [
+          "销售主管需要按客户查询销售订单",
+          "销售主管需要将查询结果导出为Excel"
+        ]
+      },
+      {
+        "input": "请拆解这段需求：仓库管理员按日期查询入库单，并将查询结果导出。",
+        "runId": "a3551a8f-c04a-431a-9ba1-78738bf23188",
+        "actual": [
+          "仓库管理员按日期查询入库单",
+          "仓库管理员将查询结果导出"
+        ]
+      }
+    ],
+    "refresh": "用途和追问恢复；标签恢复；执行后原始用户消息完整且只出现一次；验收会话最终2个completed Run、6条普通消息",
+    "projectionRepair": "首次真实任务发现混合历史回落漏用户正文；从原canonical user/message事件幂等补投影；第二次真实任务自动路径验证通过",
+    "viewports": {
+      "desktop": 1440,
+      "narrow": 760,
+      "narrowPageWidth": 760,
+      "narrowComposerWidth": 647,
+      "nativeRestored": 1543
+    },
+    "senderStyles": {
+      "user": "右侧 / 浅品牌色底 / 你",
+      "assistant": "左侧 / 表面色底 / AI"
+    },
+    "screenshots": [
+      "message-senders-final.png",
+      "message-senders-1440.png",
+      "message-senders-760.png",
+      "skill-conversation-clarify.png"
+    ],
+    "screenshotDirectory": "/Users/kevin/.codex/visualizations/2026/11/04/01a1a4db-1dd5-7c33-9b3d-2077e4e7ccb4"
+  },
+  "boundaries": [
+    "未修改已发布Skill内容、用户模型配置或凭据",
+    "普通聊天与原业务写入确认保持原入口",
+    "验收专用Skill的查询/导出限制仍作为测试定义保留，未冒充通用业务Skill治理完成",
+    "未合并主线、未推送；全量后台取消时序2例仍失败；最终用户验收待确认"
+  ],
+  "followupUi": {
+    "systemNav": "03_技术设计/系统架构/WES-Agent-升级总看板/events/2026-11-04-remove-system-page-nav.json",
+    "inputRecord": "中性执行参数记录、默认折叠，真实正文和实际参数分开",
+    "systemNavFocused": 13,
+    "messageFocused": 36,
+    "webFinal": 992
+  },
+  "review": {
+    "scope": "本次增量，分别核对工作台和系统导航表面",
+    "correctness": "真实用途/追问/执行、重放、归属、版本与混合历史已验证",
+    "readability": "会话服务、仓储及共享模型装配分文件；执行参数与原话分开",
+    "architecture": "复用Vite/React、现有generation绑定与invocation，无新DB表/技术栈",
+    "security": "JWT及当前身份、受控来源、模型输出和版本校验；理解阶段无业务工具；凭据留服务端；既有审计45项及夹具扫描命中保留",
+    "performance": "上下文与输出有界，模型理解45秒，无模型等待持锁；导航删除重复DOM",
+    "unresolved": "后端取消时序2例、通用集成模板环境、既有依赖风险及最终用户验收仍开放"
+  },
+  "localCommits": {
+    "backend": "47609f5",
+    "workbench": "1bab599",
+    "systemNavigation": "6c8cc5c"
+  },
+  "deliveryState": "隔离预览已加载，本地提交；未合并主线、未推送，待用户验收"
+}

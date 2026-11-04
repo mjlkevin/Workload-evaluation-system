@@ -1,0 +1,63 @@
+{
+  "id": "BE-2026-11-02-skills-b1a-verified-model-gate",
+  "date": "2026-11-02",
+  "type": "verification",
+  "scope": "RP-050 / B1a内核与模型实测门槛 / ISS-2026-11-02-005",
+  "summary": "B1a试运行核心通过规格及质量复核；实际模型请求401，保持不具备发布资格",
+  "status": "B1a验证通过 / 真实模型凭据待配置",
+  "pages": [
+    "issues",
+    "testing",
+    "monitoring",
+    "risks",
+    "changes"
+  ],
+  "source": {
+    "dedup": "未命中同范围凭据配置阻断，新增ISS-2026-11-02-005；关联RP-050，不派生新需求或代码缺陷",
+    "origin": "本批真实外部API验证"
+  },
+  "evidence": [
+    {
+      "kind": "git",
+      "ref": "e76536a",
+      "summary": "B1a本地提交：21项内核测试，包含泄漏、同步超时、可变模拟来源及畸形响应反向用例"
+    },
+    {
+      "kind": "command",
+      "ref": "/tmp/wes-skills-b1a-modules.log",
+      "result": "651/651,0skip",
+      "summary": "API构建与独立规格/质量复核通过"
+    },
+    {
+      "kind": "api",
+      "ref": "/tmp/wes-skills-b-real-model-probe-debug.log",
+      "result": "HTTP401",
+      "summary": "实际Provider拒绝认证；模型尝试不等于业务通过，releaseEligible保持false"
+    },
+    {
+      "kind": "configuration",
+      "ref": "隔离诊断的当前磁盘配置",
+      "summary": "独立诊断进程遇到CREDENTIAL_KEK格式无效及已有凭据不可解密；不据此直接判定既有主进程环境相同。未修改主配置或主库"
+    },
+    {
+      "kind": "runtime",
+      "ref": "3006/3004独立预览",
+      "summary": "新建预览专用私有加密配置，0600且Git忽略；加解密roundtrip通过，模型密钥未代填，等待用户在预览配置"
+    }
+  ],
+  "board": {
+    "testing": [
+      {
+        "command": "B1a 内核+模块",
+        "result": "651/651，独立复核通过",
+        "summary": "21项新内核断言，零跳过；同步超预算和模拟来源被篡改均拒绝发布资格"
+      },
+      {
+        "command": "B1a 真实模型探针",
+        "result": "401失败 / 发布资格未满足",
+        "summary": "未将模型调用尝试或注入模型测试作为真实业务通过；等待有效预览凭据"
+      }
+    ]
+  },
+  "next": "继续B1b发布与B2流程实现；用户配置有效预览模型密钥后重跑实际模型与发布happy path"
+}

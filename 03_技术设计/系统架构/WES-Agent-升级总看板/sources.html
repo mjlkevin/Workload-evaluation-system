@@ -67,7 +67,7 @@
         <div class="crumb">项目资料与可信度说明</div>
         <h1>项目信息来源</h1>
         <div class="meta">
-          <span>共登记 <b>95</b> 项资料（主台账去重）</span>
+          <span>共登记 <b>101</b> 项资料（主台账去重）</span>
           <span>当前事实源 <b>22</b> 份</span>
           <span>项目管理页面 <b>19</b> 个</span>
           <span>历史参考 <b>5</b> 份</span>
@@ -594,7 +594,8 @@
           <p>横轴为当前已定义的 Phase，纵轴为文档类型。单元格展示该 Phase 下对应文档的入口或状态。</p>
         </div>
 
-        <div class="matrix-grid">
+        <p data-board-event-id="BE-2026-11-04-skill-conversation:matrix">RP-050 / RP-056：<a href="../../../docs/superpowers/specs/2026-11-04-skill-conversation-design.md">对话与气泡设计</a>、<a href="../../../docs/superpowers/plans/2026-11-04-skill-conversation.md">实施与验证计划</a>，本地验证完成，待用户验收。</p>
+<div class="matrix-grid">
           <div class="matrix-cell head row-head">Type / Phase</div>
           <div class="matrix-cell head">Agent OS V2</div>
           <div class="matrix-cell head">Harness 1A</div>
@@ -908,8 +909,16 @@
                 <th>历史标注</th>
                 <th>关联 Phase</th>
               </tr>
+
             </thead>
             <tbody>
+<tr data-board-event-id="BE-2026-11-04-wes-sandbox-invocation-design:source"><td class="mono">设计与架构</td><td><a href="../../../docs/superpowers/specs/2026-11-04-wes-sandbox-invocation-design.md">WES受控沙箱调用机制</a></td><td>docs/superpowers/specs/2026-11-04-wes-sandbox-invocation-design.md</td><td>原生工具、权限、恢复、文件交付与三批验收</td><td>已确认 / 实施验证</td><td>Codex</td><td>否</td><td>RP-067</td></tr>
+<tr data-board-event-id="BE-2026-11-04-wes-sandbox-implementation:source-plan"><td>实现与验证</td><td><a href="../../../docs/superpowers/plans/2026-11-04-wes-sandbox-invocation.md">沙箱实施计划</a></td><td>docs/superpowers/plans/2026-11-04-wes-sandbox-invocation.md</td><td>沙箱调用、文件交付与验证边界</td><td>本地候选 / 待验收</td><td>Codex</td><td>否</td><td>RP-067</td></tr>
+<tr data-board-event-id="BE-2026-11-04-wes-sandbox-implementation:source-operations"><td>实现与验证</td><td><a href="../../../docs/superpowers/specs/2026-11-04-wes-sandbox-operations.md">沙箱接入与运行说明</a></td><td>docs/superpowers/specs/2026-11-04-wes-sandbox-operations.md</td><td>沙箱调用、文件交付与验证边界</td><td>本地候选 / 待验收</td><td>Codex</td><td>否</td><td>RP-067</td></tr>
+<tr data-board-event-id="BE-2026-11-04-wes-sandbox-implementation:source-evidence"><td>实现与验证</td><td><a href="../../../docs/superpowers/evidence/2026-11-04-wes-sandbox-implementation.md">沙箱实现与验证记录</a></td><td>docs/superpowers/evidence/2026-11-04-wes-sandbox-implementation.md</td><td>沙箱调用、文件交付与验证边界</td><td>本地候选 / 待验收</td><td>Codex</td><td>否</td><td>RP-067</td></tr>
+<tr data-board-event-id="BE-2026-11-04-skill-conversation:source-技能对话与气泡设计"><td>设计与实施</td><td><a href="../../../docs/superpowers/specs/2026-11-04-skill-conversation-design.md">技能对话与气泡设计</a></td><td class="mono">docs/superpowers/specs/2026-11-04-skill-conversation-design.md</td><td>工作台对话、气泡来源及验证边界</td><td>本地验证 / 待用户验收</td><td>Codex</td><td>否</td><td>RP-050 / RP-056</td></tr>
+<tr data-board-event-id="BE-2026-11-04-skill-conversation:source-技能对话实施计划"><td>设计与实施</td><td><a href="../../../docs/superpowers/plans/2026-11-04-skill-conversation.md">技能对话实施计划</a></td><td class="mono">docs/superpowers/plans/2026-11-04-skill-conversation.md</td><td>工作台对话、气泡来源及验证边界</td><td>本地验证 / 待用户验收</td><td>Codex</td><td>否</td><td>RP-050 / RP-056</td></tr>
+
               <tr data-board-event-id="BE-2026-10-21-system-unification-research:sources"><td>设计调研</td><td><a href="../../../02_产品设计/系统管理统一化重构调研-2026-10-21/调研与重构方案.md">完整调研与重构方案（含 15 张截图）</a></td><td class="mono">02_产品设计/系统管理统一化重构调研-2026-10-21/</td><td>12子页调研、统一规范、四批实现及最终截图验证</td><td>前端实现完成 / 待验收</td><td>Codex；方案与实施状态变化时更新</td><td>否</td><td>阶段 3 / RP-065 阶段 B</td></tr>
               <tr data-board-event-id="BE-2026-10-17-state-machines-catalog-and-system-ia:sources">
                 <td>设计文档</td><td><a href="../../../03_技术设计/数据模型/状态控制规则梳理-V1.md">状态控制规则梳理-V1.md</a></td><td colspan="6">21 个状态机描述符（20 类业务对象 + 版本文档三轴/六动作守卫）静态快照；口径以 <code class="inline">GET /api/v1/system/state-machines</code> 为准，目录与源码枚举由防漂移测试钉住（RP-065，2026-10-17）。2026-10-21 控件改版附件：<a href="../../../docs/superpowers/plans/2026-10-21-system-controls-polish.md">改版计划与证据</a>。当前用途：状态控制规则梳查与可视化页对照；维护责任：随目录代码变更同步。</td>
@@ -1671,6 +1680,9 @@
 
         <div id="cards-view" style="display:none">
           <div class="asset-cards">
+<div class="asset-card"><div class="asset-head"><div class="asset-title"><a href="../../../docs/superpowers/specs/2026-11-04-skill-conversation-design.md">技能对话与气泡设计</a></div></div><div class="asset-body">Skill对话语义与消息来源，已实现并本地验证，待用户验收。</div></div>
+<div class="asset-card"><div class="asset-head"><div class="asset-title"><a href="../../../docs/superpowers/plans/2026-11-04-skill-conversation.md">技能对话实施计划</a></div></div><div class="asset-body">Skill对话语义与消息来源，已实现并本地验证，待用户验收。</div></div>
+
             <div class="asset-card">
               <div class="asset-head">
                 <div><div class="asset-title"><a href="../../../ui/V2_PROTOTYPE/design-system/wes-workbench/DESIGN.md">wes-workbench 设计系统包</a></div><span class="asset-path">ui/V2_PROTOTYPE/design-system/wes-workbench/</span></div>
@@ -2325,9 +2337,11 @@
     </section>
 
     <footer class="wrap footer">
-      WES 项目管理 · 项目信息来源 · 2026-10-21 · 95 项资料（主台账去重） · 5 份历史参考
+      WES 项目管理 · 项目信息来源 · 2026-11-04 · 101 项资料（主台账去重） · 5 份历史参考
     </footer>
-  </main>
+  <section class="section" data-board-event-id="BE-2026-11-04-composer-skill-invocation:sources"><h2>工作台 / 技能调用 · 技术验证完成</h2><p>命中 ISS-2026-11-04-001，扩展 RP-050。/ 搜索、单项可移除标签、提示词与附件统一发送已实现；缺参补齐，失败保留草稿，切会话隔离。</p><p>Web 988/988、定向36及构建通过；实际Skill完成两条需求拆解。模块1157/1159，既有取消/超时2例保留，隔离66/66；目录性能观察保留。</p><p>1440/760浏览器验证完成，用户验收待回填。<a href="events/2026-11-04-composer-skill-invocation.json">验证证据与边界</a> · <a href="../../../docs/superpowers/specs/2026-11-04-composer-skill-invocation-design.md">批准设计</a> · <a href="../../../docs/superpowers/plans/2026-11-04-composer-skill-invocation.md">实施计划</a>。本地候选，未合主线、未推送。</p></section>
+<section class="section" data-board-event-id="BE-2026-11-04-skill-conversation:sources"><h2>技能对话与消息来源 · 资料已补齐</h2><p>新增已批准设计与一次性实施计划，覆盖对话判断、执行边界、混合历史补投影和角色气泡。验证文件独立保留真实模型观察、截图、自动检查及未通过的后台用例，不以模拟检查替代语义验收。</p><p><a href="events/2026-11-04-skill-capability-input-misinterpretation.json">原问题与回归</a> · <a href="events/2026-11-04-message-sender-distinction.json">消息来源优化</a> · <a href="../../../docs/superpowers/evidence/2026-11-04-skill-conversation-and-message-senders.json">完整验证证据</a></p></section>
+</main>
 
   <script>
     const btnTable = document.getElementById('btn-table');

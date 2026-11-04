@@ -52,6 +52,8 @@ function assertUsecaseOk(result: unknown): unknown {
 export function buildCreateProjectTool(createProject: CreateProjectFn): AgentTool {
   return {
     name: "create_project",
+    // Production uses an explicit local transaction adapter; trial isolation still follows mutates.
+    simulationOnly: false,
     description: "为当前用户创建项目评估草稿",
     parameters: {
       type: "object",

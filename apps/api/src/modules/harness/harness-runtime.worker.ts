@@ -40,6 +40,9 @@ export class HarnessWorkflowCancelledError extends Error {
   }
 }
 
+/** Raised only after the durable wait transaction has committed. */
+export class HarnessWorkflowWaitingError extends Error {}
+
 /** 故障注入错误：模拟进程崩溃，Worker 不得再写任何状态。 */
 export class HarnessFaultInjectedError extends Error {
   constructor(message?: string) {
@@ -111,6 +114,7 @@ export type HarnessWorkflow = {
   workflowVersion: string;
   firstStepKey: string;
   stepKeys: readonly string[];
+  preflight?(run: HarnessRunRow, checkpoints: readonly HarnessRunCheckpointRow[]): void | Promise<void>;
   executeStep(stepKey: string, ctx: HarnessWorkflowStepContext): Promise<HarnessWorkflowStepOutcome>;
 };
 
@@ -230,6 +234,13 @@ export function createHarnessRuntimeWorker(options: HarnessRuntimeWorkerOptions)
     let leaseLost = false;
     let cancelDetected = false;
     let heartbeatBusy = false;
+    const notifyTerminal = (result: Awaited<ReturnType<HarnessRuntimeRepository['completeAttemptAndRun']>>) => {
+      const status = result.run.status;
+      if (result.changed && (status === 'completed' || status === 'failed' || status === 'cancelled')) {
+        // The locked repository result, rather than this attempt's stale snapshot, owns the outcome.
+        void options.onRunTerminal?.(result.run, status).catch(() => {});
+      }
+    };
 
     const heartbeat = setInterval(() => {
       if (heartbeatBusy) return;
@@ -279,6 +290,7 @@ export function createHarnessRuntimeWorker(options: HarnessRuntimeWorkerOptions)
       }
 
       const checkpoints = await repository.listCheckpointsForRun({ runId });
+      await workflow.preflight?.(run, checkpoints);
       let resumeFrom: HarnessRunCheckpointRow | null = null;
       if (checkpoints.length > 0) {
         resumeFrom = selectHarnessResumeCheckpoint({ checkpoints, workflow, runId });
@@ -407,9 +419,9 @@ export function createHarnessRuntimeWorker(options: HarnessRuntimeWorkerOptions)
         stepKey = outcome.nextStepKey;
       }
 
-      await repository.completeAttemptAndRun({ attemptId, runId, outcome: "succeeded" });
+      const terminal = await repository.completeAttemptAndRun({ attemptId, runId, outcome: "succeeded" });
       // SP-2026-007 MS2：终态后触发异步蒸馏（不阻塞、不抛错）
-      void options.onRunTerminal?.(run, "completed").catch(() => {});
+      notifyTerminal(terminal);
     } catch (err) {
       if (leaseLost) return; // 租约已失：一切写入禁止，等待扫描接管。
       if (err instanceof HarnessFaultInjectedError) return; // 模拟死进程。
@@ -419,19 +431,19 @@ export function createHarnessRuntimeWorker(options: HarnessRuntimeWorkerOptions)
       // 落库事实只有：tool.call.awaiting_approval + status=waiting。
       // 批次 9 · 填表挂起同构（落库事实是 tool.call.awaiting_input + status=waiting）：
       // 用户还没答，答了才有下一步，两种等待都不该被写成一次故障。
-      if (err instanceof WorkbenchToolApprovalPendingError || err instanceof WorkbenchToolAwaitingInputError) return;
+      if (err instanceof HarnessWorkflowWaitingError || err instanceof WorkbenchToolApprovalPendingError || err instanceof WorkbenchToolAwaitingInputError) return;
       if (
         cancelDetected ||
         controller.signal.aborted ||
         err instanceof HarnessWorkflowCancelledError ||
         err instanceof HarnessStepBoundaryAbort
       ) {
-        await repository.completeAttemptAndRun({ attemptId, runId, outcome: "cancelled" });
+        const terminal = await repository.completeAttemptAndRun({ attemptId, runId, outcome: "cancelled" });
         // SP-2026-007 MS2：终态后触发异步蒸馏（不阻塞、不抛错）
-        void options.onRunTerminal?.(run, "cancelled").catch(() => {});
+        notifyTerminal(terminal);
         return;
       }
-      await repository.completeAttemptAndRun({
+      const terminal = await repository.completeAttemptAndRun({
         attemptId,
         runId,
         outcome: "failed",
@@ -439,7 +451,7 @@ export function createHarnessRuntimeWorker(options: HarnessRuntimeWorkerOptions)
         errorMessage: err instanceof Error ? err.message.slice(0, 200) : "worker step failed",
       });
       // SP-2026-007 MS2：终态后触发异步蒸馏（不阻塞、不抛错）
-      void options.onRunTerminal?.(run, "failed").catch(() => {});
+      notifyTerminal(terminal);
     } finally {
       clearInterval(heartbeat);
     }

@@ -1,0 +1,113 @@
+{
+  "eventId": "BE-2026-11-04-wes-sandbox-implementation",
+  "date": "2026-11-04",
+  "issueId": "ISS-2026-11-04-004",
+  "requirementId": "RP-067",
+  "title": "WES受控沙箱实现与验证",
+  "status": "本地候选已实现 / 自动检查通过 / 用户验收待完成",
+  "userAuthorization": [
+    "开始实现",
+    "临时Qoderwork Key仅合成测试，生产另配独立Key",
+    "按平台隔离交付：禁止公网，保留系统OSS内网通道"
+  ],
+  "secretPersisted": false,
+  "productionEnabled": false,
+  "merged": false,
+  "pushed": false,
+  "artifacts": [
+    "docs/superpowers/evidence/2026-11-04-wes-sandbox-implementation.md",
+    "docs/superpowers/plans/2026-11-04-wes-sandbox-invocation.md",
+    "docs/superpowers/specs/2026-11-04-wes-sandbox-operations.md"
+  ],
+  "evidence": {
+    "web": {
+      "passed": 1001,
+      "failed": 0
+    },
+    "uiReview": {
+      "passed": 43,
+      "failed": 0
+    },
+    "providerSynthetic": "/tmp/wes-sandbox-cloud-evidence.json",
+    "realModel": "docs/superpowers/evidence/2026-11-04-wes-sandbox/real-model-technical-pass.json",
+    "moduleFinal": {
+      "passed": 1235,
+      "failed": 0,
+      "skipped": 0,
+      "mode": "original file list, explicit serial, isolated *_test DB"
+    },
+    "harnessFinal": {
+      "passed": 697,
+      "failed": 0,
+      "skipped": 0,
+      "mode": "exclusive workload_eval_test, before final text leaf hardening"
+    },
+    "integrationGap": "templates_status_not_200",
+    "agent": {
+      "passed": 259
+    },
+    "ai": {
+      "passed": 286
+    },
+    "builds": [
+      "api",
+      "web"
+    ],
+    "officeLeaf": {
+      "red": "missing rejection",
+      "greenPassed": 18
+    },
+    "npmAudit": {
+      "critical": 1,
+      "high": 11,
+      "moderate": 33,
+      "total": 45
+    },
+    "contentQuality": "Earlier failure retained; final explicit synthetic sample passed, general fidelity not guaranteed",
+    "realModelFinal": "docs/superpowers/evidence/2026-11-04-wes-sandbox/real-model-repair-pass.json",
+    "realModelFinalCounts": {
+      "creations": 3,
+      "releases": 3,
+      "modelRequests": 5,
+      "additionalApprovals": 2
+    },
+    "contentFinal": "synthetic sample pass, explicit source-only instruction",
+    "browserFinal": {
+      "wordDownloadSha256": "94df0469f0a60132d72992c40e9b5c72c6ad4a10cb683743f017e4265c61b01c",
+      "viewports": [
+        1440,
+        760
+      ],
+      "horizontalOverflow": false
+    }
+  },
+  "remaining": [
+    "生产独立Key与连接",
+    "真实业务内容与跨阅读器人工验收",
+    "附件/关联Skill结果/修改原产物的真实场景",
+    "人工Office兼容与用户验收"
+  ],
+  "boardAudit": {
+    "sources": {
+      "rawRows": 102,
+      "uniquePrimaryRefs": 101
+    },
+    "requirementsChanged": "RP-067 remains in pending/implementation bucket; no delivered claim",
+    "scope": "isolated candidate",
+    "mainSources": {
+      "rawRows": 105,
+      "uniquePrimaryRefs": 104
+    },
+    "requirements": {
+      "candidateRaw": 54,
+      "candidateUnique": 53,
+      "mainRaw": 55,
+      "mainUnique": 54
+    }
+  },
+  "boardValidation": {
+    "candidate": "21 pages, 0 errors, 0 warnings",
+    "main": "21 pages, 0 errors, 0 warnings",
+    "mainCodeMerged": false
+  }
+}

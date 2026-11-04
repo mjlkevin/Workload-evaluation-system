@@ -40,8 +40,9 @@
     "test:web": "npm run test --prefix ui/V2_PROTOTYPE",
     "test:bundle": "bash scripts/run-test-bundle.sh",
     "ops:backup:config": "node scripts/backup-config.js",
-    "test:all": "npm run test:modules && npm run test:modules:serial-store && npm run test:rules && npm run test:integration && npm run rules:regression && npm run rules:excel-report",
-    "test:e2e:web": "npm run test:web"
+    "test:all": "npm run test:modules && npm run test:workflows && npm run test:modules:serial-store && npm run test:rules && npm run test:integration && npm run rules:regression && npm run rules:excel-report",
+    "test:e2e:web": "npm run test:web",
+    "test:workflows": "npm run test:workflows -w apps/api"
   },
   "devDependencies": {
     "typescript": "^5.9.3"

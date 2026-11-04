@@ -1,0 +1,64 @@
+{
+  "id": "BE-2026-11-03-skills-c2c3a-operation-intents",
+  "date": "2026-11-03",
+  "type": "implementation",
+  "scope": "RP-050 C2c.3a 待确认操作登记与稳定重试身份",
+  "summary": "待确认操作现已持久登记：重复准备、服务重建及明确手动重试沿用同一逻辑身份，同位置变更内容报冲突。登记仍是pending意图，批准和真实工具执行继续后续。",
+  "status": "自动检查与独立复核通过 / 内部能力",
+  "pages": [
+    "index",
+    "requirements",
+    "plan",
+    "testing",
+    "monitoring",
+    "risks",
+    "changes"
+  ],
+  "additionalBoardPages": [
+    "runtime",
+    "design"
+  ],
+  "evidence": [
+    {
+      "kind": "user",
+      "ref": "2026-11-03 continue after 8dba8a7",
+      "summary": "继续下一步，沿用已批准Skill机制与C2工单。"
+    },
+    {
+      "kind": "git",
+      "ref": "8dba8a7",
+      "summary": "手动retry与会话并发保护已验证，原模型状态文件禁止读写或暂存。"
+    },
+    {
+      "kind": "plan",
+      "ref": "docs/superpowers/plans/2026-11-02-wes-business-skills.md",
+      "summary": "C2c.3拆为登记、确认、同事务业务写幂等、累计预算四审查单元；3a复用现有Harness工具表与唯一约束，无迁移或新HTTP。"
+    },
+    {
+      "kind": "test",
+      "ref": "/tmp/wes-c2c3a-parent-final",
+      "summary": "默认模块与全域回归日志；首专项110/111测试选行失败保留，最终专项见parent-recheck。"
+    },
+    {
+      "kind": "test",
+      "ref": "/tmp/wes-c2c3a-parent-final; /tmp/wes-c2c3a-parent-recheck; /tmp/wes-c2c3a-build-api.log; /tmp/wes-c2c3a-build-web.log",
+      "summary": "父独立登记专项111、模块931、Harness441、AI286及API/Web双构建通过，均0skip。最终登记专项位于recheck；其余套件逐文件读取，首轮失败不覆盖。"
+    },
+    {
+      "kind": "review",
+      "ref": "/tmp/wes-c2c3a-spec; /tmp/wes-c2c3a-quality-pg; /tmp/wes-c2c3a-quality-pure",
+      "summary": "规格历史25+修正后静态复核、质量PG25/纯测155，0skip，APPROVE。"
+    },
+    {
+      "kind": "risk",
+      "ref": "/tmp/wes-c2c3a-audit.json",
+      "summary": "45既有风险（32moderate/12high/1critical）；通用集成缺活动模板/分配0/1。无真实工具或MVP验收。"
+    },
+    {
+      "kind": "ui-check",
+      "ref": "/Users/kevin/.codex/visualizations/2026/11/02/01a19a18-92f8-7bf1-b70c-df3fd911608f/c2c3a-2026-11-03-board-requirements.png",
+      "summary": "浏览器实读最终标题、RP-050仍C实施中、下一步绑定确认；原窄列/P2换行和大空列保留，不声称共享样式优化。"
+    }
+  ],
+  "next": "下一步绑定持久确认决定与当前参数/权限（C2c.3b），随后完成本地同事务写幂等和跨调用预算（3c/3d）、统一视图、生产宿主和工作台。"
+}

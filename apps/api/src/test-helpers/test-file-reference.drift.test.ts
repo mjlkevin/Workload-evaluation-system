@@ -269,3 +269,12 @@ test("排除清单条目不得过期（文件已删或已被引用都必须移�
     );
   }
 });
+
+// Real root/audit rows must not overlap skills.repository.test.ts's full-table TRUNCATE.
+test('emergency HTTP persistence runs in the CI serial Harness group, outside parallel modules cleanup', () => {
+  const { scripts } = JSON.parse(fs.readFileSync(path.join(API_ROOT, 'package.json'), 'utf8'));
+  const file = 'src/routes/execution-emergency.routes.test.ts';
+  assert.ok(!scripts['test:modules'].split(/\s+/).includes(file), 'parallel repository cleanup can erase emergency HTTP fixtures');
+  assert.ok(scripts['test:harness'].split(/\s+/).includes(file), 'real HTTP persistence must remain CI reachable');
+  assert.ok(scripts['test:harness'].split(/\s+/).includes('--test-concurrency=1'));
+});

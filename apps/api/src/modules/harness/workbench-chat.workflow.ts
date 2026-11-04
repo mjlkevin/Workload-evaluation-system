@@ -42,7 +42,7 @@ import type {
   AppendAiSessionMessageIdempotentResult,
 } from "../ai-sessions/ai-sessions.repository";
 import type { AiAttachment, AiMessage, AiSessionRecord } from "../ai-sessions/ai-sessions.types";
-import { normalizeHomeAttachments, latestSessionAttachmentWithSummary, sessionRecordToHomeMessages, isExplicitReportRequest } from "../../services/ai/handlers/workbench-shared";
+import { normalizeHomeAttachments, latestSessionAttachmentWithSummary, sessionRecordToHomeMessages } from "../../services/ai/handlers/workbench-shared";
 import type { HomeMessageInput } from "../../services/ai/handlers/workbench-shared";
 import { resolveRunMemoryProjectId } from "./harness.types";
 import {
@@ -53,12 +53,12 @@ import {
   workbenchUserProjectionSource,
   withWorkbenchProjectionSource,
 } from "./workbench-conversation-fact";
-import { runExplicitHomeReportFlow } from "../../services/ai/handlers/report-flow";
 import { hasOngoingWorkbenchToolInteraction } from "../../services/ai/workbench-intent.service";
 import { deriveSessionMessages } from "../ai-sessions/session-history";
 import type { recordWorkbenchTurnTrace, recordWorkbenchTurnFailureTrace } from "../trace/trace.usecase";
 
 export type WorkbenchChatWorkflowDeps = {
+  readModelTurn?(runId: string, effectKey: string): Promise<import("../../services/ai/workbench-tool-loop").WorkbenchModelTurn | undefined>;
   /**
    * 复用 workbench-dispatch.service.ts 的分发入口。
    * 调用方注入真实 dispatch 或测试 stub。
@@ -160,11 +160,11 @@ export type WorkbenchChatWorkflowDeps = {
   recordTurnFailureTrace?(input: Parameters<typeof recordWorkbenchTurnFailureTrace>[0]): Promise<unknown>;
 };
 
-export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): HarnessWorkflow {
+export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps, mode: 'chat' | 'sandbox' = 'chat'): HarnessWorkflow {
   const CHAT_STEP_KEY = "chat";
 
   return {
-    workflowId: "workbench_chat_v1",
+    workflowId: mode === 'sandbox' ? 'sandbox-task-v1' : 'workbench_chat_v1',
     workflowVersion: "1.0.0",
     firstStepKey: CHAT_STEP_KEY,
     stepKeys: [CHAT_STEP_KEY],
@@ -203,7 +203,7 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
       // 来源键 run 维度 deduplicationKey，恢复重放由去重吸收，不重复。
       // 批次 2b-2：消息本体（messageId / createdAt / attachmentIds）取自提交侧信封，
       // 与入队事务里那条 user/message 载荷同一份——见 workbench-conversation-fact.ts。
-      await deps.appendSessionMessage({
+      if (!(mode === 'sandbox' && executionConfig.sourceRunId)) await deps.appendSessionMessage({
         sessionId: aiSessionId,
         message: composeWorkbenchUserMessage({ fact, content }),
         attachments: storedAttachments,
@@ -220,33 +220,8 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
       const historyMessages = sessionRecordToHomeMessages(sessionRecordWithUserTurn);
       const memoryProjectId = resolveRunMemoryProjectId(run);
 
-      // ISS-2026-08-16-004：显式报告闸门——当 dispatchAttachment 存在且用户消息
-      // 是「生成需求解析报告」时，直接调用 runExplicitHomeReportFlow 生成报告，
-      // 而不是走 dispatchHomeWorkbenchTurn 的意图分发（后者路由到静态文案）。
-      // 与同步路径 workbench-chat.handler.ts L65 同一口径。
-      if (dispatchAttachment && isExplicitReportRequest(content)) {
-        const sessionWithUserTurn = (await deps.getSessionRecord?.(aiSessionId, run.ownerUserId)) ?? null;
-        if (!sessionWithUserTurn) {
-          throw new Error(`session not found: ${aiSessionId}`);
-        }
-        const flowResult = await runExplicitHomeReportFlow({
-          user: { id: run.ownerUserId, username: run.ownerUsername, role: "user", status: "active", passwordHash: "", createdAt: "", lastLoginAt: "" },
-          workflowKey: "free_chat",
-          session: sessionWithUserTurn,
-          sessionWithUserTurn,
-          parsedAttachment: dispatchAttachment,
-          allAttachments: [dispatchAttachment],
-        });
-        if (flowResult.ok) {
-          // runExplicitHomeReportFlow 已直接落库 assistant 消息 + artifact + pendingAction，
-          // 返回体只带终态游标（补偿链已于 S2b-2 删除，outbox 字段随 S7 退役）。
-          return {
-            nextStepKey: null,
-          };
-        }
-        // API Key 缺失时回退到普通 dispatch（与同步路径行为对齐：同步路径返回 40001，
-        // 异步路径降级为普通问答，由意图分发器路由到静态文案）。
-      }
+      // Natural-language requests enter the model/tool path. Legacy report execution
+      // bypassed durable effects and treated capability questions as commands.
 
       // 批次 1a：审批闸门随本 Run 构造。gate 只认服务端持久决策（run_action_confirmed /
       // tool.call.rejected），模型与前端都无从表达「本次无需确认」。
@@ -339,6 +314,11 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
           let result: Awaited<ReturnType<WorkbenchChatWorkflowDeps["dispatch"]>>;
           try {
             result = await deps.dispatch({
+              runtime: { requestId: run.harnessRunId, traceId: run.harnessRunId,
+                actor: { userId: run.ownerUserId, username: run.ownerUsername, roles: [], capabilities: [] },
+                channel: 'web', workflowKey: mode === 'sandbox' ? 'sandbox_task' : 'free_chat', aiSessionId, harnessRunId: run.harnessRunId,
+                harnessAttemptId: ctx.attempt.harnessRunAttemptId, toolStepKey: stepKey, abortSignal: ctx.abortSignal },
+              ...(mode === 'sandbox' ? { sandboxContext: executionConfig.sandboxContext } : {}),
               message: content,
               attachment: dispatchAttachment,
               user: { id: run.ownerUserId, username: run.ownerUsername, role: "user", status: "active", passwordHash: "", createdAt: "", lastLoginAt: "" },
@@ -347,7 +327,7 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
               projectId: memoryProjectId,
               // 批次 1c · 缺陷二：进行中的工具交互 → 意图路由让位（判据取自上面那次
               // 已落库读取，不新增查询；本轮用户消息是末条，判据看的是它之前那条 assistant）
-              hasOngoingToolInteraction: hasOngoingWorkbenchToolInteraction(deriveSessionMessages(sessionRecordWithUserTurn)),
+              hasOngoingToolInteraction: mode === 'sandbox' || hasOngoingWorkbenchToolInteraction(deriveSessionMessages(sessionRecordWithUserTurn)),
               streamingAdapter,
               // 批次 0.5 · ②：工具事件 → UI 事件接缝（additive）。仅异步 Run 通道
               // 注入；同步直写路径不经 Harness 事件流，无 runId 可写，不注入即为 undefined。
@@ -358,12 +338,26 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
               ...(toolInputGate ? { toolInputGate } : {}),
               // 批次 0 · ⑤：发送-vs-存储对账的读取钩子。必须当场重取会话记录，
               // 不得复用上面的 historyMessages——那份正是被对账的发送侧，同源即永真。
-              ...(deps.getSessionRecord
+              ...(deps.getSessionRecord && mode !== 'sandbox'
                 ? { readSessionForInvariant: () => deps.getSessionRecord!(aiSessionId, run.ownerUserId) }
                 : {}),
               // 批次 0 · ④：工具副作用逐次落独立 effectKey（N = 全局第 N 次工具调用）。
               // 命中已记录 effect 时 recordToolEffectOnce 直接回存量 output 且不调用
               // execute —— 重放同一 Run 不会重复执行工具，幂等语义与外层同构。
+              ...(deps.readModelTurn ? {modelTurns: {
+                ...(mode === 'chat' ? {activationTool: 'sandbox_execute'} : {}),
+                read: (ordinal: number) => deps.readModelTurn!(run.harnessRunId,ctx.makeEffectKey("workbench_chat_model_turn",ordinal)),
+                save: async (ordinal: number, value: import("../../services/ai/workbench-tool-loop").WorkbenchModelTurn) => {
+                  if (ctx.abortSignal.aborted) throw new Error("model_turn_cancelled");
+                  const {output} = await ctx.recordToolEffectOnce({
+                    effectKey:ctx.makeEffectKey("workbench_chat_model_turn",ordinal),
+                    toolName:"workbench_chat_model_turn",input:{ordinal},
+                    execute:async()=> {if(ctx.abortSignal.aborted) throw new Error("model_turn_cancelled"); return value;},
+                  });
+                  if (!output || typeof output.content !== "string") throw new Error("model_turn_output_missing");
+                  return output as import("../../services/ai/workbench-tool-loop").WorkbenchModelTurn;
+                },
+              }} : {}),
               recordToolEffect: async (ordinal, execute, toolEffectContext) => {
                 const { output } = await ctx.recordToolEffectOnce({
                   effectKey: ctx.makeEffectKey("workbench_chat_tool_call", ordinal),

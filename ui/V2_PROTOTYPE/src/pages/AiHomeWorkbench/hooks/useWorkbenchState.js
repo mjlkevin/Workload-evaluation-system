@@ -7,19 +7,9 @@ import { getAiHomePreset } from '../../aiHomePresets.js'
 import { pickArray, stripPendingMarker } from '../utils/harnessPayload.js'
 import { getWorkflowOutputs } from '../utils/workflowOutputs.js'
 
-const WORKSPACE_PANEL_COLLAPSED_KEY = 'wes-ai-workspace-panel-collapsed'
-
-function readWorkspacePanelCollapsed() {
-  try {
-    return localStorage.getItem(WORKSPACE_PANEL_COLLAPSED_KEY) === 'true'
-  } catch {
-    return false
-  }
-}
-
 /**
  * 收敛 AI 工作台分散的 useState：预设/工作流、会话列表、输入草稿、
- * 附件选择、工作区折叠、会话删除确认、客户主体检索。
+ * 附件选择、会话删除确认、客户主体检索。
  * callbacks.onActiveSessionDeleted 用于删除当前会话后清空消息区。
  *
  * O5 Sprint 3A：首屏与刷新时机接入统一视图（GET /ai/home-workbench/view），
@@ -44,7 +34,6 @@ export default function useWorkbenchState(currentUser, callbacks = {}) {
   const [deleteTargetSession, setDeleteTargetSession] = useState(null)
   const [deletingSessionId, setDeletingSessionId] = useState('')
   const [deleteSessionError, setDeleteSessionError] = useState('')
-  const [workspacePanelCollapsed, setWorkspacePanelCollapsed] = useState(readWorkspacePanelCollapsed)
   const [workbenchCompanyLookupOpen, setWorkbenchCompanyLookupOpen] = useState(false)
   const [workbenchCompanyLookupLoading, setWorkbenchCompanyLookupLoading] = useState(false)
   const [workbenchCompanyCandidates, setWorkbenchCompanyCandidates] = useState([])
@@ -54,6 +43,18 @@ export default function useWorkbenchState(currentUser, callbacks = {}) {
   const [unifiedView, setUnifiedView] = useState(null)
   const [unifiedViewLoading, setUnifiedViewLoading] = useState(false)
   const [unifiedViewError, setUnifiedViewError] = useState('')
+  const unifiedViewRequestRef = useRef(0)
+  const unifiedViewPendingRef = useRef(false)
+  const unifiedViewMountedRef = useRef(true)
+  const unifiedViewScopeRef = useRef({ key: '', generation: 0 })
+  const unifiedViewScopeKey = JSON.stringify([composerUserId, composerSessionId])
+  if (unifiedViewScopeRef.current.key !== unifiedViewScopeKey) {
+    unifiedViewScopeRef.current = { key: unifiedViewScopeKey, generation: unifiedViewScopeRef.current.generation + 1 }
+  }
+  useEffect(() => {
+    unifiedViewMountedRef.current = true
+    return () => { unifiedViewMountedRef.current = false; unifiedViewRequestRef.current++ }
+  }, [])
 
   const activeWorkflow = workflowsByKey.get(activeWorkflowKey)
   const centerTitle = activeWorkflow?.title || preset.headline
@@ -62,19 +63,33 @@ export default function useWorkbenchState(currentUser, callbacks = {}) {
 
   // O5：首屏加载统一视图；失败时静默降级（不阻塞既有 loadSessions 链路）
   const loadUnifiedView = useCallback(async () => {
+    if (!unifiedViewMountedRef.current) return null
+    const sequence = ++unifiedViewRequestRef.current
+    unifiedViewPendingRef.current = true
+    const generation = unifiedViewScopeRef.current.generation
+    const isCurrent = () => unifiedViewMountedRef.current && sequence === unifiedViewRequestRef.current
+      && generation === unifiedViewScopeRef.current.generation
     setUnifiedViewLoading(true)
     setUnifiedViewError('')
     try {
       const view = await getWorkbenchView()
+      if (!isCurrent()) return null
       setUnifiedView(view)
       return view
     } catch (err) {
-      setUnifiedViewError(err?.message || '统一视图加载失败')
+      if (isCurrent()) setUnifiedViewError(err?.message || '统一视图加载失败')
       return null
     } finally {
-      setUnifiedViewLoading(false)
+      if (sequence === unifiedViewRequestRef.current) unifiedViewPendingRef.current = false
+      if (isCurrent()) setUnifiedViewLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    // Replace only an invalidated in-flight read; a settled global view remains
+    // usable across session selection (including the synchronous chat fallback).
+    if (unifiedViewPendingRef.current) loadUnifiedView().catch(() => {})
+  }, [loadUnifiedView, unifiedViewScopeKey])
 
   useEffect(() => {
     // 首屏：统一视图与会话列表并行加载；统一视图失败不阻塞会话列表
@@ -102,14 +117,6 @@ export default function useWorkbenchState(currentUser, callbacks = {}) {
   function clearComposerDraft() {
     if (composerSessionId) sessionRuntimeStore.writeComposerDraft(composerUserId, composerSessionId, '')
   }
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(WORKSPACE_PANEL_COLLAPSED_KEY, workspacePanelCollapsed ? 'true' : 'false')
-    } catch {
-      // localStorage may be unavailable in private or embedded contexts.
-    }
-  }, [workspacePanelCollapsed])
 
   useEffect(() => {
     if (activeSession?.workflowKey && !activeWorkflowKey) {
@@ -217,8 +224,6 @@ export default function useWorkbenchState(currentUser, callbacks = {}) {
     setDraftBeforeLogin,
     selectedFile,
     setSelectedFile,
-    workspacePanelCollapsed,
-    toggleWorkspacePanel: () => setWorkspacePanelCollapsed((value) => !value),
     startWorkflow,
     startNewSession,
     selectSession,

@@ -1,0 +1,270 @@
+{
+  "id": "BE-2026-11-03-skills-final-integration",
+  "date": "2026-11-03",
+  "type": "implementation",
+  "scope": "RP-050 已批准C/D剩余连续实现",
+  "summary": "按用户最新授权连续完成事务业务工具、累计预算、生产宿主、统一工作台和MVP收口；保持技术验证与人工业务验收分开。",
+  "status": "C/D本地实现与技术验证完成，待用户最终验收；未合主线、未推送",
+  "pages": [
+    "index",
+    "requirements",
+    "plan",
+    "testing",
+    "monitoring",
+    "risks",
+    "changes",
+    "runtime",
+    "design",
+    "sources",
+    "issues",
+    "defects"
+  ],
+  "additionalBoardPages": [
+    "runtime",
+    "design"
+  ],
+  "evidence": [
+    {
+      "kind": "user",
+      "ref": "2026-11-03 continue until finished",
+      "summary": "不再逐批等待继续，不创建Loop自动化；本地实现/验证后统一汇报。"
+    },
+    {
+      "kind": "git",
+      "ref": "0251415",
+      "summary": "本地事务底座已验证；剩余全流程持续推进，未合main/未推送。"
+    },
+    {
+      "kind": "plan",
+      "ref": "docs/superpowers/plans/2026-11-02-wes-business-skills.md",
+      "summary": "已记录连续完成范围与内部拆分、权限/预算/持久恢复、UI和D验收门槛。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-finish-project/empty-rules-final; /tmp/wes-finish-project-quality; /tmp/wes-finish-core-modules/test:modules.log",
+      "summary": "事务项目adapter source678；SPEC/fresh质量通过，PG12/12与父模块984通过。空规则P2已修，生产host/metadata和全MVP继续接线。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-finish-budget/green-blocked-deadline-final; /tmp/wes-finish-budget-quality",
+      "summary": "预算库SPEC/fresh质量通过21/21；source490。同步阻塞deadline P2修复；Host事务超时传播P1正在修，整体C/D未关闭。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-finish-state-roles-quality; /tmp/wes-finish-core-modules",
+      "summary": "游标311+权限244gross，SPEC/fresh纯92/92与模块984通过；服务器CP信任边界与v1直连拒绝保留，host另行接线。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-finish-operation-scope-quality; /tmp/wes-finish-host-quality; /tmp/wes-finish-host-quality-regression",
+      "summary": "S source305 freshPG12及H638 fresh56通过，P1真实迟到写已修。默认boot/Workflow/API/UI未接齐，C/D继续。"
+    },
+    {
+      "kind": "git",
+      "ref": "a74a3e3;1faf103;25f2f73;2db604e",
+      "summary": "事务项目、累计预算、持久游标/原角色证据、root宿主及Workflow操作作用域已独立复核并本地提交，未推送。"
+    },
+    {
+      "kind": "continuous-review",
+      "ref": "/tmp/wes-finish-workflow-host/timeout-authority-green; /tmp/wes-finish-workbench-ui/spec-green.log",
+      "summary": "W发现普通超时与晚撤权分类P2，真实RED4项后组合92通过；UI local-ref/跨会话P2真实RED9项后37通过。候选待fresh质量，未作整体验收。"
+    },
+    {
+      "kind": "continuous-review",
+      "ref": "/tmp/wes-finish-workbench-api; apps/api/src/modules/skills/fixtures/mvp-acceptance-baseline.md",
+      "summary": "公开操作确认恢复事务fence与Workflow失败receipt重试P2在修；原summary不可当上传原文，D补真实来源。预览真实585目录及标准2+3天样本已整理待用户选定。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-finish-mvp-contracts/green-boundaries.log",
+      "summary": "D纯需求/匹配契约21/21零跳过，SPEC和fresh质量APPROVE；样本待用户选定，不等同生产链或业务验收。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-finish-workflow-host/source-freeze-write-authority.sha256; /tmp/wes-finish-workflow-host/write-authority-green",
+      "summary": "四节点生产host696gross，SPEC及fresh质量APPROVE；95/95零跳过与tsc0。普通超时及写入晚撤权均已真实反例验证；取消终态竞态另单元开放。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-finish-workbench-ui/quality-red.log; /tmp/wes-finish-workbench-ui/quality-green.log",
+      "summary": "UI①645与②644gross分别SPEC/fresh质量APPROVE，focused43/43。合法Schema与跨会话迟到问题真实RED修正；全量Web/构建/真实浏览器与模型另行验证。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-finish-mvp-assets/p1-red-admission-worker-retry.log; /tmp/wes-finish-mvp-assets/p1-green-pg.log; /tmp/wes-finish-mvp-assets/p1-green-pure.log; /tmp/wes-finish-mvp-assets/p1-regression-pg.log",
+      "summary": "真实资产/会话底座512gross，SPEC及fresh质量APPROVE；新17、相关纯3、旧PG60通过。遗漏资产指纹P1经真实admission/Worker/预算/retry三RED修复；file原文另单元补齐。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-finish-workbench-api/spec-green; /tmp/wes-finish-workbench-api/spec-regression; /tmp/wes-finish-workbench-api/role-fence-green",
+      "summary": "C3 a/b/c/d分别SPEC和fresh质量通过；11+58关联及最终身份37全0skip。权限命令/可信retry及安全投影已接；OpenAPI11正反例已核，取消与全套门禁继续。"
+    },
+    {
+      "kind": "user",
+      "ref": "2026-11-03 standard catalog baseline confirmed",
+      "summary": "用户确认标准目录2+3=5人天、50用户/1组织/无增量；只确认测试样本，最终界面验收另记。查询与Excel导出保留未匹配反例。"
+    },
+    {
+      "kind": "continuous-review",
+      "ref": "/tmp/wes-finish-c-gate/modules/test:modules.log; /tmp/wes-finish-c-gate/timing-targeted/files-src_modules_skills_skills.evaluation.test.ts_src_modules_skills_skills.execution.log",
+      "summary": "父原并发模块1041中1038通过、3项计时失败；同2文件隔离实跑85/85、零跳过。保留失败证据，不改旧预算/原并发；待整体候选冻结后原命令复验。"
+    },
+    {
+      "kind": "continuous-review",
+      "ref": "apps/api/src/modules/skills/source-documents/source-document.ts",
+      "summary": "新增上传原文候选独立质量复核发现旧XLSX解析器评论引用可污染共享原型，S1修复中；HTTP入口未开放，解析隔离/资源限额/授权前置将经反例复核后放行。"
+    },
+    {
+      "kind": "intake",
+      "ref": "ISS/DEF-2026-11-03-001; ISS/DEF-2026-11-03-002",
+      "summary": "取消终态竞态与上传候选共享解析器污染已去重分诊；取消137gross/PG91及独立复核通过，来源632gross/15项候选通过待独立复核。canonical问题52行49唯一ID，分桶27缺陷/10需求/4待分诊/11其他；旧requirement候选按待分诊计，缺陷36=7open+13done+16待人工复核。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-finish-typed-final; /tmp/wes-finish-typed-quality-final",
+      "summary": "原生可选输出契约SPEC/fresh质量通过；真实RED39中3fail后GREEN39、相关208、独立114均0skip。无效结果按Workflow等待、完成历史复验与SQL写回滚已覆盖；旧hash/MCP边界保持。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-finish-source-spec-independent; /tmp/wes-finish-source-quality",
+      "summary": "S1来源632gross及小hunk SPEC/fresh质量APPROVE；独立15/15、APIbuild0及真实distJS原文/并发槽/超时退出恢复/Buffer快照探针通过。HTTP S2独立接线中；不把旧deadline断言错误当漏洞RED。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-finish-source-http/final-green; /tmp/wes-finish-source-http-quality",
+      "summary": "S2 HTTP268gross SPEC/fresh质量通过，独立8/8零跳过及类型检查0；真实上传/权限/UUID/多段/字节/中文刷新已覆盖。固定Excel2cells/125chars生产JS回读一致；不代替LLM/业务操作验收。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-finish-mvp-proof-quality; /tmp/wes-finish-mvp-proof-quality-share",
+      "summary": "D1真实来源/确认/最新输出证明SPEC/fresh质量通过；独立13+2及最终11PG零跳过。一次visit同规模读取7903.9→495.54ms；SHARE兼容且冻结六类更新，不降低500receipt配额。D3草稿/模型验收另待。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-finish-mvp-native; /tmp/wes-finish-mvp-native-quality",
+      "summary": "六原生工具及真实runtime接线SPEC/fresh质量通过；RED88中11fail后GREEN88及独立pure9/六工具发布合同探针通过，0skip。清单17保留旧8顺序；模型三Skill/草稿业务验收尚未完成。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-ui1-enum-const-red.log; /tmp/wes-ui1-enum-const-green.log",
+      "summary": "启动弹窗真实上传/模板资产/异步隔离UI① SPEC/fresh质量通过；独立61后enum+const P2有效RED修为62/62零跳过无警告，7路径scope/diff0。真实浏览器与全Web另待。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-finish-mvp-draft/code-cross-red; /tmp/wes-finish-mvp-draft/code-cross-regression; /tmp/wes-finish-mvp-draft/quality-four-cases.log",
+      "summary": "D3原子草稿及typed-root SPEC/fresh质量APPROVE；作者新18+旧23及兼容14通过，独立精准4例通过（另14未跑）。跨真实普通创建重复编码RED经共用事务锁修复；规则引擎5天、回执失败回滚与当前run重试已核。真实LLM/业务验收另待。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-quote-transport-red.log; /tmp/wes-quote-transport-quality-tests.log; /tmp/wes-quote-transport-quality-tsc.log",
+      "summary": "模型引用传输边界SPEC/fresh质量APPROVE，RED1pass9fail后独立40/40及tsc0；同需求两不同旧锚点拒绝探针通过。仅唯一逐字引用派生位置，规范报告/确认/原生证明不放宽；不等同模型验收。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-finish-mvp-frozen/history-red; /tmp/wes-finish-mvp-frozen/review/d4-13.log; /tmp/wes-finish-mvp-frozen/review/d3-d4-integration-green.log; /tmp/wes-d4-openapi/result.log",
+      "summary": "D4冻结依据/只读重算SPEC及fresh质量APPROVE；历史批准P2经RED6fail修复，作者55与独立13全过。真实D3创建→检出/保存/检入→刷新/重算5天精准1例通过（另17未重跑）；保留JWT夹具401及被其他线阻塞tsc证据，后续共同tsc0。OpenAPI unique YAML/AJV16通过，198paths。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-ui2-spec-red.log; /tmp/wes-ui2-quality-independent.log",
+      "summary": "工作台报告/真实范围选择/原生草稿链接UI② SPEC及fresh质量APPROVE；有效懒挂载RED2后独立6files79/79，scope/diff0。规范报告/未匹配/AI建议分明，正式工期仅取真实草稿效果；不等同浏览器或人工验收。"
+    },
+    {
+      "kind": "unit",
+      "ref": "apps/api/src/modules/skills/mvp/managed-assets.ts; /tmp/wes-managed-assets-quality-own.log; /tmp/wes-managed-assets-quality-regression.log; /tmp/wes-managed-assets-quality-tsc.log",
+      "summary": "三个可维护语义Skill及精确版本绑定15步Workflow初始定义SPEC/fresh质量APPROVE；人工TESTONLY样例，7/7新增与独立48纯回归/tsc0。只返回管理定义、不直接发布或伪造证明；真实模型试运行、正式发布及实际业务验收仍待执行。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-ui3-p2-red.log; /tmp/wes-ui3-quality-review-tests.log; /tmp/wes-final-cd-validation/modules/test:modules.log",
+      "summary": "评估详情UI③ SPEC/fresh质量APPROVE，独立21/21及scope/diff0。仅明确legacy读最新；frozen按原依据重算/真实检出检入，503保留实际人工scope与覆盖7而隐藏计算值。父原并发模块1080中1079过1旧20ms超时case失败，保留证据并独立定位，不改生产预算/原并发或降低断言。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-trial-deadline-probe.log; /tmp/wes-trial-deadline-quality.log; /tmp/wes-final-cd-validation/modules-fixed/test:modules.log; /tmp/wes-final-web.log",
+      "summary": "旧试运行超时测试独立定位并以test-only时钟控制修正，SPEC/fresh质量APPROVE，独立26/26；原20ms真实timer/abort/旧断言及并发均保留，另证setup超时不调模型。父原并发modules1081/1081、Web93files851/851通过，零跳过；原1080/1079/1失败日志保留，串行/Harness/AI/构建和真实预览继续。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-mvp-visibility/independent-quality.log; /tmp/wes-final-cd-validation/tool-scope-fixed; /tmp/wes-final-cd-validation/remaining",
+      "summary": "Agent整体验证发现七个流程工具进入普通对话，已以代码所有通道标记修复六个注入/发现出口，后台18项和业务契约/hash保留。SPEC/fresh质量120项通过；父Agent254/模块1094/AI286再验通过。串行228/Harness660/规则8/流程17及Web851已过；通用integration仍为原空模板1失败，保留而不seed。"
+    },
+    {
+      "kind": "preview-backup",
+      "ref": "workload_eval_skills_backup_20261103142252; /tmp/wes-preview-final/backup-result.log",
+      "summary": "恢复前已克隆原预览库，10表仅取count和digest；用户4、凭据1、原Skill3/版本7。未迁移或改账号/密钥，待0030升级后复证哈希。"
+    },
+    {
+      "kind": "live-environment",
+      "ref": "/tmp/wes-preview-final/post-migrate-check.log; /tmp/wes-preview-final/stored-key-restored.log",
+      "summary": "0030升级后原10表摘要不变。初次启动误用主目录无效KEK，继而无法解密而回退env401；已找回A预览原专用0600配置，原DB密钥解密成功且真实Kimi输出350tokens。未改账号/凭据/主配置，不归咎用户密钥，旧失败证据保留。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-preview-final/decompose-trial-evidence.json; /tmp/wes-managed-assets-quality-recheck-tests.log; /tmp/wes-final-cd-validation/semantic-assertions",
+      "summary": "真实拆解样例被约束数组字面断言误拒；仅修新增定义的语义判据并收紧数量，原文引用不变。SPEC/fresh质量48/48、父模块1095/1095及APIbuild0；新增模拟回归明确不具发布资格。新Skill已正式检出保存检入A.1，真实复测/发布继续，原失败不抹除。"
+    },
+    {
+      "kind": "live-model-release",
+      "ref": "/tmp/wes-preview-final/publish-semantic.log; /tmp/wes-preview-final/managed-assets-state.json",
+      "summary": "真实Kimi六样例全过：decompose344、clarify374、matching531输出tokens，各2次模型尝试；三Skill正式审核发布，15步Workflow A.0发布。实际业务运行独立验证中。"
+    },
+    {
+      "kind": "live-business-chain",
+      "ref": "/tmp/wes-preview-final/acceptance-vcs.log; /tmp/wes-preview-final/baseline-vcs-refresh.json; apps/api/src/modules/skills/fixtures/mvp-acceptance-baseline.md",
+      "summary": "真实Excel两条来源经Kimi拆解/澄清/匹配、真实需求/范围/参数及操作明确批准，Run98670192完成15步；1889输出tokens/3模型/8工具。原生item60+62算5天，创建项目1fed1664和评估110a8e31；IA1101检出保存检入IA1101-VA1，刷新原frozen依据一致、重算5天。此为技术HTTP验收，非用户界面验收。"
+    },
+    {
+      "kind": "version-freeze",
+      "ref": "/tmp/wes-preview-final/workflow-version-freeze.json; /tmp/wes-preview-final/negative-state.json",
+      "summary": "原A.0业务Run在澄清等待期间正式升版发布B.0；原Run继续A.0完成，新查询导出反例Run固定B.0。首反例仍有未答问题，未确认或建草稿，已停止后以明确补充复跑。"
+    },
+    {
+      "kind": "preservation",
+      "ref": "/tmp/wes-preview-final/original-records-preserved.json",
+      "summary": "备份与预览对照10表原始记录多重集摘要全部保持；用户4、凭据1、凭据审计1条且总数不变。仅新MVP Skill3与Workflow1及其版本历史新增，旧用户记录未覆盖。"
+    },
+    {
+      "kind": "investigation",
+      "ref": "/tmp/wes-preview-final/acceptance-final.log; /tmp/wes-preview-final/probe-projection.log; ISS-2026-11-03-003",
+      "summary": "写入批准完成期间一次状态GET409后重读completed，原证据保留并入问题池待分诊；同15receipt/364122字节CP实测旧投影270.9ms/单visit含构造211.8ms，结果相同，未把分钟级延迟归因于投影或宣称优化已完成。"
+    },
+    {
+      "kind": "approved-scope-gap",
+      "ref": "docs/superpowers/specs/2026-11-02-wes-business-skills-design.md#12; docs/superpowers/plans/2026-11-02-wes-business-skills.md",
+      "summary": "实取C3仅显式目录选择，原定推荐卡片尚缺；沿既有RP-050补只读授权目录模型推荐和现有Dialog显式启动，API/UI分单TDD和双重复核，不扩展自动启动。"
+    },
+    {
+      "kind": "browser-defect",
+      "ref": "ISS-2026-11-03-004; DEF-2026-11-03-004; /Users/kevin/.codex/visualizations/2026/11/02/01a19a18-92f8-7bf1-b70c-df3fd911608f/mvp-detail-before-1440.jpg",
+      "summary": "浏览器已有信息恢复临时管理员登录；真实5天详情只纳入2项但显示585行及旧假筛选/无关零值云摘要。项目名称实际正常，未误报。沿已批准UI③范围登记缺陷并最小补修，传统评估与旧SKU表不改。"
+    },
+    {
+      "kind": "final-regression",
+      "ref": "/tmp/wes-final-closure-api-summary.log; /tmp/wes-final-closure-web-status.log; /tmp/wes-final-closure-build-web-status.log; /tmp/wes-final-closure-build-api.log",
+      "summary": "模块1140/1140、Harness668/668、AI286/286、Agent254/254、Web96文件908/908及API/Web双构建通过；此前未改动的存储228、规则8、流程17通过。通用integration0/1缺活动模板；原失败及audit45基线保留。"
+    },
+    {
+      "kind": "browser-acceptance",
+      "ref": "/tmp/wes-preview-final/browser-acceptance-state.json; /tmp/wes-preview-final/browser-write-receipt.json; /tmp/wes-preview-final/browser-terminal-runs.json",
+      "summary": "完整普通UI登录/推荐/上传/补充/三次明确确认/原生5天/检出检入刷新通过，Run543f1f23及独立Skill28fe6846均completed；新评估bb213f8a为IA1101-VA1。最终用户验收待回填。"
+    },
+    {
+      "kind": "ui-fixes",
+      "ref": "19b2036; 3eb6d83; ISS/DEF-2026-11-03-004/005",
+      "summary": "冻结详情真实2项范围、紧凑5天统计及1440/760通过；状态对账实际终态一致。SPEC71及独立3探针、QUALITY84通过。"
+    },
+    {
+      "kind": "preservation-final",
+      "ref": "/tmp/wes-preview-final/original-records-preserved.json; /tmp/wes-preview-final/user-metadata-differences.json",
+      "summary": "10表旧记录保留；账号4/凭据1/审计1不变。正常登录仅更新last_login_at/updated_at，密码/身份与凭据未变；不把正常登录时间变更称作用户全行字节不变。"
+    },
+    {
+      "kind": "final-governance-review",
+      "ref": "/tmp/wes-final-board-build.log; /tmp/wes-final-board-check.log; mvp-final-board-requirements.jpg; mvp-final-board-defects.jpg; mvp-final-board-issues.jpg",
+      "summary": "独立最终证据一致性复核APPROVE；12页同步，21页构建/一致性0错误0警告，浏览器实读RP050与新ISS/DEF状态。问题55行52编号；缺陷39=7open+13done+19manual，未修历史窄列或代用户验收。"
+    }
+  ],
+  "next": "用户最终业务验收；主线集成与推送另行授权。",
+  "updatedAt": "2026-11-04"
+}

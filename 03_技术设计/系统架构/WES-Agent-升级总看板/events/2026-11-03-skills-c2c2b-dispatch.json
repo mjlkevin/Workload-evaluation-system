@@ -1,0 +1,69 @@
+{
+  "id": "BE-2026-11-03-skills-c2c2b-dispatch",
+  "date": "2026-11-03",
+  "type": "implementation",
+  "scope": "RP-050 C2c.2b 逐次调用与恢复权限",
+  "summary": "逐次模型、Skill工具与Worker恢复权限检查已验证；旧权限不能绕过当前撤权或紧停。写入外发及缺原角色证据的直接流程工具保持关闭，重试授权/幂等与工作台待接入。",
+  "status": "自动检查与独立复核通过 / 未接生产宿主",
+  "pages": [
+    "index",
+    "requirements",
+    "plan",
+    "testing",
+    "monitoring",
+    "risks",
+    "changes"
+  ],
+  "additionalBoardPages": [
+    "runtime",
+    "design"
+  ],
+  "evidence": [
+    {
+      "kind": "user",
+      "ref": "2026-11-03 continuation after C2c.2a",
+      "summary": "继续下一步"
+    },
+    {
+      "kind": "git",
+      "ref": "1309fe9",
+      "summary": "紧停与真实任务准入已验证；仅原模型状态文件dirty保留，禁止读取修改。"
+    },
+    {
+      "kind": "plan",
+      "ref": "docs/superpowers/plans/2026-11-02-wes-business-skills.md",
+      "summary": "逐次默认门禁、当前Registry/角色/策略交集、Worker恢复检查；无DB迁移/新HTTP/UI。"
+    },
+    {
+      "kind": "test",
+      "ref": "/tmp/wes-c2c2b-baseline/test:execution-emergency.log",
+      "summary": "本轮基线42/42、0skip。"
+    },
+    {
+      "kind": "decision",
+      "ref": "apps/api/src/modules/workflows/workflows.types.ts:86",
+      "summary": "顶层tool未保存原V2角色证据，本批执行/恢复保持拒绝；不另造businessRole授权映射，不扩C1 shape。"
+    },
+    {
+      "kind": "review",
+      "ref": "/tmp/wes-c2c2b-spec/test:execution-authority.log",
+      "summary": "独立SPEC APPROVE，亲跑154/154、0skip；该阶段SPEC已通过，最终质量与父验证见后续证据。"
+    },
+    {
+      "kind": "test",
+      "ref": "/tmp/wes-c2c2b-parent-final",
+      "summary": "专项154、紧停42、模块931、Harness391、存储194、AI286及双构建通过，均0skip。通用集成0/1缺模板保留。"
+    },
+    {
+      "kind": "review",
+      "ref": "/tmp/wes-c2c2b-spec; /tmp/wes-c2c2b-quality",
+      "summary": "规格后fresh五轴质量安全复核APPROVE；不宣称真实模型/业务工具/工作台人工验收通过。"
+    },
+    {
+      "kind": "risk",
+      "ref": "docs/superpowers/plans/2026-11-02-wes-business-skills.md",
+      "summary": "生产宿主及业务HTTP/UI未开放；B预览基线未更新，3006/3004当前未监听，主线未合入、未推送。.2c重试重新授权/会话删除并发、写确认/持久幂等/跨调用预算、统一视图与C3/D/MVP待完成。"
+    }
+  ],
+  "next": "C2c.2c：重试重新授权与会话删除并发保护。"
+}

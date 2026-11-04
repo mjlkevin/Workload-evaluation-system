@@ -1,0 +1,52 @@
+{
+  "id": "BE-2026-11-04-composer-clear-on-dispatch",
+  "date": "2026-11-04",
+  "type": "defect",
+  "issueId": "ISS-2026-11-04-003",
+  "defectId": "DEF-2026-11-04-002",
+  "relatedRequirements": [
+    "RP-050"
+  ],
+  "dedup": "未命中同因清空时机缺陷，新增ISS-2026-11-04-003；与工作台交互ISS-2026-11-04-001相关但根因独立",
+  "originalFeedback": "为什么我消息发送了，消息编辑框里还残留着消息",
+  "sourceScreenshot": "/var/folders/60/mjl7g8pj0bj3pcqspdlc49xw0000gn/T/codex-clipboard-2d8ecb3e-e50a-45f3-b57e-78ab07997406.png",
+  "surface": "AI工作台带Skill标签的消息发送",
+  "currentFact": "中央已出现用户消息和正在理解占位，编辑框在模型等待期间仍显示同一原文",
+  "rootCause": "useComposerBusinessTask.send 的setComposer清空操作位于await sendSkillConversation之后；普通消息通道在加入消息流时立即清空",
+  "impact": "用户难以确认发送是否生效，可能产生重复发送疑虑",
+  "priority": "P2",
+  "severity": "S3",
+  "status": "fixed_manual_pending / 本地修复，待用户验收",
+  "design": "只调整清空时机；发送到对话流时清空文本，失败在同会话且编辑框仍空时恢复原文，不覆盖新草稿；成功不再清空编辑框；能力标签保留",
+  "owner": "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/hooks/useComposerBusinessTask.js",
+  "acceptance": [
+    "模型请求未返回时编辑框已空且用户消息仍显示完整原文",
+    "失败后恢复原文、保留附件与能力标签且重试复用提交键",
+    "迟到成功/失败不覆盖同会话的新草稿或切换后的会话"
+  ],
+  "pages": [
+    "issues",
+    "defects",
+    "requirements",
+    "design",
+    "plan",
+    "testing",
+    "changes",
+    "risks"
+  ],
+  "verification": {
+    "red": "2 failed / 10 passed; /tmp/wes-composer-clear-red.log",
+    "targeted": "13/13; /tmp/wes-composer-clear-green.log",
+    "web": "101 files / 996 tests passed; /tmp/wes-composer-clear-web-final.log",
+    "modules": "1176/1176, fail 0, skipped 0; /tmp/wes-composer-clear-modules.log",
+    "build": "build:web passed; /tmp/wes-composer-clear-build-final.log",
+    "uiScope": "no deterministic findings; /tmp/wes-composer-clear-scope.log",
+    "browser": "真实登录3006，需求拆解分析skill；模型占位5.0s时textarea.value为空，用户原文完整保留；只询问输入要求，不执行业务任务",
+    "screenshot": "/Users/kevin/.codex/visualizations/2026/11/04/01a1a4db-1dd5-7c33-9b3d-2077e4e7ccb4/composer-cleared-while-pending.png",
+    "priorFailures": "前轮模块1174/1176两项取消时序失败证据保留；本次未修改后端或超时预算，完整复跑1176通过"
+  },
+  "review": "五轴自查通过：保留请求快照；同会话空编辑框才函数式恢复；迟到结果不擦新草稿；无API/权限/依赖变更，无额外请求",
+  "delivery": "本地候选，未合主线、未推送；用户验收待回填",
+  "boardCheck": "21页0错0警；问题44=4+22+9+9，缺陷31=7+11+13（候选目录）；新增行实读无内容水平溢出，既有长状态列导致窄列换行，未改共享看板布局。",
+  "sourceCommit": "c3e800c"
+}

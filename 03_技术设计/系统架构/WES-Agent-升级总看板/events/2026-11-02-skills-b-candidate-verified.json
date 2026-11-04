@@ -1,0 +1,85 @@
+{
+  "id": "BE-2026-11-02-skills-b-candidate-verified",
+  "date": "2026-11-02",
+  "type": "verification",
+  "scope": "RP-050 / B候选管理与发布治理",
+  "summary": "B代码、管理界面与契约复核通过；人工流程配置发布回滚实测通过，真实模型验收待有效凭据",
+  "status": "B候选已验证 / 待真实模型及用户验收",
+  "pages": [
+    "index",
+    "requirements",
+    "plan",
+    "testing",
+    "monitoring",
+    "risks",
+    "changes",
+    "sources"
+  ],
+  "additionalBoardPages": [
+    "design"
+  ],
+  "source": {
+    "dedup": "沿用ISS-2026-08-06-002及RP-050；凭据门槛沿用ISS-2026-11-02-005",
+    "boardLayout": "本批验证和变更独立短表，保留历史；浏览器列宽/折叠与页面范围检查通过，board build/check 0错0警。"
+  },
+  "evidence": [
+    {
+      "kind": "git",
+      "ref": "760bf6a / 1e5e0d5 / codex/wes-skills-b",
+      "summary": "B3/B4及所有修正通过规格和质量复核，本地候选未合入主线或推送"
+    },
+    {
+      "kind": "command",
+      "ref": "/tmp/wes-skills-b-final-web.log",
+      "result": "755/755,86files,0skip",
+      "summary": "模块684、流程PG17、AI286、Agent240、规则8、集成1全部通过，API/Web构建通过"
+    },
+    {
+      "kind": "review",
+      "ref": "B5独立集成复核",
+      "summary": "契约、权限、沙箱、发布事务和固定依赖一致；19Skill/17Workflow方法文档覆盖、863内部引用有效、重复key0；步骤长度约束已补齐"
+    },
+    {
+      "kind": "browser",
+      "ref": "Workflow68fe2d14-53b9-4f89-9210-404316cbd5d4",
+      "summary": "人工输入→范围确认映射：A.0校验复核发布，B.1检出保存检入重新校验复核发布，回滚A.0刷新保持；当前B.1只读，生效A.0"
+    },
+    {
+      "kind": "screenshot",
+      "ref": "/Users/kevin/.codex/visualizations/2026/11/02/01a19a18-92f8-7bf1-b70c-df3fd911608f/wes-b-workflow-result.png",
+      "summary": "截图已打开检查；1440/760页面、弹窗、步骤表无横向溢出，原生Tab/Shift+Tab/Escape焦点和拖拽通过"
+    },
+    {
+      "kind": "database",
+      "ref": "专用预览与A备份只读摘要复核",
+      "result": "原2Skill/4版本/16历史保持一致",
+      "summary": "用户原样例未被验收编辑，预览登录保留，主库及主环境未写入"
+    }
+  ],
+  "board": {
+    "testing": [
+      {
+        "command": "B候选最终自动检查",
+        "result": "Web755 / 模块684通过",
+        "summary": "流程PG17、AI286、Agent240、规则8、集成1及双构建通过，零跳过；独立集成复核通过"
+      },
+      {
+        "command": "B4实际浏览器验证",
+        "result": "人工配置发布回滚通过",
+        "summary": "1440/760、固定快照、版本只读和键盘拖拽通过；未执行模型、工具或业务流程"
+      },
+      {
+        "command": "Skill真实成功发布验收",
+        "result": "待有效凭据",
+        "summary": "Provider401；模拟、静态校验与注入模型测试不能替代真实成功，不放开门禁"
+      }
+    ]
+  },
+  "limits": [
+    "A验收不扩展为B或MVP验收，B用户验收仍待确认",
+    "成功真实模型试运行及Skill发布/回滚仍待有效预览凭据；固定Skill跨域happy path未执行",
+    "C/D工作台运行未启动；主线未合入、未推送，原现场保留",
+    "诊断敏感输出事件已通知并记录，建议用户在对应工具服务轮换凭据；事件不含字段或值"
+  ],
+  "next": "用户在3006模型配置保存有效密钥后补验真实Skill试运行→审核发布/回滚及固定Skill流程；完成B业务验收后再进入C"
+}

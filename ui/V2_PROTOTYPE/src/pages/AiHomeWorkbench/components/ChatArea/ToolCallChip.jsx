@@ -17,7 +17,8 @@ export default function ToolCallChip({
 }) {
   const approval = call.approval
   const awaiting = call.status === TOOL_CALL_STATUS.AWAITING_APPROVAL
-  const argEntries = awaiting || call.status === TOOL_CALL_STATUS.REJECTED
+  const sandboxPlan = call.name === 'sandbox_execute' ? approval?.arguments?._sandboxPlan : null
+  const argEntries = !sandboxPlan && (awaiting || call.status === TOOL_CALL_STATUS.REJECTED)
     ? formatToolCallArgs(approval?.arguments)
     : []
   const pending = actionState?.pending === true
@@ -30,6 +31,11 @@ export default function ToolCallChip({
     >
       <code className="border-0 bg-transparent p-0 font-mono text-ink">{call.name}</code>
       {call.source === 'list_tools' && <em className="not-italic text-ink-3">· 经发现</em>}
+      {sandboxPlan && <span className="flex min-w-0 flex-col gap-1" aria-label="云端处理确认">
+        <b>{sandboxPlan.title}</b><span>将授权材料发送到云端沙箱，生成 {(sandboxPlan.outputs || []).map(o => String(o.format).toUpperCase()).join('、')}；最长 {sandboxPlan.maxSeconds} 秒。</span>
+        <span>材料：{sandboxPlan.materials?.length ? sandboxPlan.materials.map(m => m.name).join('、') : '本次提示词中的内容'}</span>
+        <details><summary>查看代码</summary><pre className="max-h-60 max-w-full overflow-auto whitespace-pre-wrap break-words">{approval?.arguments?.code}</pre></details>
+      </span>}
       {argEntries.length > 0 && (
         <span className="flex flex-wrap items-center gap-1.5" aria-label="待批准参数">
           {argEntries.map((entry) => (

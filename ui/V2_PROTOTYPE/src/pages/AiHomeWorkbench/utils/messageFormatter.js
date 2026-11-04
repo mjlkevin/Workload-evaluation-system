@@ -79,6 +79,10 @@ const MAX_ERROR_PREVIEW_CHARS = 120
 
 function normalizeToolCallFields(call) {
   const out = {}
+  if (Array.isArray(call.artifacts)) {
+    const artifacts = call.artifacts.slice(0, 5).filter(a => a && /^[a-f0-9-]{36}$/i.test(a.id) && ['html', 'docx', 'xlsx'].includes(a.format) && typeof a.name === 'string' && typeof a.title === 'string' && Number.isFinite(a.size) && Number.isFinite(Date.parse(a.expiresAt)))
+    if (artifacts.length) out.artifacts = artifacts.map(({id,name,title,format,size,expiresAt}) => ({id,name,title,format,size,expiresAt}))
+  }
   if (Number.isInteger(call.callIndex) && call.callIndex > 0) out.callIndex = call.callIndex
   if (TOOL_CALL_STATUSES.has(call.status)) out.status = call.status
   if (Number.isFinite(call.elapsedMs) && call.elapsedMs >= 0) out.elapsedMs = call.elapsedMs
@@ -296,7 +300,7 @@ export function applyToolCallEventToList(calls, event, context = {}) {
       name: displayName,
       ...(callIndex ? { callIndex } : {}),
       status,
-      ...normalizeToolCallFields({ elapsedMs: payload.elapsedMs, errorPreview: payload.error }),
+      ...normalizeToolCallFields({ elapsedMs: payload.elapsedMs, errorPreview: payload.error, ...(eventType === TOOL_CALL_EVENT_TYPES.COMPLETED && displayName === 'sandbox_execute' ? { artifacts: payload.artifacts } : {}) }),
     }]
   }
 
@@ -343,7 +347,7 @@ export function applyToolCallEventToList(calls, event, context = {}) {
   if (current.status === TOOL_CALL_STATUS.REJECTED) {
     const next = {
       ...current,
-      ...normalizeToolCallFields({ elapsedMs: payload.elapsedMs, errorPreview: payload.error }),
+      ...normalizeToolCallFields({ elapsedMs: payload.elapsedMs, errorPreview: payload.error, ...(eventType === TOOL_CALL_EVENT_TYPES.COMPLETED && displayName === 'sandbox_execute' ? { artifacts: payload.artifacts } : {}) }),
     }
     if (JSON.stringify(next) === JSON.stringify(current)) return null
     return list.map((call, i) => (i === index ? next : call))
@@ -356,7 +360,7 @@ export function applyToolCallEventToList(calls, event, context = {}) {
     ...current,
     ...(displayName && !current?.name ? { name: displayName } : {}),
     status,
-    ...normalizeToolCallFields({ elapsedMs: payload.elapsedMs, errorPreview: payload.error }),
+    ...normalizeToolCallFields({ elapsedMs: payload.elapsedMs, errorPreview: payload.error, ...(eventType === TOOL_CALL_EVENT_TYPES.COMPLETED && displayName === 'sandbox_execute' ? { artifacts: payload.artifacts } : {}) }),
   }
   if (next.approval) {
     // 收口后不再需要展示参数：approval 只留决策痕迹
@@ -435,6 +439,21 @@ export function normalizeSuggestedActions(value) {
   return actions.length ? actions : undefined
 }
 
+// Public identity only; instructions, sources and decision internals never enter bubble props.
+export function normalizeSkillContext(value) {
+  const selection = value?.selection
+  if (!['reply', 'clarify'].includes(value?.action) || !['skill', 'workflow'].includes(selection?.kind)
+    || !['id', 'versionId', 'name'].every(key => typeof selection[key] === 'string' && selection[key])) return undefined
+  return { kind: selection.kind, target: { id: selection.id, versionId: selection.versionId, name: selection.name } }
+}
+// Only the persisted business-start identity is exposed; other metadata stays private.
+export function normalizeProjectionSource(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)
+    || typeof value.runId !== 'string' || !value.runId.trim()
+    || value.eventType !== 'user_message' || value.deduplicationKey !== `${value.runId}:user:1`) return undefined
+  return { runId: value.runId, deduplicationKey: value.deduplicationKey, eventType: value.eventType }
+}
+
 export function mapSessionMessages(session) {
   if (!Array.isArray(session?.messages)) return []
   const attachmentsById = new Map((Array.isArray(session.attachments) ? session.attachments : [])
@@ -485,6 +504,8 @@ export function mapSessionMessages(session) {
         suggestedActions,
         intent,
         model,
+        ...(normalizeSkillContext(metadata.skillConversation) ? { skillContext: normalizeSkillContext(metadata.skillConversation) } : {}),
+        ...(normalizeProjectionSource(metadata.projectionSource) ? { projectionSource: normalizeProjectionSource(metadata.projectionSource) } : {}),
       }
     })
     .filter((message) => message.text)
@@ -533,6 +554,7 @@ export function sameMessageList(left, right) {
     message.role === right[index]?.role &&
     message.text === right[index]?.text &&
     message.model === right[index]?.model &&
+    JSON.stringify(message.projectionSource || null) === JSON.stringify(right[index]?.projectionSource || null) &&
     message.file?.name === right[index]?.file?.name &&
     message.file?.size === right[index]?.file?.size &&
     message.file?.type === right[index]?.file?.type &&

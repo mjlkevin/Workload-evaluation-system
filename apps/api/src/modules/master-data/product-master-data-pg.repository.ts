@@ -135,6 +135,45 @@ const assignmentOrder = [
   asc(productSkuModuleAssignments.id),
 ];
 
+async function resolveAssignmentNames(
+  tx: Pick<Database, "select">,
+  assignment: typeof productSkuModuleAssignments.$inferSelect,
+): Promise<{ productName: string; skuName: string; moduleName: string }> {
+  const [product, sku, module] = await Promise.all([
+    tx.select({ name: productLines.name }).from(productLines).where(eq(productLines.id, assignment.productId)).limit(1),
+    tx.select({ name: productSkus.name }).from(productSkus).where(eq(productSkus.id, assignment.skuId)).limit(1),
+    // 模块可空（套件类 SKU 无模块层级）：为空时不查名，直接给空结果
+    assignment.moduleId
+      ? tx.select({ name: productModules.name }).from(productModules).where(eq(productModules.id, assignment.moduleId)).limit(1)
+      : Promise.resolve([] as Array<{ name: string }>),
+  ]);
+  return {
+    productName: product[0]?.name ?? "",
+    skuName: sku[0]?.name ?? "",
+    moduleName: module[0]?.name ?? "",
+  };
+}
+
+
+export async function readActiveProductAssignments(dbInstance: Pick<Database, "select">): Promise<ProductSkuModuleAssignment[]> {
+  try {
+    const rows = await dbInstance
+      .select()
+      .from(productSkuModuleAssignments)
+      .where(eq(productSkuModuleAssignments.status, "active"))
+      .orderBy(...assignmentOrder);
+    const result: ProductSkuModuleAssignment[] = [];
+    for (const row of rows) {
+      const names = await resolveAssignmentNames(dbInstance, row);
+      result.push(rowToAssignment(row, names));
+    }
+    return result;
+  } catch (err) {
+    throw toSafeError(err);
+  }
+}
+
+
 export function createProductMasterDataPgRepository(dbInstance: Database = db) {
   async function ensureNameFree(
     tx: DbLike,
@@ -166,24 +205,6 @@ export function createProductMasterDataPgRepository(dbInstance: Database = db) {
     return (result.rows as (typeof productSkuModuleAssignments.$inferSelect)[])[0] ?? null;
   }
 
-  async function resolveAssignmentNames(
-    tx: DbLike,
-    assignment: typeof productSkuModuleAssignments.$inferSelect,
-  ): Promise<{ productName: string; skuName: string; moduleName: string }> {
-    const [product, sku, module] = await Promise.all([
-      tx.select({ name: productLines.name }).from(productLines).where(eq(productLines.id, assignment.productId)).limit(1),
-      tx.select({ name: productSkus.name }).from(productSkus).where(eq(productSkus.id, assignment.skuId)).limit(1),
-      // 模块可空（套件类 SKU 无模块层级）：为空时不查名，直接给空结果
-      assignment.moduleId
-        ? tx.select({ name: productModules.name }).from(productModules).where(eq(productModules.id, assignment.moduleId)).limit(1)
-        : Promise.resolve([] as Array<{ name: string }>),
-    ]);
-    return {
-      productName: product[0]?.name ?? "",
-      skuName: sku[0]?.name ?? "",
-      moduleName: module[0]?.name ?? "",
-    };
-  }
 
   async function getAssignment(id: string): Promise<ProductSkuModuleAssignment | null> {
     try {
@@ -218,23 +239,6 @@ export function createProductMasterDataPgRepository(dbInstance: Database = db) {
     }
   }
 
-  async function listActiveAssignments(): Promise<ProductSkuModuleAssignment[]> {
-    try {
-      const rows = await dbInstance
-        .select()
-        .from(productSkuModuleAssignments)
-        .where(eq(productSkuModuleAssignments.status, "active"))
-        .orderBy(...assignmentOrder);
-      const result: ProductSkuModuleAssignment[] = [];
-      for (const row of rows) {
-        const names = await resolveAssignmentNames(dbInstance, row);
-        result.push(rowToAssignment(row, names));
-      }
-      return result;
-    } catch (err) {
-      throw toSafeError(err);
-    }
-  }
 
   async function listProductLines(): Promise<ProductLine[]> {
     try {
@@ -573,7 +577,7 @@ export function createProductMasterDataPgRepository(dbInstance: Database = db) {
       return dbInstance;
     },
     listAssignments,
-    listActiveAssignments,
+    listActiveAssignments: () => readActiveProductAssignments(dbInstance),
     listProductLines,
     listProductSkus,
     listProductModules,

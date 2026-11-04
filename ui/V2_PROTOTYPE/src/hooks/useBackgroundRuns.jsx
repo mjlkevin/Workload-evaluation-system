@@ -40,6 +40,9 @@ const TERMINAL_TEXT = {
 // 正在等的任务，只能靠消费这个事件；等下一次列表刷新等于让用户去找那趟已经开走的车。
 const TOOL_APPROVAL_REQUEST_EVENT = 'tool.call.awaiting_approval'
 const TOOL_APPROVAL_DECISION_EVENTS = ['run_action_confirmed', 'tool.call.rejected']
+// These workflow events commit the same waiting / queued Run states on the server.
+const WORKFLOW_WAIT_EVENTS = ['workflow.awaiting_input', 'workflow.awaiting_confirmation']
+const WORKFLOW_ANSWER_EVENT = 'workflow.answer_recorded'
 /** 决策之后向服务端对账一次的防抖时长（决策本身已在本地收敛，不依赖这一次） */
 const APPROVAL_RECONCILE_DEBOUNCE_MS = 1200
 
@@ -62,6 +65,8 @@ export function BackgroundRunProvider({ children }) {
   const timersRef = useRef([])
   const lastRunsNotifyRef = useRef(0)
   const trailingNotifyPendingRef = useRef(false)
+  const statusRevisionsRef = useRef(new Map())
+  const refreshSequenceRef = useRef(0)
 
   const scheduleTimer = useCallback((fn, delay) => {
     if (!mountedRef.current) return
@@ -75,10 +80,18 @@ export function BackgroundRunProvider({ children }) {
   /** 刷新活跃列表；failed 时指数退避重试（D5），flag 关闭静默降级为无任务。 */
   const refresh = useCallback(async () => {
     if (!mountedRef.current) return
+    const sequence = ++refreshSequenceRef.current
+    const revisions = new Map(statusRevisionsRef.current)
     const result = await listActiveRuns()
-    if (!mountedRef.current) return
+    if (!mountedRef.current || sequence !== refreshSequenceRef.current) return
     setEnabled(result.enabled)
-    setRuns(result.runs)
+    setRuns(previous => {
+      const current = new Map(previous.map(run => [run.runId, run]))
+      return result.runs.map(run => {
+        const changed = (revisions.get(run.runId) || 0) !== (statusRevisionsRef.current.get(run.runId) || 0)
+        return changed && current.has(run.runId) ? { ...run, status: current.get(run.runId).status } : run
+      })
+    })
     if (result.failed) {
       const delay = retryDelayRef.current
       retryDelayRef.current = Math.min(delay * 2, RETRY_MAX_MS)
@@ -113,6 +126,12 @@ export function BackgroundRunProvider({ children }) {
   }, [refresh, scheduleTimer])
 
   const handleEvent = useCallback((runId, event) => {
+    if (!mountedRef.current) return
+    const waiting = event.eventType === TOOL_APPROVAL_REQUEST_EVENT || WORKFLOW_WAIT_EVENTS.includes(event.eventType)
+    const answered = TOOL_APPROVAL_DECISION_EVENTS.includes(event.eventType) || event.eventType === WORKFLOW_ANSWER_EVENT
+    if (waiting || answered || event.eventType === 'run_status_changed' || isTerminalRunEvent(event.eventType)) {
+      statusRevisionsRef.current.set(runId, (statusRevisionsRef.current.get(runId) || 0) + 1)
+    }
     if (event.sequence) sessionRuntimeStore.writeRunCursor(runId, event.sequence)
     if (event.eventType === 'run_status_changed' && event.payload?.status) {
       const nextStatus = event.payload.status
@@ -121,9 +140,9 @@ export function BackgroundRunProvider({ children }) {
 
     // 批次 1b：审批挂起 / 决策。只改本 provider 持有的 Run 摘要（会话徽标的唯一
     // 数据源仍在这里，由下方 [runs] 效应映射进 sessionViews），不另写一份状态。
-    if (event.eventType === TOOL_APPROVAL_REQUEST_EVENT) {
+    if (waiting) {
       setRuns((prev) => prev.map((run) => (run.runId === runId ? { ...run, status: 'waiting' } : run)))
-    } else if (TOOL_APPROVAL_DECISION_EVENTS.includes(event.eventType)) {
+    } else if (answered) {
       setRuns((prev) => prev.map((run) => (
         run.runId === runId && run.status === 'waiting' ? { ...run, status: 'queued' } : run
       )))
@@ -229,10 +248,13 @@ export function BackgroundRunProvider({ children }) {
     runs.forEach((run) => {
       if (snapshotFetchedRef.current.has(run.runId)) return
       snapshotFetchedRef.current.add(run.runId)
+      const revision = statusRevisionsRef.current.get(run.runId) || 0
+      const listSequence = refreshSequenceRef.current
       getRunSnapshot(run.runId)
         .then((snapshot) => {
           const snapshotStatus = snapshot?.run?.status
-          if (!mountedRef.current || !snapshotStatus) return
+          if (!mountedRef.current || !snapshotStatus || listSequence !== refreshSequenceRef.current
+            || revision !== (statusRevisionsRef.current.get(run.runId) || 0)) return
           setRuns((prev) => prev.map((item) => (item.runId === run.runId ? { ...item, status: snapshotStatus } : item)))
         })
         .catch(() => {}) // ISS-2026-08-18-005（档 3）：快照读取失败降级为列表状态，不阻塞恢复——快照仅用于终态对齐，失败时保持列表既有状态即可，可静默

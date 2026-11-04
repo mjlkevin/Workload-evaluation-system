@@ -50,6 +50,7 @@ import { db, type Database } from "../../db/client";
 import { readDbNow } from "../../db/now";
 import { versionRecords } from "../../db/schema";
 import type { VersionRecord } from "../../types";
+import { allocateAssessmentCodeInTransaction, type AssessmentCodeError } from "./assessment-code-transaction";
 
 // ============================================================
 // 安全错误（范式 #1 / #5）
@@ -159,6 +160,8 @@ export interface VersionsStoreRepository {
   // ── 写 ──
   /** 幂等插入：同 recordId 冲突重放返回原记录（created=false，范式 #2） */
   createVersionRecord(record: VersionRecord): Promise<{ created: boolean; record: VersionRecord }>;
+  /** Ordinary assessment allocation and insert share the Skill draft owner/template transaction lock. */
+  createAssessmentVersionRecord(record: VersionRecord): Promise<{ record: VersionRecord } | AssessmentCodeError>;
   /** 整行 upsert（project-evaluations 的 saveProjectRecord 语义） */
   upsertVersionRecord(record: VersionRecord): Promise<VersionRecord>;
   /**
@@ -192,7 +195,7 @@ export interface VersionsStoreRepository {
 
 type VersionRecordRow = typeof versionRecords.$inferSelect;
 
-function toVersionRecord(row: VersionRecordRow): VersionRecord {
+export function toVersionRecord(row: VersionRecordRow): VersionRecord {
   const record: VersionRecord = {
     id: row.recordId,
     type: row.type as VersionRecord["type"],
@@ -226,7 +229,7 @@ function toVersionRecord(row: VersionRecordRow): VersionRecord {
 
 type VersionRecordValues = typeof versionRecords.$inferInsert;
 
-function toRowValues(record: VersionRecord): VersionRecordValues {
+export function toRowValues(record: VersionRecord): VersionRecordValues {
   return {
     recordId: record.id,
     type: record.type,
@@ -324,6 +327,21 @@ export function createVersionsPgRepository(dbInstance: Database = db): VersionsP
     },
 
     // ── 写路径 ──
+
+    async createAssessmentVersionRecord(record) {
+      try {
+        if (record.type !== "assessment") throw new VersionsStoreError("VERSIONS_STORE_INTERNAL");
+        return await dbInstance.transaction(async tx => {
+          const allocated = await allocateAssessmentCodeInTransaction(tx, record, new Date(record.createdAt));
+          if ("errorCode" in allocated) return allocated;
+          const completed = { ...record, versionCode: allocated.versionCode, baseCode: allocated.versionCode };
+          await tx.insert(versionRecords).values(toRowValues(completed));
+          return { record: completed };
+        });
+      } catch (err) {
+        throw toSafeError(err);
+      }
+    },
 
     async createVersionRecord(record) {
       try {

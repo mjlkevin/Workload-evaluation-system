@@ -160,7 +160,7 @@ export async function createVersion(req: Request, res: Response) {
   }
 
   const repo = getVersionsRepository();
-  if (!versionCode) {
+  if (!versionCode && type !== "assessment") {
     // 序号探测只需同 owner+type+template 下的既有版本号集合
     const owned = await repo.listRecords({ ownerUserId: auth.user.id, type, templateId });
     const existingCodes = new Set(owned.map((record) => record.versionCode));
@@ -175,7 +175,8 @@ export async function createVersion(req: Request, res: Response) {
     }
     versionCode = generated.versionCode;
   }
-  const existed = await repo.findRecordByCode(auth.user.id, type, templateId, versionCode);
+  // Assessment allocation, duplicate checks and insertion must stay in one repository transaction.
+  const existed = type !== "assessment" && await repo.findRecordByCode(auth.user.id, type, templateId, versionCode);
 
   if (existed) {
     return fail(res, 40901, "版本号已存在，不可覆盖（不可变版本）", [{ field: "versionCode", reason: "already_exists" }]);
@@ -211,6 +212,13 @@ export async function createVersion(req: Request, res: Response) {
     record.reviewedByUserId = auth.user.id;
   }
 
+  if (type === "assessment") {
+    const created = await repo.createAssessmentVersionRecord(record);
+    if ("errorCode" in created) {
+      return fail(res, created.errorCode, created.message, [{ field: created.field, reason: created.reason }]);
+    }
+    return res.json(ok({ record: toPublicVersionRecord(created.record) }, randomUUID()));
+  }
   await repo.createVersionRecord(record);
 
   return res.json(ok({ record: toPublicVersionRecord(record) }, randomUUID()));

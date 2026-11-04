@@ -45,11 +45,2029 @@ tags:
   - name: DevAssessment
   - name: Change
   - name: History
+  - name: Skills
+  - name: Workflows
 
 security:
   - bearerAuth: []
 
 paths:
+  /api/v1/skills:
+    get:
+      tags:
+      - Skills
+      summary: Admin Skill list; business-user catalog is /api/v1/skills/catalog
+      description: 需要有效JWT且账号角色为admin；不接受前端操作者或发布证明。
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - code
+                - message
+                - data
+                properties:
+                  code:
+                    const: 0
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required:
+                    - items
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SkillRecord'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      parameters:
+      - name: includeArchived
+        in: query
+        schema:
+          type: boolean
+          default: false
+    post:
+      tags:
+      - Skills
+      summary: 创建已检入草稿，无生效版本
+      description: 需要有效JWT且账号角色为admin；不接受前端操作者或发布证明。
+      responses:
+        '201':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillRecordResponse'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - definition
+              properties:
+                definition:
+                  $ref: '#/components/schemas/SkillDefinition'
+  /api/v1/skills/metadata:
+    get:
+      tags:
+      - Skills
+      summary: 管理元数据与实时注册工具的原生参数
+      description: 需要有效JWT且账号角色为admin；不接受前端操作者或发布证明。
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - code
+                - message
+                - data
+                properties:
+                  code:
+                    const: 0
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required:
+                    - tools
+                    - viewerId
+                    - roles
+                    - modelScenarios
+                    - publishAvailable
+                    properties:
+                      tools:
+                        type: array
+                        items:
+                          type: object
+                          additionalProperties: false
+                          required:
+                          - name
+                          - description
+                          - parameters
+                          - mutates
+                          - exfiltrates
+                          properties:
+                            name:
+                              type: string
+                            description:
+                              type: string
+                            parameters:
+                              type: object
+                              additionalProperties: true
+                            mutates:
+                              type: boolean
+                            exfiltrates:
+                              type: boolean
+                            simulationOnly:
+                              type: boolean
+                      viewerId:
+                        type: string
+                      roles:
+                        type: array
+                        items:
+                          type: string
+                      modelScenarios:
+                        type: array
+                        items:
+                          type: string
+                      publishAvailable:
+                        type: boolean
+                        const: true
+                        description: Release API capability only. Per-candidate authority is GET /skills/{skillId}/release.
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+  /api/v1/skills/validate:
+    post:
+      tags:
+      - Skills
+      summary: 定义与工具映射静态校验，不执行模型或工具
+      description: 需要有效JWT且账号角色为admin；不接受前端操作者或发布证明。
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - code
+                - message
+                - data
+                properties:
+                  code:
+                    const: 0
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required:
+                    - valid
+                    - releaseReady
+                    - reason
+                    properties:
+                      valid:
+                        const: true
+                      releaseReady:
+                        const: false
+                      reason:
+                        const: SKILL_RELEASE_GATE_PENDING
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - definition
+              properties:
+                definition:
+                  $ref: '#/components/schemas/SkillDefinition'
+  /api/v1/skills/{skillId}:
+    parameters:
+    - name: skillId
+      in: path
+      required: true
+      schema:
+        type: string
+    get:
+      tags:
+      - Skills
+      summary: 读取当前及历史版本与操作审计
+      description: 需要有效JWT且账号角色为admin；不接受前端操作者或发布证明。
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillRecordResponse'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+  /api/v1/skills/{skillId}/save-draft:
+    parameters:
+    - name: skillId
+      in: path
+      required: true
+      schema:
+        type: string
+    patch:
+      tags:
+      - Skills
+      summary: 仅当前检出人保存；revision不匹配返回409
+      description: 需要有效JWT且账号角色为admin；不接受前端操作者或发布证明。
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillRecordResponse'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - revision
+              - definition
+              properties:
+                revision:
+                  type: integer
+                  minimum: 1
+                definition:
+                  $ref: '#/components/schemas/SkillDefinition'
+  /api/v1/skills/{skillId}/status:
+    parameters:
+    - name: skillId
+      in: path
+      required: true
+      schema:
+        type: string
+    patch:
+      tags:
+      - Skills
+      summary: 启停或归档；至少一个布尔状态，归档会停用
+      description: 需要有效JWT且账号角色为admin；不接受前端操作者或发布证明。
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillRecordResponse'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - revision
+              properties:
+                revision:
+                  type: integer
+                  minimum: 1
+                enabled:
+                  type: boolean
+                archived:
+                  type: boolean
+  /api/v1/skills/{skillId}/checkout:
+    parameters:
+    - name: skillId
+      in: path
+      required: true
+      schema:
+        type: string
+    post:
+      tags:
+      - Skills
+      summary: 检出当前草稿
+      description: 需要有效JWT且账号角色为admin；不接受前端操作者或发布证明。
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillRecordResponse'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SkillRevisionInput'
+  /api/v1/skills/{skillId}/checkin:
+    parameters:
+    - name: skillId
+      in: path
+      required: true
+      schema:
+        type: string
+    post:
+      tags:
+      - Skills
+      summary: 检入并递增小版本
+      description: 需要有效JWT且账号角色为admin；不接受前端操作者或发布证明。
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillRecordResponse'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SkillRevisionInput'
+  /api/v1/skills/{skillId}/undo-checkout:
+    parameters:
+    - name: skillId
+      in: path
+      required: true
+      schema:
+        type: string
+    post:
+      tags:
+      - Skills
+      summary: 撤销并恢复最近检入快照
+      description: 需要有效JWT且账号角色为admin；不接受前端操作者或发布证明。
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillRecordResponse'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SkillRevisionInput'
+  /api/v1/skills/{skillId}/promote:
+    parameters:
+    - name: skillId
+      in: path
+      required: true
+      schema:
+        type: string
+    post:
+      tags:
+      - Skills
+      summary: 保留历史并创建下一主版本草稿
+      description: 需要有效JWT且账号角色为admin；不接受前端操作者或发布证明。
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillRecordResponse'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SkillRevisionInput'
+  /api/v1/skills/{skillId}/force-unlock:
+    parameters:
+    - name: skillId
+      in: path
+      required: true
+      schema:
+        type: string
+    post:
+      tags:
+      - Skills
+      summary: 管理员强制解锁并恢复检入快照
+      description: 需要有效JWT且账号角色为admin；不接受前端操作者或发布证明。
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillRecordResponse'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SkillRevisionInput'
+  /api/v1/skills/{skillId}/publish:
+    parameters:
+    - name: skillId
+      in: path
+      required: true
+      schema:
+        type: string
+    post:
+      tags:
+      - Skills
+      summary: Atomically publish reviewed candidate with matching version, content and dependency proofs
+      description: JWT + system:manage + actual admin role. Candidate revision and server evidence are authoritative.
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - code
+                - message
+                - data
+                properties:
+                  code:
+                    type: integer
+                    const: 0
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required:
+                    - record
+                    properties:
+                      record:
+                        $ref: '#/components/schemas/SkillRecord'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SkillRevisionInput'
+  /api/v1/skills/{skillId}/release:
+    parameters:
+    - name: skillId
+      in: path
+      required: true
+      schema:
+        type: string
+    get:
+      tags:
+      - Skills
+      summary: Current candidate release evidence and authoritative readiness
+      description: JWT + system:manage + actual admin role. Candidate revision and server evidence are authoritative.
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - code
+                - message
+                - data
+                properties:
+                  code:
+                    type: integer
+                    const: 0
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/SkillReleaseReadiness'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+  /api/v1/skills/{skillId}/trial:
+    parameters:
+    - name: skillId
+      in: path
+      required: true
+      schema:
+        type: string
+    post:
+      tags:
+      - Skills
+      summary: Evaluate persisted candidate in model or explicit simulation mode
+      description: JWT + system:manage + actual admin role. Candidate revision and server evidence are authoritative.
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - code
+                - message
+                - data
+                properties:
+                  code:
+                    type: integer
+                    const: 0
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required:
+                    - record
+                    - evaluation
+                    properties:
+                      record:
+                        $ref: '#/components/schemas/SkillRecord'
+                      evaluation:
+                        $ref: '#/components/schemas/SkillEvaluation'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - revision
+              - mode
+              properties:
+                revision:
+                  type: integer
+                  minimum: 1
+                mode:
+                  enum:
+                  - model
+                  - simulation
+  /api/v1/skills/{skillId}/review:
+    parameters:
+    - name: skillId
+      in: path
+      required: true
+      schema:
+        type: string
+    post:
+      tags:
+      - Skills
+      summary: Review matching real model evidence with isolated-step acknowledgement
+      description: JWT + system:manage + actual admin role. Candidate revision and server evidence are authoritative.
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - code
+                - message
+                - data
+                properties:
+                  code:
+                    type: integer
+                    const: 0
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required:
+                    - record
+                    properties:
+                      record:
+                        $ref: '#/components/schemas/SkillRecord'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - revision
+              - evaluationId
+              - reason
+              properties:
+                revision:
+                  type: integer
+                  minimum: 1
+                evaluationId:
+                  type: string
+                reason:
+                  type: string
+                  minLength: 1
+                  maxLength: 2000
+                acknowledgeSimulation:
+                  type: boolean
+  /api/v1/skills/{skillId}/rollback:
+    parameters:
+    - name: skillId
+      in: path
+      required: true
+      schema:
+        type: string
+    post:
+      tags:
+      - Skills
+      summary: Switch active pointer to a compatible previously published version; preserve history
+      description: JWT + system:manage + actual admin role. Candidate revision and server evidence are authoritative.
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - code
+                - message
+                - data
+                properties:
+                  code:
+                    type: integer
+                    const: 0
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required:
+                    - record
+                    properties:
+                      record:
+                        $ref: '#/components/schemas/SkillRecord'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - revision
+              - targetVersionId
+              - reason
+              properties:
+                revision:
+                  type: integer
+                  minimum: 1
+                targetVersionId:
+                  type: string
+                reason:
+                  type: string
+                  minLength: 1
+                  maxLength: 2000
+  /api/v1/skills/catalog:
+    get:
+      tags:
+      - Skills
+      summary: Authenticated callable published Skill catalog (safe projection)
+      description: JWT required; enabled, nonarchived, active published version, actual business role and current native tool
+        capability/policy must all permit it. No draft/prompt/audit exposure.
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - code
+                - message
+                - data
+                properties:
+                  code:
+                    type: integer
+                    const: 0
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required:
+                    - items
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SkillCatalogItem'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+  /api/v1/workflows:
+    get:
+      tags:
+      - Workflows
+      summary: Admin Workflow list; archived records hidden by default
+      description: JWT + system:manage + actual admin. Configuration/static verification only; no workflow execution, model
+        calls or Harness run.
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - code
+                - message
+                - data
+                properties:
+                  code:
+                    type: integer
+                    const: 0
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required:
+                    - items
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/WorkflowRecord'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      parameters:
+      - name: includeArchived
+        in: query
+        schema:
+          type: boolean
+          default: false
+    post:
+      tags:
+      - Workflows
+      summary: Create checked-in A.0 draft Workflow
+      description: JWT + system:manage + actual admin. Configuration/static verification only; no workflow execution, model
+        calls or Harness run.
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - code
+                - message
+                - data
+                properties:
+                  code:
+                    type: integer
+                    const: 0
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required:
+                    - record
+                    properties:
+                      record:
+                        $ref: '#/components/schemas/WorkflowRecord'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - definition
+              properties:
+                definition:
+                  $ref: '#/components/schemas/WorkflowDefinition'
+  /api/v1/workflows/metadata:
+    get:
+      tags:
+      - Workflows
+      summary: Registered native contracts and explicit published Skill versions
+      description: JWT + system:manage + actual admin. Configuration/static verification only; no workflow execution, model
+        calls or Harness run.
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - code
+                - message
+                - data
+                properties:
+                  code:
+                    type: integer
+                    const: 0
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/WorkflowMetadata'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+  /api/v1/workflows/{workflowId}:
+    parameters:
+    - name: workflowId
+      in: path
+      required: true
+      schema:
+        type: string
+    get:
+      tags:
+      - Workflows
+      summary: Workflow detail including immutable version history
+      description: JWT + system:manage + actual admin. Configuration/static verification only; no workflow execution, model
+        calls or Harness run.
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - code
+                - message
+                - data
+                properties:
+                  code:
+                    type: integer
+                    const: 0
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required:
+                    - record
+                    properties:
+                      record:
+                        $ref: '#/components/schemas/WorkflowRecord'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+  /api/v1/workflows/{workflowId}/save-draft:
+    parameters:
+    - name: workflowId
+      in: path
+      required: true
+      schema:
+        type: string
+    patch:
+      tags:
+      - Workflows
+      summary: Save only checkout owner draft with revision CAS
+      description: JWT + system:manage + actual admin. Configuration/static verification only; no workflow execution, model
+        calls or Harness run.
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - code
+                - message
+                - data
+                properties:
+                  code:
+                    type: integer
+                    const: 0
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required:
+                    - record
+                    properties:
+                      record:
+                        $ref: '#/components/schemas/WorkflowRecord'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - revision
+              - definition
+              properties:
+                revision:
+                  type: integer
+                  minimum: 1
+                definition:
+                  $ref: '#/components/schemas/WorkflowDefinition'
+  /api/v1/workflows/{workflowId}/status:
+    parameters:
+    - name: workflowId
+      in: path
+      required: true
+      schema:
+        type: string
+    patch:
+      tags:
+      - Workflows
+      summary: Enable, disable or archive without deleting fixed history
+      description: JWT + system:manage + actual admin. Configuration/static verification only; no workflow execution, model
+        calls or Harness run.
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - code
+                - message
+                - data
+                properties:
+                  code:
+                    type: integer
+                    const: 0
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required:
+                    - record
+                    properties:
+                      record:
+                        $ref: '#/components/schemas/WorkflowRecord'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - revision
+              properties:
+                revision:
+                  type: integer
+                  minimum: 1
+                enabled:
+                  type: boolean
+                archived:
+                  type: boolean
+  /api/v1/workflows/{workflowId}/checkout:
+    parameters:
+    - name: workflowId
+      in: path
+      required: true
+      schema:
+        type: string
+    post:
+      tags:
+      - Workflows
+      summary: 'Workflow version action: checkout'
+      description: JWT + system:manage + actual admin. Configuration/static verification only; no workflow execution, model
+        calls or Harness run.
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - code
+                - message
+                - data
+                properties:
+                  code:
+                    type: integer
+                    const: 0
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required:
+                    - record
+                    properties:
+                      record:
+                        $ref: '#/components/schemas/WorkflowRecord'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - revision
+              properties:
+                revision:
+                  type: integer
+                  minimum: 1
+  /api/v1/workflows/{workflowId}/checkin:
+    parameters:
+    - name: workflowId
+      in: path
+      required: true
+      schema:
+        type: string
+    post:
+      tags:
+      - Workflows
+      summary: 'Workflow version action: checkin'
+      description: JWT + system:manage + actual admin. Configuration/static verification only; no workflow execution, model
+        calls or Harness run.
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - code
+                - message
+                - data
+                properties:
+                  code:
+                    type: integer
+                    const: 0
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required:
+                    - record
+                    properties:
+                      record:
+                        $ref: '#/components/schemas/WorkflowRecord'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - revision
+              properties:
+                revision:
+                  type: integer
+                  minimum: 1
+  /api/v1/workflows/{workflowId}/undo-checkout:
+    parameters:
+    - name: workflowId
+      in: path
+      required: true
+      schema:
+        type: string
+    post:
+      tags:
+      - Workflows
+      summary: 'Workflow version action: undo-checkout'
+      description: JWT + system:manage + actual admin. Configuration/static verification only; no workflow execution, model
+        calls or Harness run.
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - code
+                - message
+                - data
+                properties:
+                  code:
+                    type: integer
+                    const: 0
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required:
+                    - record
+                    properties:
+                      record:
+                        $ref: '#/components/schemas/WorkflowRecord'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - revision
+              properties:
+                revision:
+                  type: integer
+                  minimum: 1
+  /api/v1/workflows/{workflowId}/promote:
+    parameters:
+    - name: workflowId
+      in: path
+      required: true
+      schema:
+        type: string
+    post:
+      tags:
+      - Workflows
+      summary: 'Workflow version action: promote'
+      description: JWT + system:manage + actual admin. Configuration/static verification only; no workflow execution, model
+        calls or Harness run.
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - code
+                - message
+                - data
+                properties:
+                  code:
+                    type: integer
+                    const: 0
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required:
+                    - record
+                    properties:
+                      record:
+                        $ref: '#/components/schemas/WorkflowRecord'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - revision
+              properties:
+                revision:
+                  type: integer
+                  minimum: 1
+  /api/v1/workflows/{workflowId}/force-unlock:
+    parameters:
+    - name: workflowId
+      in: path
+      required: true
+      schema:
+        type: string
+    post:
+      tags:
+      - Workflows
+      summary: 'Workflow version action: force-unlock'
+      description: JWT + system:manage + actual admin. Configuration/static verification only; no workflow execution, model
+        calls or Harness run.
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - code
+                - message
+                - data
+                properties:
+                  code:
+                    type: integer
+                    const: 0
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required:
+                    - record
+                    properties:
+                      record:
+                        $ref: '#/components/schemas/WorkflowRecord'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - revision
+              properties:
+                revision:
+                  type: integer
+                  minimum: 1
+  /api/v1/workflows/{workflowId}/validate:
+    parameters:
+    - name: workflowId
+      in: path
+      required: true
+      schema:
+        type: string
+    post:
+      tags:
+      - Workflows
+      summary: Persist static definition/dependency proof; executionPerformed=false
+      description: JWT + system:manage + actual admin. Configuration/static verification only; no workflow execution, model
+        calls or Harness run.
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - code
+                - message
+                - data
+                properties:
+                  code:
+                    type: integer
+                    const: 0
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required:
+                    - record
+                    - mode
+                    - executionPerformed
+                    properties:
+                      record:
+                        $ref: '#/components/schemas/WorkflowRecord'
+                      mode:
+                        const: static
+                      executionPerformed:
+                        const: false
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - revision
+              properties:
+                revision:
+                  type: integer
+                  minimum: 1
+  /api/v1/workflows/{workflowId}/review:
+    parameters:
+    - name: workflowId
+      in: path
+      required: true
+      schema:
+        type: string
+    post:
+      tags:
+      - Workflows
+      summary: Review matching current server static proof and dependency digest
+      description: JWT + system:manage + actual admin. Configuration/static verification only; no workflow execution, model
+        calls or Harness run.
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - code
+                - message
+                - data
+                properties:
+                  code:
+                    type: integer
+                    const: 0
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required:
+                    - record
+                    properties:
+                      record:
+                        $ref: '#/components/schemas/WorkflowRecord'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - revision
+              - reason
+              properties:
+                revision:
+                  type: integer
+                  minimum: 1
+                reason:
+                  type: string
+                  minLength: 1
+                  maxLength: 2000
+  /api/v1/workflows/{workflowId}/publish:
+    parameters:
+    - name: workflowId
+      in: path
+      required: true
+      schema:
+        type: string
+    post:
+      tags:
+      - Workflows
+      summary: Atomically publish reviewed fixed dependency snapshot
+      description: JWT + system:manage + actual admin. Configuration/static verification only; no workflow execution, model
+        calls or Harness run.
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - code
+                - message
+                - data
+                properties:
+                  code:
+                    type: integer
+                    const: 0
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required:
+                    - record
+                    properties:
+                      record:
+                        $ref: '#/components/schemas/WorkflowRecord'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - revision
+              properties:
+                revision:
+                  type: integer
+                  minimum: 1
+  /api/v1/workflows/{workflowId}/rollback:
+    parameters:
+    - name: workflowId
+      in: path
+      required: true
+      schema:
+        type: string
+    post:
+      tags:
+      - Workflows
+      summary: Switch to compatible own historical published version after dependency revalidation
+      description: JWT + system:manage + actual admin. Configuration/static verification only; no workflow execution, model
+        calls or Harness run.
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - code
+                - message
+                - data
+                properties:
+                  code:
+                    type: integer
+                    const: 0
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required:
+                    - record
+                    properties:
+                      record:
+                        $ref: '#/components/schemas/WorkflowRecord'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - revision
+              - targetVersionId
+              - reason
+              properties:
+                revision:
+                  type: integer
+                  minimum: 1
+                targetVersionId:
+                  type: string
+                reason:
+                  type: string
+                  minLength: 1
+                  maxLength: 2000
+  /api/v1/workflows/{workflowId}/release:
+    parameters:
+    - name: workflowId
+      in: path
+      required: true
+      schema:
+        type: string
+    get:
+      tags:
+      - Workflows
+      summary: Authoritative static proof/review/publish readiness
+      description: JWT + system:manage + actual admin. Configuration/static verification only; no workflow execution, model
+        calls or Harness run.
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - code
+                - message
+                - data
+                properties:
+                  code:
+                    type: integer
+                    const: 0
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/WorkflowReadiness'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+  /api/v1/workflows/{workflowId}/dependencies:
+    parameters:
+    - name: workflowId
+      in: path
+      required: true
+      schema:
+        type: string
+    get:
+      tags:
+      - Workflows
+      summary: Read frozen published dependencies or current draft resolution
+      description: JWT + system:manage + actual admin. Configuration/static verification only; no workflow execution, model
+        calls or Harness run.
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - code
+                - message
+                - data
+                properties:
+                  code:
+                    type: integer
+                    const: 0
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required:
+                    - versionId
+                    - frozen
+                    - snapshot
+                    - issues
+                    properties:
+                      versionId:
+                        type: string
+                      frozen:
+                        type: boolean
+                      snapshot:
+                        anyOf:
+                        - $ref: '#/components/schemas/WorkflowDependencySnapshot'
+                        - type: 'null'
+                      issues:
+                        type: array
+                        items:
+                          type: object
+                          additionalProperties: false
+                          required:
+                          - code
+                          - message
+                          properties:
+                            code:
+                              type: string
+                            message:
+                              type: string
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      parameters:
+      - name: versionId
+        in: query
+        schema:
+          type: string
+        description: Explicit stable Workflow version ID, never latest
+  /api/v1/skills/{skillId}/influences:
+    parameters:
+    - name: skillId
+      in: path
+      required: true
+      schema:
+        type: string
+    get:
+      tags:
+      - Skills
+      summary: Exact Skill version references across active, historical and archived Workflows
+      description: JWT + system:manage + actual admin. Configuration/static verification only; no workflow execution, model
+        calls or Harness run.
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - code
+                - message
+                - data
+                properties:
+                  code:
+                    type: integer
+                    const: 0
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required:
+                    - items
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/WorkflowSkillInfluence'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      parameters:
+      - name: skillVersionId
+        in: query
+        schema:
+          type: string
   /api/v1/health:
     get:
       tags: [Health]
@@ -665,6 +2683,150 @@ paths:
                 $ref: "#/components/schemas/GenericOkResponse"
 
   # ------------------------------------------------------------
+  /api/v1/business-assessments/{recordId}/basis:
+    get:
+      tags: [Estimates]
+      summary: 读取实施评估的服务器冻结计算依据
+      description: >
+        仅当前有读取能力的活动 owner 可访问。服务器以实际记录 ID 查询真实原生草稿成功回执，
+        核对历史操作及批准、来源 Run、冻结清单和目录摘要，不采信可编辑 payload 中的自称快照。
+        普通旧记录明确返回 kind=legacy；真正业务流程草稿返回 kind=frozen。
+        移除可编辑来源标记不解除冻结；声明来源但依据缺失、损坏或借用其他记录的回执返回 409，
+        不自动读取最新模板。原记录 minor 签入后 ID 不变，仍读取原依据；复制来源到新 ID 不成立。
+      operationId: readBusinessAssessmentBasis
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: recordId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 明确的 legacy 或服务器复证的 frozen 依据。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusinessAssessmentBasisResponse'
+        "400": { description: 记录 ID 无效。 }
+        "401": { description: JWT 缺失或失效。 }
+        "403": { description: 当前身份或读取能力无效。 }
+        "404": { description: 评估不存在或非 owner。 }
+        "409": { description: 原始计算依据缺失、损坏或不匹配，不回退最新目录。 }
+        "503": { description: 依据服务暂不可用，内部错误不外泄。 }
+
+  /api/v1/business-assessments/{recordId}/calculate:
+    post:
+      tags: [Estimates]
+      summary: 以原冻结模板和规则只读重算业务流程评估
+      description: >
+        与 basis 相同的 owner 和历史依据校验。只接受明确参数与条目选择，由既有 WES 引擎计算，
+        不保存记录、不检出检入、不执行模型或导出。模板和规则 ID 可省略，提供时必须等于冻结 ID；
+        客户端不能提交模板、规则、快照或计算结果。条目必须完整覆盖原模板，不允许重复或未知 ID。
+        customStandardDays 仅代表显式人工输入，不自动采用 AI 增量建议。legacy 返回 409，
+        调用方只有在 basis 明确为 legacy 时才使用原有普通计算入口。
+      operationId: calculateBusinessAssessmentWithFrozenBasis
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: recordId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BusinessAssessmentCalculateRequest'
+      responses:
+        "200":
+          description: 规则引擎结果，记录和冻结依据未被修改。
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, message, data]
+                properties:
+                  code: { const: 0 }
+                  message: { type: string }
+                  requestId: { type: string }
+                  data: { $ref: '#/components/schemas/EstimateResult' }
+        "400": { description: 无效 ID、参数、条目、未知字段或客户端快照。 }
+        "401": { description: JWT 缺失或失效。 }
+        "403": { description: 当前身份或读取能力无效。 }
+        "404": { description: 评估不存在或非 owner。 }
+        "409": { description: 依据不匹配或 BUSINESS_ASSESSMENT_LEGACY，不回退计算。 }
+        "503": { description: 依据服务暂不可用。 }
+
+  # 真实来源上传独立于异步 Run 开关；只有显式启动任务才调用模型。
+  /api/v1/ai-sessions/{sessionId}/execution-sources:
+    post:
+      tags: [AIRuns]
+      summary: 为本人会话上传真实需求来源材料
+      description: >
+        JWT 与 estimates:read 校验后，接受一个名为 file 的 .xlsx、.txt 或 .md 文件，
+        原始文件不超过 2 MiB；每用户每分钟最多 60 次，不接受附加文本字段或客户端 sourceDocument。
+        服务器检查当前身份及会话归属，在受限进程中提取不超过 200000 字符的原文，
+        保存字节摘要、工作表及单元格位置，提交前重新检查权限。每会话最多 10 份材料、
+        合计 500000 字符；不静默截断。返回附件元数据，不返回原始字节或规范化原文。
+        后续执行使用 sources 中的 file 引用冻结材料；旧 parsedSummary 不作为上传原文。
+      operationId: uploadBusinessExecutionSource
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: 一个不超过 2097152 原始字节的 XLSX 或 UTF-8 文本文件。
+      responses:
+        "200":
+          description: 原文已持久化，data 直接包含附件元数据。
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, message, data]
+                properties:
+                  code: { const: 0 }
+                  message: { type: string }
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required: [attachmentId, name, size, type, createdAt, sourceAvailable, sourceDigest, sourceCharCount]
+                    properties:
+                      attachmentId: { type: string, format: uuid }
+                      name: { type: string, minLength: 1, maxLength: 255 }
+                      size: { type: integer, minimum: 1, maximum: 2097152 }
+                      type: { enum: [application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, text/plain, text/markdown] }
+                      createdAt: { type: string, format: date-time }
+                      sourceAvailable: { const: true }
+                      sourceDigest: { type: string, pattern: '^[a-f0-9]{64}$' }
+                      sourceCharCount: { type: integer, minimum: 1, maximum: 200000 }
+        "400": { description: 无效会话 ID、文件、编码或 multipart 内容，错误为安全响应信封。 }
+        "401": { description: JWT 缺失、失效或过期。 }
+        "403": { description: 能力不足或当前身份已变化。 }
+        "404": { description: 会话不存在、已归档或不属于当前用户。 }
+        "409": { description: 会话材料数量或累计字符达到上限。 }
+        "413": { description: 文件、提取内容或并发解析达到处理上限。 }
+        "429": { description: 当前用户上传过于频繁。 }
+        "500": { description: 原文服务内部失败，返回固定安全消息。 }
+        "503": { description: 材料上传暂不可用，不返回内部异常。 }
+
+  # ------------------------------------------------------------
   # AI Runs — 异步 Run API（RP-047 Batch C）
   # ------------------------------------------------------------
   # 受 feature flag `WES_AI_DURABLE_RUNS_ENABLED` 控制（默认关闭）：
@@ -683,7 +2845,11 @@ paths:
         该会话是否存在活跃 Run：命中时返回 409 SESSION_HAS_ACTIVE_RUN
         且不删除（前端冻结文案：该会话仍有后台任务运行中，请先停止任务。），
         会话不存在或非 owner 返回 404（不泄露存在性）。
-        本条为 Batch D 契约增补，不回填其他旧域端点。
+        仓储在同一事务先锁定所属 Session（FOR UPDATE），再以独立 SQL
+        查询 queued/running/waiting/recovering/cancelling 五种活跃状态后删除。
+        生产提交与普通重试在入队事务持有 Session FOR SHARE：入队先提交则删除
+        返回 409；删除先提交则提交或重试返回 404，不创建孤儿任务。
+        外层检查器不能绕过仓储保护。本条不回填其他旧域端点。
       operationId: deleteAiSession
       security:
         - bearerAuth: []
@@ -713,6 +2879,161 @@ paths:
               schema:
                 $ref: "#/components/schemas/AiRunsConflictResponse"
 
+  /api/v1/ai-executions/catalog:
+    get:
+      tags: [AIRuns]
+      summary: 当前用户可执行的 Skill 和工作流目录
+      description: >
+        JWT 与当前数据库身份校验后，仅返回可调用的启用发布版本。
+        data.items 包含 kind、id、versionId、name、description、inputSchema；不返回指令、模型凭据或授权证明。
+        目录用于显式选择和推荐；提交时仍重新检查定义、权限和依赖。
+      operationId: listBusinessExecutionCatalog
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: data.items 为授权目录
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+        "503":
+          description: 后台任务关闭或目录暂不可用
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/ai-executions/conversation:
+    post:
+      tags: [AIRuns]
+      summary: 将所选 Skill 或流程作为上下文进行对话
+      description: >
+        选择能力不构成执行请求。服务端读取当前授权发布版本、归属会话历史和受控原文，调用 generation 绑定模型理解输入。
+        reply/clarify 为自然语言回答或追问，原子保存成对消息且不创建Run；execute 校验输入与当前版本后复用既有执行入口。
+        模型判断不授予工具权限，业务写入仍独立确认。不得提交定义、模型配置或客户端历史。
+        请求正文最多12000个UTF-16字符，原文最多8份，上下文160KiB，模型输出4096tokens，模型理解阶段总时限45秒。
+        开始持久化或提交任务后由原有事务和队列决定结果，不在已接受后额外制造模型超时。提交键支持重放，重复内容冲突返回409。
+        与推荐共享每用户每分钟20次限流；需JWT、estimates:read及后台任务开关。
+      operationId: converseWithSelectedAbility
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [sessionId, submissionKey, content, selection]
+              properties:
+                sessionId: { type: string, minLength: 1, maxLength: 160 }
+                submissionKey: { type: string, minLength: 1, maxLength: 160 }
+                content: { type: string, minLength: 1, maxLength: 12000 }
+                selection:
+                  type: object
+                  additionalProperties: false
+                  required: [kind, id, versionId]
+                  properties:
+                    kind: { type: string, enum: [skill, workflow] }
+                    id: { type: string, minLength: 1, maxLength: 160 }
+                    versionId: { type: string, minLength: 1, maxLength: 160 }
+                sources:
+                  type: array
+                  maxItems: 8
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [kind, id]
+                    properties:
+                      kind: { type: string, enum: [file] }
+                      id: { type: string, minLength: 1, maxLength: 160 }
+      responses:
+        "200":
+          description: data为{action:reply或clarify,message}，或{action:execute,run:{runId,sessionId,status,eventCursor}}
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GenericOkResponse" }
+        "401": { description: JWT缺失或无效 }
+        "403": { description: 当前身份或能力权限已变化 }
+        "404": { description: 会话或能力不存在或不可用 }
+        "409": { description: 提交键冲突、版本或会话变化 }
+        "413": { description: 材料或上下文超限 }
+        "422": { description: 请求或模型决策无效，或执行输入不符合契约 }
+        "429": { description: 请求过于频繁 }
+        "503": { description: 功能未开启、模型或基础设施不可用 }
+        "504": { description: 模型理解超时 }
+
+  /api/v1/ai-executions/recommendations:
+    post:
+      tags: [AIRuns]
+      summary: 从当前授权目录推荐 Skill 或工作流
+      description: >
+        仅接受业务目标；服务端读取授权目录，单次调用现有 generation 模型并在返回前重验当前身份及精确发布版本。
+        不创建会话、消息、Run、操作批准或业务记录，卡片点击后仍须补齐输入并明确启动。
+        目录最多100项及48KiB，目标最多4000个UTF-16字符；一次调用最多512输出tokens，准备和目录复读共享30秒总超时。
+        卡片名称与用途来自服务端目录；未知或重复候选、畸形输出及工具调用拒绝。无匹配返回空卡片及固定补充提示。
+        每用户每分钟最多20次请求；需 estimates:read 能力且后台任务开关开启。
+      operationId: recommendBusinessExecutions
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExecutionRecommendationRequest"
+      responses:
+        "200":
+          description: 推荐卡片或无匹配结果，不代表已启动任务
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecutionRecommendationResponse"
+        "400":
+          description: 目标为空、超过上限或请求包含其他字段
+        "401":
+          description: 未登录或JWT无效
+        "403":
+          description: 缺少能力或当前数据库身份已变化
+        "413":
+          description: 授权目录数量或投影大小超过推荐上限，请手动选择
+        "429":
+          description: 当前用户推荐请求超过每分钟20次
+        "502":
+          description: 模型返回非法、重复或未知候选或工具调用
+        "503":
+          description: 后台任务关闭、目录或实际generation模型暂不可用
+        "504":
+          description: 超过共享30秒总期限，模型信号已取消
+
+  /api/v1/ai-executions/runs:
+    get:
+      tags: [AIRuns]
+      summary: 指定本人会话的最近业务执行任务
+      description: 返回最多20条业务Run元数据，包含已结束任务；不存在和非本人会话均返回404。
+      operationId: listBusinessExecutionRuns
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: sessionId
+          in: query
+          required: true
+          schema:
+            type: string
+            maxLength: 160
+      responses:
+        "200":
+          description: data.items 为业务任务摘要，不含执行清单或检查点正文
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+        "404":
+          description: 会话不存在或非owner
+        "503":
+          description: 后台任务关闭或查询暂不可用
+
   /api/v1/ai-sessions/{sessionId}/runs:
     post:
       tags: [AIRuns]
@@ -721,7 +3042,10 @@ paths:
         将一条会话消息提交为后台 Run，立即返回 202。重复 submissionKey
         返回同一 runId（幂等重放）。session 不属于当前用户时返回 404
         （不泄露存在性）；该 session 已存在活跃工作台 Run 时返回
-        409 SESSION_HAS_ACTIVE_RUN。
+        409 SESSION_HAS_ACTIVE_RUN。入队事务重新锁定并检查当前 Session
+        归属和可用性；并发删除已提交时返回 404，Run、事件和消息均不落库。
+        提供 execution 时走业务调用：严格校验发布目标、原输入Schema与本人来源材料，
+        同事务冻结版本、依赖及授权；不接收客户端执行清单、游标、模型凭据或批准标志。
       operationId: submitAiRun
       security:
         - bearerAuth: []
@@ -736,7 +3060,12 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AiRunSubmitRequest"
+              oneOf:
+                - allOf:
+                    - $ref: "#/components/schemas/AiRunSubmitRequest"
+                    - not:
+                        required: [execution]
+                - $ref: "#/components/schemas/BusinessInvocationSubmitRequest"
       responses:
         "202":
           description: 任务已进入后台执行
@@ -802,7 +3131,12 @@ paths:
     get:
       tags: [AIRuns]
       summary: Run snapshot（run + attempt + checkpoint + output）
-      description: 非 owner 与不存在同为 404，不泄露资源存在性。
+      description: >
+        非 owner 与不存在同为 404，不泄露资源存在性。business_skills_v1 业务运行快照
+        省略 run.executionConfig 及 checkpoint.state、checkpoint.aiMilestone，避免返回私有执行清单与进度正文。
+        业务快照另有 businessExecution：发布目标/步骤元数据、原输入、步骤结果、实际写入回执、
+        累计预算和当前 pendingInput 或 pendingOperation。表单及确认仅接受该投影的actionId与摘要，
+        不以浏览器缓存或普通聊天文字授权。
       operationId: getAiRunSnapshot
       security:
         - bearerAuth: []
@@ -899,6 +3233,10 @@ paths:
         仍在 waiting 的 Run 无处可填。该事件 payload 自带契约校验后的 formBlock。
         参数只在 tool.call.started 那一份事件里（审批事件只带 actionId/callId），
         界面按 callId 回查后显示在同意/拒绝按钮旁。
+        业务 Skill 内部 pending 操作登记只表达待确认意图，不属于已执行回执；
+        本端点仍只投影上述既有工具轨迹，不返回内部 pending 登记或持久确认决定，
+        也不提供这些内部服务的批准/执行入口；批准事实不等于真实工具执行授权。
+        内部本地事务执行账同样不由本端点投影；具体生产工具适配与公开入口尚待接入。
         非 owner 与不存在的 Run 同为 404，不泄露存在性。
       operationId: listAiRunToolEvents
       security:
@@ -1009,6 +3347,9 @@ paths:
         为什么不能改用「发一条新聊天消息」：会话存在活跃 Run 时提交新消息会被
         harness_runs_active_workbench_session_unique 挡成 409
         SESSION_HAS_ACTIVE_RUN，而 waiting 属活跃态。
+        business_skills_v1 使用独立严格请求 BusinessExecutionInputAnswer；kind固定userInput，
+        actionId、stepId、contentHash及冻结回答Schema均由服务器检查。
+        首答在持久写入事务内复核当前身份与紧停epoch；已记录的完全相同回答保持幂等。
       operationId: submitAiRunInputs
       security:
         - bearerAuth: []
@@ -1023,12 +3364,16 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                input:
-                  type: object
-                  additionalProperties: true
-              required: [input]
+              oneOf:
+                - type: object
+                  not:
+                    required: [kind]
+                  properties:
+                    input:
+                      type: object
+                      additionalProperties: true
+                  required: [input]
+                - $ref: "#/components/schemas/BusinessExecutionInputAnswer"
       responses:
         "202":
           description: 补充信息已受理，Run 恢复排队
@@ -1069,6 +3414,9 @@ paths:
         首次确认返回 202 并 append run_action_confirmed 事件 + waiting→queued；
         重复确认同一 actionId 返回 200 且不重复写事件；非 waiting 返回
         409 RUN_NOT_WAITING。
+        business_skills_v1 的流程确认提交 stepId/contentHash，实际业务操作确认提交 confirmationHash。
+        参数只来自已保存的服务器操作；当前身份、原权限与紧停epoch在决定和恢复排队事务内复核。
+        相同决定可恢复已记录但未排队的任务；相反决定冲突，不能通过聊天文字批准。
       operationId: confirmAiRunAction
       security:
         - bearerAuth: []
@@ -1083,6 +3431,14 @@ paths:
           required: true
           schema:
             type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/BusinessWorkflowDecision"
+                - $ref: "#/components/schemas/BusinessOperationDecision"
       responses:
         "200":
           description: 幂等重放（此前已确认过该 actionId）
@@ -1134,6 +3490,7 @@ paths:
         重复拒绝同一 actionId 返回 200 且不重复写事件；非 waiting 返回 409 RUN_NOT_WAITING。
         请求体不接收工具参数：被拒调用的参数唯一来源是 tool.call.started 事件（约束②）。
         同意侧不新增端点也不新增事件类型，继续复用 …/confirm 与 run_action_confirmed。
+        business_skills_v1 使用与confirm相同的摘要请求体，决定固定为reject；不得替换已记录的approve。
       operationId: rejectAiRunAction
       security:
         - bearerAuth: []
@@ -1148,6 +3505,14 @@ paths:
           required: true
           schema:
             type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/BusinessWorkflowDecision"
+                - $ref: "#/components/schemas/BusinessOperationDecision"
       responses:
         "200":
           description: 幂等重放（此前已拒绝过该 actionId）
@@ -1193,7 +3558,12 @@ paths:
       description: >
         仅终态 failed 可重试：新建带 retryOfRunId 的 Run（新 submissionKey），
         原 Run 行保持不可变；非 failed 返回 409 RUN_NOT_FAILED，无法定位
-        原 session 返回 409 RUN_NOT_RETRYABLE。
+        原 session 返回 409 RUN_NOT_RETRYABLE；原 session 当前不存在、已归档或
+        非 owner 返回 404，入队事务重新检查 Session，防止并发删除后生成孤儿任务。
+        business_skills_v1 要求 BusinessExecutionRetryRequest，按当前身份/策略和epoch重新授权，
+        原子继承可信检查点、原发布清单和逻辑根，累计预算不重置；保留成功步骤及业务写入回执。
+        execution_failed或invalid_output的末尾失败节点可显式重试；rejected与repeat_limit不可用重试改写，
+        返回409 INVOCATION_RETRY_NOT_ALLOWED。损坏或孤儿检查点返回409，不能提交客户端恢复状态。
       operationId: retryAiRun
       security:
         - bearerAuth: []
@@ -1203,6 +3573,12 @@ paths:
           required: true
           schema:
             type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BusinessExecutionRetryRequest"
       responses:
         "202":
           description: 重试 Run 已创建
@@ -1211,13 +3587,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/GenericOkResponse"
         "404":
-          description: Run 不存在或非 owner
+          description: Run 或当前 Session 不存在、非 owner，或 Session 已归档
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "409":
-          description: 非 failed 终态或不可重试（code=RUN_NOT_FAILED/RUN_NOT_RETRYABLE）
+          description: 非failed、不可重试、检查点损坏或当前授权已失效
           content:
             application/json:
               schema:
@@ -6193,6 +8569,359 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /api/v1/skills/{skillId}/emergency-control:
+    get:
+      tags:
+        - Skills
+      summary: Read emergency control and recent immutable audit
+      description: Requires JWT, system:manage and an active current database admin.
+        Control uses an independent revision. Stop increments epoch; release
+        leaves the epoch unchanged, so old Runs require explicit reauthorization.
+        This API provides submission/admission fencing. Internal per-model/Skill-tool
+        dispatch and Worker-resume checks are implemented separately; production
+        host wiring and business start/resume HTTP entrypoints remain unavailable.
+        Already-dispatched I/O cannot be revoked.
+      parameters:
+        - name: skillId
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 160
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecutionEmergencyReadResponse"
+        "400":
+          $ref: "#/components/responses/SkillFailure"
+        "401":
+          $ref: "#/components/responses/SkillFailure"
+        "403":
+          $ref: "#/components/responses/SkillFailure"
+        "404":
+          $ref: "#/components/responses/SkillFailure"
+        "409":
+          $ref: "#/components/responses/SkillFailure"
+        "503":
+          $ref: "#/components/responses/SkillFailure"
+  /api/v1/skills/{skillId}/emergency-stop:
+    post:
+      tags:
+        - Skills
+      summary: Emergency stop new submission and Run admission
+      description: Requires JWT, system:manage and an active current database admin.
+        Control uses an independent revision. Stop increments epoch; release
+        leaves the epoch unchanged, so old Runs require explicit reauthorization.
+        This API provides submission/admission fencing. Internal per-model/Skill-tool
+        dispatch and Worker-resume checks are implemented separately; production
+        host wiring and business start/resume HTTP entrypoints remain unavailable.
+        Already-dispatched I/O cannot be revoked.
+      parameters:
+        - name: skillId
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 160
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExecutionEmergencyInput"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecutionEmergencyChangeResponse"
+        "400":
+          $ref: "#/components/responses/SkillFailure"
+        "401":
+          $ref: "#/components/responses/SkillFailure"
+        "403":
+          $ref: "#/components/responses/SkillFailure"
+        "404":
+          $ref: "#/components/responses/SkillFailure"
+        "409":
+          $ref: "#/components/responses/SkillFailure"
+        "503":
+          $ref: "#/components/responses/SkillFailure"
+  /api/v1/skills/{skillId}/emergency-release:
+    post:
+      tags:
+        - Skills
+      summary: Release emergency control without reviving old Runs
+      description: Requires JWT, system:manage and an active current database admin.
+        Control uses an independent revision. Stop increments epoch; release
+        leaves the epoch unchanged, so old Runs require explicit reauthorization.
+        This API provides submission/admission fencing. Internal per-model/Skill-tool
+        dispatch and Worker-resume checks are implemented separately; production
+        host wiring and business start/resume HTTP entrypoints remain unavailable.
+        Already-dispatched I/O cannot be revoked.
+      parameters:
+        - name: skillId
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 160
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExecutionEmergencyInput"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecutionEmergencyChangeResponse"
+        "400":
+          $ref: "#/components/responses/SkillFailure"
+        "401":
+          $ref: "#/components/responses/SkillFailure"
+        "403":
+          $ref: "#/components/responses/SkillFailure"
+        "404":
+          $ref: "#/components/responses/SkillFailure"
+        "409":
+          $ref: "#/components/responses/SkillFailure"
+        "503":
+          $ref: "#/components/responses/SkillFailure"
+  /api/v1/workflows/{workflowId}/emergency-control:
+    get:
+      tags:
+        - Workflows
+      summary: Read emergency control and recent immutable audit
+      description: Requires JWT, system:manage and an active current database admin.
+        Control uses an independent revision. Stop increments epoch; release
+        leaves the epoch unchanged, so old Runs require explicit reauthorization.
+        This API provides submission/admission fencing. Internal per-model/Skill-tool
+        dispatch and Worker-resume checks are implemented separately; production
+        host wiring and business start/resume HTTP entrypoints remain unavailable.
+        Already-dispatched I/O cannot be revoked.
+      parameters:
+        - name: workflowId
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 160
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecutionEmergencyReadResponse"
+        "400":
+          $ref: "#/components/responses/SkillFailure"
+        "401":
+          $ref: "#/components/responses/SkillFailure"
+        "403":
+          $ref: "#/components/responses/SkillFailure"
+        "404":
+          $ref: "#/components/responses/SkillFailure"
+        "409":
+          $ref: "#/components/responses/SkillFailure"
+        "503":
+          $ref: "#/components/responses/SkillFailure"
+  /api/v1/workflows/{workflowId}/emergency-stop:
+    post:
+      tags:
+        - Workflows
+      summary: Emergency stop new submission and Run admission
+      description: Requires JWT, system:manage and an active current database admin.
+        Control uses an independent revision. Stop increments epoch; release
+        leaves the epoch unchanged, so old Runs require explicit reauthorization.
+        This API provides submission/admission fencing. Internal per-model/Skill-tool
+        dispatch and Worker-resume checks are implemented separately; production
+        host wiring and business start/resume HTTP entrypoints remain unavailable.
+        Already-dispatched I/O cannot be revoked.
+      parameters:
+        - name: workflowId
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 160
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExecutionEmergencyInput"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecutionEmergencyChangeResponse"
+        "400":
+          $ref: "#/components/responses/SkillFailure"
+        "401":
+          $ref: "#/components/responses/SkillFailure"
+        "403":
+          $ref: "#/components/responses/SkillFailure"
+        "404":
+          $ref: "#/components/responses/SkillFailure"
+        "409":
+          $ref: "#/components/responses/SkillFailure"
+        "503":
+          $ref: "#/components/responses/SkillFailure"
+  /api/v1/workflows/{workflowId}/emergency-release:
+    post:
+      tags:
+        - Workflows
+      summary: Release emergency control without reviving old Runs
+      description: Requires JWT, system:manage and an active current database admin.
+        Control uses an independent revision. Stop increments epoch; release
+        leaves the epoch unchanged, so old Runs require explicit reauthorization.
+        This API provides submission/admission fencing. Internal per-model/Skill-tool
+        dispatch and Worker-resume checks are implemented separately; production
+        host wiring and business start/resume HTTP entrypoints remain unavailable.
+        Already-dispatched I/O cannot be revoked.
+      parameters:
+        - name: workflowId
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 160
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExecutionEmergencyInput"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecutionEmergencyChangeResponse"
+        "400":
+          $ref: "#/components/responses/SkillFailure"
+        "401":
+          $ref: "#/components/responses/SkillFailure"
+        "403":
+          $ref: "#/components/responses/SkillFailure"
+        "404":
+          $ref: "#/components/responses/SkillFailure"
+        "409":
+          $ref: "#/components/responses/SkillFailure"
+        "503":
+          $ref: "#/components/responses/SkillFailure"
+  /api/v1/system/sandbox-connections:
+    get:
+      tags: [System]
+      summary: 读取默认沙箱连接（仅 admin）
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: WES envelope；data 包含 connection、hasApiKey、keyVersion，不回显密钥
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code: {type: integer, const: 0}
+                  message: {type: string}
+                  data:
+                    type: object
+                    properties:
+                      connection:
+                        oneOf:
+                          - {$ref: '#/components/schemas/SandboxConnection'}
+                          - {type: 'null'}
+                      hasApiKey: {type: boolean}
+                      keyVersion: {type: integer}
+        '401': {description: 未登录}
+        '403': {description: 非管理员}
+    put:
+      tags: [System]
+      summary: 保存默认连接与独立按量付费密钥（仅 admin）
+      description: 密钥使用既有凭据库加密保存。配置或密钥身份变化会使此前计划失效，必须重新确认。
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [connection]
+              properties:
+                connection: {$ref: '#/components/schemas/SandboxConnection'}
+                apiKey: {type: string, writeOnly: true, description: 可选；与 clearApiKey=true 互斥，不可用于自动保存临时测试密钥}
+                clearApiKey: {type: boolean}
+      responses:
+        '200': {description: 返回脱敏连接状态，与 GET 相同}
+        '400': {description: 配置无效或启用前缺少独立密钥}
+        '401': {description: 未登录}
+        '403': {description: 非管理员}
+  /api/v1/system/sandbox-connections/test:
+    post:
+      tags: [System]
+      summary: 只读核对模板构建及隔离配置（不创建实例）
+      security: [{bearerAuth: []}]
+      responses:
+        '200': {description: WES envelope；data.ready=true}
+        '401': {description: 未登录}
+        '403': {description: 非管理员}
+        '503': {description: 未配置、模板未就绪、隔离配置无法证明或云端不可用}
+  /api/v1/ai-artifacts/{artifactId}/download:
+    get:
+      tags: [AI]
+      summary: 下载当前用户当前有效会话的沙箱文件
+      description: 仅文件所有者可读，需 estimates:read；到期、归档会话、跨用户均不提供文件。成功返回原始字节，失败使用 WES envelope；不接受路径或 URL。
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: artifactId
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: attachment；private,no-store；nosniff
+          content:
+            text/html: {schema: {type: string}}
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document: {schema: {type: string, format: binary}}
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: {schema: {type: string, format: binary}}
+        '401': {description: 未登录}
+        '403': {description: 缺少业务能力}
+        '404': {description: 文件不可见或已失效}
+        '409': {description: 文件校验失败}
+  /api/v1/ai-artifacts/{artifactId}/preview:
+    get:
+      tags: [AI]
+      summary: 获取隔离 HTML 预览
+      description: 与下载相同的 owner、会话与过期校验；只支持 HTML。响应携带 CSP 头并在 HTML 首字节前加入策略 meta；客户端仍须使用 sandbox 空权限 iframe，不添加 allow-scripts 或 allow-same-origin。
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: path
+          name: artifactId
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: inline；private,no-store；禁止脚本、网络、表单和嵌套框架
+          content:
+            text/html: {schema: {type: string}}
+        '400': {description: 非 HTML 文件}
+        '401': {description: 未登录}
+        '403': {description: 缺少业务能力}
+        '404': {description: 文件不可见或已失效}
+        '409': {description: 文件校验失败}
 components:
   securitySchemes:
     bearerAuth:
@@ -6200,6 +8929,13 @@ components:
       scheme: bearer
       bearerFormat: JWT
       description: "登录 `POST /api/v1/auth/login` 获取 token，请求头 `Authorization: Bearer <token>`"
+  responses:
+    SkillFailure:
+      description: Skill参数、权限、版本或存储错误；errorCode和details给出稳定原因
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SkillError'
   parameters:
     IdempotencyHeader:
       name: Idempotency-Key
@@ -6218,6 +8954,1985 @@ components:
       description: 模型供应商标识。
 
   schemas:
+    SandboxConnection:
+      type: object
+      additionalProperties: false
+      required: [id, workspaceId, region, templateCode, templateRevision, aliyunUid, enabled]
+      properties:
+        id: {type: string, const: default}
+        workspaceId: {type: string, pattern: '^llm-[a-z0-9-]{1,80}$'}
+        region: {type: string, const: cn-beijing}
+        templateCode: {type: string, maxLength: 160}
+        templateRevision: {type: string, minLength: 1, maxLength: 160, description: 固定的 ready 构建 ID，不允许 latest}
+        aliyunUid: {type: string, pattern: '^[0-9]{6,30}$'}
+        enabled: {type: boolean}
+    SkillDefinition:
+      type: object
+      additionalProperties: false
+      required:
+      - name
+      - description
+      - category
+      - instructions
+      - roles
+      - references
+      - inputSchema
+      - outputSchema
+      - model
+      - tools
+      - examples
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 2000
+        category:
+          type: string
+          minLength: 1
+          maxLength: 80
+        instructions:
+          type: string
+          minLength: 1
+          maxLength: 30000
+        roles:
+          type: array
+          items:
+            enum:
+            - sales
+            - pre_sales
+            - delivery
+            - pm
+            - pmo
+            - dev
+            - admin
+          minItems: 1
+          maxItems: 7
+          uniqueItems: true
+        references:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - label
+            - uri
+            - version
+            properties:
+              label:
+                type: string
+              uri:
+                type: string
+              version:
+                type: string
+          maxItems: 30
+        inputSchema:
+          type: object
+          additionalProperties: true
+        outputSchema:
+          type: object
+          additionalProperties: true
+        model:
+          type: object
+          additionalProperties: false
+          required:
+          - scenario
+          - temperature
+          - maxTokens
+          - timeoutMs
+          properties:
+            scenario:
+              enum:
+              - assessment
+              - fileParsing
+              - generation
+            temperature:
+              type: number
+              minimum: 0
+              maximum: 2
+            maxTokens:
+              type: integer
+              minimum: 1
+              maximum: 64000
+            timeoutMs:
+              type: integer
+              minimum: 1000
+              maximum: 300000
+        tools:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - toolName
+            - inputMapping
+            - requiresConfirmation
+            properties:
+              toolName:
+                type: string
+              inputMapping:
+                type: object
+                additionalProperties:
+                  type: string
+              requiresConfirmation:
+                type: boolean
+          maxItems: 30
+        examples:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - title
+            - input
+            - expected
+            properties:
+              title:
+                type: string
+              input: {}
+              expected: {}
+              assertions:
+                type: array
+                minItems: 1
+                maxItems: 30
+                items:
+                  type: object
+                  additionalProperties: false
+                  required:
+                  - path
+                  - op
+                  properties:
+                    path:
+                      type: string
+                      minLength: 1
+                      maxLength: 300
+                    op:
+                      enum:
+                      - equals
+                      - contains
+                      - exists
+                      - minItems
+                    value: {}
+                  description: Bounded field paths only; no expressions. Non-exists operators require a valid value; minItems
+                    requires a nonnegative integer.
+          maxItems: 30
+      description: 管理员完整定义。整体不超过128000字节；输入输出根类型object，受限JSON Schema、本地非递归引用；工具映射须能证明兼容完整原生Schema。未知约束、远程引用和pattern拒绝。
+    SkillVersion:
+      type: object
+      additionalProperties: false
+      required:
+      - skillVersionId
+      - versionCode
+      - majorLetter
+      - minorNumber
+      - status
+      - checkoutStatus
+      - checkedOutBy
+      - definition
+      - hash
+      - lastCheckinDefinition
+      - createdAt
+      - updatedAt
+      properties:
+        skillVersionId:
+          type: string
+        versionCode:
+          type: string
+        majorLetter:
+          type: string
+        minorNumber:
+          type: integer
+          minimum: 0
+        status:
+          enum:
+          - draft
+          - reviewed
+          - published
+        checkoutStatus:
+          enum:
+          - checked_in
+          - checked_out
+        checkedOutBy:
+          type:
+          - string
+          - 'null'
+        definition:
+          $ref: '#/components/schemas/SkillDefinition'
+        hash:
+          type: string
+        lastCheckinDefinition:
+          $ref: '#/components/schemas/SkillDefinition'
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+    SkillRecord:
+      type: object
+      additionalProperties: false
+      required:
+      - skillId
+      - enabled
+      - archived
+      - activeVersionId
+      - currentVersionId
+      - revision
+      - versions
+      - audit
+      - createdAt
+      - updatedAt
+      properties:
+        skillId:
+          type: string
+        enabled:
+          type: boolean
+        archived:
+          type: boolean
+        activeVersionId:
+          type:
+          - string
+          - 'null'
+        currentVersionId:
+          type: string
+        revision:
+          type: integer
+          minimum: 1
+        versions:
+          type: array
+          items:
+            $ref: '#/components/schemas/SkillVersion'
+        audit:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - id
+            - action
+            - actorId
+            - actorName
+            - createdAt
+            - versionId
+            properties:
+              id:
+                type: string
+              action:
+                type: string
+              actorId:
+                type: string
+              actorName:
+                type: string
+              createdAt:
+                type: string
+              versionId:
+                type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+    SkillRecordResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - code
+      - message
+      - data
+      properties:
+        code:
+          const: 0
+        message:
+          type: string
+        data:
+          type: object
+          additionalProperties: false
+          required:
+          - record
+          properties:
+            record:
+              $ref: '#/components/schemas/SkillRecord'
+    SkillRevisionInput:
+      type: object
+      additionalProperties: false
+      required:
+      - revision
+      properties:
+        revision:
+          type: integer
+          minimum: 1
+    ExecutionEmergencyControl:
+      type: object
+      additionalProperties: false
+      required:
+        - stopped
+        - epoch
+        - revision
+      properties:
+        stopped:
+          type: boolean
+        epoch:
+          type: integer
+          minimum: 0
+          description: Incremented on stop; release does not restore old Run authority.
+        revision:
+          type: integer
+          minimum: 0
+          description: Independent emergency-control revision, unrelated to definition revision.
+    ExecutionEmergencyInput:
+      type: object
+      additionalProperties: false
+      required:
+        - revision
+        - reason
+      properties:
+        revision:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        reason:
+          type: string
+          minLength: 1
+          description: Trimmed value must contain 1–1000 characters; actor and time are
+            assigned by server.
+    ExecutionEmergencyAudit:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - actorId
+        - action
+        - reason
+        - epoch
+        - revision
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        actorId:
+          type: string
+        action:
+          enum:
+            - stop
+            - release
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        epoch:
+          type: integer
+          minimum: 0
+        revision:
+          type: integer
+          minimum: 1
+        createdAt:
+          type: string
+          format: date-time
+    ExecutionEmergencyReadResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+        - message
+        - data
+      properties:
+        code:
+          const: 0
+        message:
+          type: string
+        data:
+          type: object
+          additionalProperties: false
+          required:
+            - control
+            - hasMore
+            - audit
+          properties:
+            control:
+              $ref: "#/components/schemas/ExecutionEmergencyControl"
+            hasMore:
+              type: boolean
+              description: Older audit rows exist beyond the latest 100 returned.
+            audit:
+              type: array
+              maxItems: 100
+              description: Latest 100 events, ordered by ascending emergency revision;
+                historical database rows remain immutable.
+              items:
+                $ref: "#/components/schemas/ExecutionEmergencyAudit"
+    ExecutionEmergencyChangeResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+        - message
+        - data
+      properties:
+        code:
+          const: 0
+        message:
+          type: string
+        data:
+          type: object
+          additionalProperties: false
+          required:
+            - control
+          properties:
+            control:
+              $ref: "#/components/schemas/ExecutionEmergencyControl"
+    SkillError:
+      type: object
+      additionalProperties: true
+      required:
+      - code
+      - message
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          type: 'null'
+        errorCode:
+          type: string
+        details:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - field
+            - reason
+            properties:
+              field:
+                type: string
+              reason:
+                type: string
+    SkillTrialIssue:
+      type: object
+      additionalProperties: false
+      required:
+      - category
+      - code
+      properties:
+        category:
+          enum:
+          - definition
+          - structure
+          - assertion
+          - budget
+          - tool
+          - provider
+        code:
+          type: string
+    SkillTrialToolStep:
+      type: object
+      additionalProperties: false
+      required:
+      - callId
+      - toolName
+      - arguments
+      - simulated
+      - result
+      properties:
+        callId:
+          type: string
+        toolName:
+          type: string
+        arguments: {}
+        simulated:
+          type: boolean
+        result: {}
+    SkillDependencySnapshot:
+      type: object
+      additionalProperties: false
+      required:
+      - schemaVersion
+      - references
+      - model
+      - tools
+      - roles
+      properties:
+        schemaVersion:
+          const: 1
+        references:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - uri
+            - version
+            - digest
+            properties:
+              uri:
+                type: string
+              version:
+                type: string
+              digest:
+                type: string
+        model:
+          type: object
+          additionalProperties: false
+          required:
+          - providerId
+          - model
+          - modelSource
+          - credentialScope
+          - baseUrlDigest
+          - params
+          - capabilities
+          - supportedParams
+          properties:
+            providerId:
+              type: string
+            model:
+              type: string
+            modelSource:
+              type: string
+            credentialScope:
+              type: string
+            baseUrlDigest:
+              type: string
+            params:
+              type: object
+              additionalProperties: false
+              required:
+              - scenario
+              - temperature
+              - maxTokens
+              - timeoutMs
+              properties:
+                scenario:
+                  enum:
+                  - assessment
+                  - fileParsing
+                  - generation
+                temperature:
+                  type: number
+                  minimum: 0
+                  maximum: 2
+                maxTokens:
+                  type: integer
+                  minimum: 1
+                  maximum: 64000
+                timeoutMs:
+                  type: integer
+                  minimum: 1000
+                  maximum: 300000
+            capabilities:
+              type: array
+              items:
+                type: string
+            supportedParams:
+              type: array
+              items:
+                type: string
+        tools:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - native
+            - policy
+            properties:
+              native:
+                type: object
+                additionalProperties: false
+                required:
+                - name
+                - description
+                - parameters
+                - mutates
+                - exfiltrates
+                - simulationOnly
+                - source
+                - sandboxReadSafe
+                - capability
+                properties:
+                  name:
+                    type: string
+                  description:
+                    type: string
+                  parameters:
+                    type: object
+                  mutates:
+                    type: boolean
+                  exfiltrates:
+                    type: boolean
+                  simulationOnly:
+                    type: boolean
+                  source:
+                    enum:
+                    - code
+                    - mcp
+                  sandboxReadSafe:
+                    type: boolean
+                  capability:
+                    type: string
+              policy:
+                type: object
+                additionalProperties: false
+                required:
+                - enabled
+                - visibleRoles
+                - approvalStrategy
+                - injectionMode
+                properties:
+                  enabled:
+                    type: boolean
+                  visibleRoles:
+                    type: array
+                    items:
+                      type: string
+                  approvalStrategy:
+                    type: string
+                  injectionMode:
+                    type: string
+        roles:
+          type: array
+          items:
+            type: string
+    SkillTrialResult:
+      type: object
+      additionalProperties: false
+      required:
+      - definitionHash
+      - mode
+      - modelExecuted
+      - passed
+      - releaseEligible
+      - releaseReason
+      - cases
+      - failures
+      - simulatedSteps
+      - usage
+      properties:
+        definitionHash:
+          type: string
+        mode:
+          enum:
+          - model
+          - simulation
+        modelExecuted:
+          type: boolean
+        passed:
+          type: boolean
+        releaseEligible:
+          type: boolean
+        releaseReason:
+          enum:
+          - MODEL_TRIAL_PASSED
+          - MODEL_TRIAL_PASSED_WITH_ISOLATED_TOOLS
+          - SIMULATION_ONLY
+          - TRIAL_FAILED
+        cases:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - title
+            - definitionHash
+            - passed
+            - failures
+            - providers
+            - toolSteps
+            properties:
+              title:
+                type: string
+              definitionHash:
+                type: string
+              passed:
+                type: boolean
+              output: {}
+              failures:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SkillTrialIssue'
+              providers:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  required:
+                  - provider
+                  - model
+                  properties:
+                    provider:
+                      type: string
+                    model:
+                      type: string
+              toolSteps:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SkillTrialToolStep'
+        failures:
+          type: array
+          items:
+            $ref: '#/components/schemas/SkillTrialIssue'
+        simulatedSteps:
+          type: array
+          items:
+            $ref: '#/components/schemas/SkillTrialToolStep'
+        usage:
+          type: object
+          additionalProperties: false
+          required:
+          - modelAttempts
+          - toolCalls
+          - outputTokens
+          - elapsedMs
+          properties:
+            modelAttempts:
+              type: integer
+              minimum: 0
+            toolCalls:
+              type: integer
+              minimum: 0
+            outputTokens:
+              type: integer
+              minimum: 0
+            elapsedMs:
+              type: number
+              minimum: 0
+        dependencyContext:
+          $ref: '#/components/schemas/SkillDependencySnapshot'
+    SkillEvaluation:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - skillId
+      - versionId
+      - hash
+      - contextHash
+      - snapshotRevision
+      - actorId
+      - createdAt
+      - result
+      properties:
+        id:
+          type: string
+        skillId:
+          type: string
+        versionId:
+          type: string
+        hash:
+          type: string
+        contextHash:
+          type: string
+        snapshotRevision:
+          type: integer
+          minimum: 1
+        actorId:
+          type: string
+        createdAt:
+          type: string
+        result:
+          $ref: '#/components/schemas/SkillTrialResult'
+    SkillReleaseReview:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - skillId
+      - versionId
+      - evaluationId
+      - hash
+      - contextHash
+      - reason
+      - acknowledgedSimulation
+      - actorId
+      - createdAt
+      properties:
+        id:
+          type: string
+        skillId:
+          type: string
+        versionId:
+          type: string
+        evaluationId:
+          type: string
+        hash:
+          type: string
+        contextHash:
+          type: string
+        reason:
+          type: string
+        acknowledgedSimulation:
+          type: boolean
+        actorId:
+          type: string
+        createdAt:
+          type: string
+    SkillReleaseEvent:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - skillId
+      - versionId
+      - previousVersionId
+      - kind
+      - reason
+      - actorId
+      - createdAt
+      properties:
+        id:
+          type: string
+        skillId:
+          type: string
+        versionId:
+          type: string
+        previousVersionId:
+          type:
+          - string
+          - 'null'
+        kind:
+          enum:
+          - publish
+          - rollback
+        reason:
+          type: string
+        actorId:
+          type: string
+        createdAt:
+          type: string
+    SkillReleaseReadiness:
+      type: object
+      additionalProperties: false
+      required:
+      - revision
+      - versionId
+      - hash
+      - contextHash
+      - trials
+      - review
+      - blockers
+      - publishAvailable
+      - reviewAvailable
+      - activeVersion
+      - rollbackVersions
+      - events
+      properties:
+        revision:
+          type: integer
+          minimum: 1
+        versionId:
+          type: string
+        hash:
+          type: string
+        contextHash:
+          type:
+          - string
+          - 'null'
+        trials:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - id
+            - hash
+            - contextHash
+            - snapshotRevision
+            - createdAt
+            - current
+            - result
+            properties:
+              id:
+                type: string
+              hash:
+                type: string
+              contextHash:
+                type: string
+              snapshotRevision:
+                type: integer
+                minimum: 1
+              createdAt:
+                type: string
+              current:
+                type: boolean
+              result:
+                $ref: '#/components/schemas/SkillTrialResult'
+        review:
+          anyOf:
+          - $ref: '#/components/schemas/SkillReleaseReview'
+          - type: 'null'
+        blockers:
+          type: array
+          items:
+            type: string
+        publishAvailable:
+          type: boolean
+        reviewAvailable:
+          type: boolean
+        activeVersion:
+          anyOf:
+          - $ref: '#/components/schemas/SkillVersion'
+          - type: 'null'
+        rollbackVersions:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - versionId
+            - versionCode
+            - hash
+            properties:
+              versionId:
+                type: string
+              versionCode:
+                type: string
+              hash:
+                type: string
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/SkillReleaseEvent'
+    SkillCatalogItem:
+      type: object
+      additionalProperties: false
+      required:
+      - skillId
+      - skillVersionId
+      - versionCode
+      - hash
+      - name
+      - description
+      - category
+      - inputSchema
+      - outputSchema
+      properties:
+        skillId:
+          type: string
+        skillVersionId:
+          type: string
+        versionCode:
+          type: string
+        hash:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        inputSchema:
+          type: object
+        outputSchema:
+          type: object
+    WorkflowMapping:
+      type: object
+      additionalProperties: false
+      required:
+      - target
+      - source
+      properties:
+        target:
+          type: string
+          pattern: ^[A-Za-z0-9_-]{1,80}$
+        source:
+          oneOf:
+          - type: object
+            additionalProperties: false
+            required:
+            - kind
+            - path
+            properties:
+              kind:
+                const: path
+              path:
+                type: string
+                minLength: 1
+                maxLength: 300
+              fallback: {}
+          - type: object
+            additionalProperties: false
+            required:
+            - kind
+            - value
+            properties:
+              kind:
+                const: literal
+              value: {}
+    WorkflowPredicate:
+      type: object
+      additionalProperties: false
+      required:
+      - path
+      - op
+      properties:
+        path:
+          type: string
+          minLength: 1
+          maxLength: 300
+        op:
+          enum:
+          - exists
+          - eq
+          - neq
+          - in
+          - gt
+          - gte
+          - lt
+          - lte
+        value: {}
+    WorkflowStep:
+      oneOf:
+      - type: object
+        additionalProperties: false
+        required:
+        - id
+        - name
+        - inputMapping
+        - onFailure
+        - type
+        - skillId
+        - skillVersionId
+        properties:
+          id:
+            type: string
+            pattern: ^[A-Za-z0-9_-]{1,80}$
+          name:
+            type: string
+            minLength: 1
+            maxLength: 120
+          inputMapping:
+            type: array
+            maxItems: 100
+            items:
+              $ref: '#/components/schemas/WorkflowMapping'
+          prerequisite:
+            type: array
+            minItems: 1
+            maxItems: 20
+            items:
+              $ref: '#/components/schemas/WorkflowPredicate'
+          branches:
+            type: array
+            minItems: 1
+            maxItems: 20
+            items:
+              type: object
+              additionalProperties: false
+              required:
+              - when
+              - target
+              properties:
+                when:
+                  type: array
+                  minItems: 1
+                  maxItems: 20
+                  items:
+                    $ref: '#/components/schemas/WorkflowPredicate'
+                target:
+                  type: string
+                  minLength: 1
+                  maxLength: 80
+          onFailure:
+            enum:
+            - wait
+            - fail
+          repeat:
+            type: object
+            additionalProperties: false
+            required:
+            - while
+            - maxIterations
+            - onLimit
+            properties:
+              while:
+                type: array
+                minItems: 1
+                maxItems: 20
+                items:
+                  $ref: '#/components/schemas/WorkflowPredicate'
+              maxIterations:
+                type: integer
+                minimum: 1
+                maximum: 10
+              onLimit:
+                enum:
+                - wait
+                - fail
+          type:
+            const: skill
+          skillId:
+            type: string
+            minLength: 1
+            maxLength: 160
+          skillVersionId:
+            type: string
+            minLength: 1
+            maxLength: 160
+      - type: object
+        additionalProperties: false
+        required:
+        - id
+        - name
+        - inputMapping
+        - onFailure
+        - type
+        - prompt
+        - inputSchema
+        - outputSchema
+        properties:
+          id:
+            type: string
+            pattern: ^[A-Za-z0-9_-]{1,80}$
+          name:
+            type: string
+            minLength: 1
+            maxLength: 120
+          inputMapping:
+            type: array
+            maxItems: 100
+            items:
+              $ref: '#/components/schemas/WorkflowMapping'
+          prerequisite:
+            type: array
+            minItems: 1
+            maxItems: 20
+            items:
+              $ref: '#/components/schemas/WorkflowPredicate'
+          branches:
+            type: array
+            minItems: 1
+            maxItems: 20
+            items:
+              type: object
+              additionalProperties: false
+              required:
+              - when
+              - target
+              properties:
+                when:
+                  type: array
+                  minItems: 1
+                  maxItems: 20
+                  items:
+                    $ref: '#/components/schemas/WorkflowPredicate'
+                target:
+                  type: string
+                  minLength: 1
+                  maxLength: 80
+          onFailure:
+            enum:
+            - wait
+            - fail
+          repeat:
+            type: object
+            additionalProperties: false
+            required:
+            - while
+            - maxIterations
+            - onLimit
+            properties:
+              while:
+                type: array
+                minItems: 1
+                maxItems: 20
+                items:
+                  $ref: '#/components/schemas/WorkflowPredicate'
+              maxIterations:
+                type: integer
+                minimum: 1
+                maximum: 10
+              onLimit:
+                enum:
+                - wait
+                - fail
+          type:
+            const: userInput
+          prompt:
+            type: string
+            minLength: 1
+            maxLength: 4000
+          inputSchema:
+            type: object
+          outputSchema:
+            type: object
+      - type: object
+        additionalProperties: false
+        required:
+        - id
+        - name
+        - inputMapping
+        - onFailure
+        - type
+        - prompt
+        - inputSchema
+        properties:
+          id:
+            type: string
+            pattern: ^[A-Za-z0-9_-]{1,80}$
+          name:
+            type: string
+            minLength: 1
+            maxLength: 120
+          inputMapping:
+            type: array
+            maxItems: 100
+            items:
+              $ref: '#/components/schemas/WorkflowMapping'
+          prerequisite:
+            type: array
+            minItems: 1
+            maxItems: 20
+            items:
+              $ref: '#/components/schemas/WorkflowPredicate'
+          branches:
+            type: array
+            minItems: 1
+            maxItems: 20
+            items:
+              type: object
+              additionalProperties: false
+              required:
+              - when
+              - target
+              properties:
+                when:
+                  type: array
+                  minItems: 1
+                  maxItems: 20
+                  items:
+                    $ref: '#/components/schemas/WorkflowPredicate'
+                target:
+                  type: string
+                  minLength: 1
+                  maxLength: 80
+          onFailure:
+            enum:
+            - wait
+            - fail
+          repeat:
+            type: object
+            additionalProperties: false
+            required:
+            - while
+            - maxIterations
+            - onLimit
+            properties:
+              while:
+                type: array
+                minItems: 1
+                maxItems: 20
+                items:
+                  $ref: '#/components/schemas/WorkflowPredicate'
+              maxIterations:
+                type: integer
+                minimum: 1
+                maximum: 10
+              onLimit:
+                enum:
+                - wait
+                - fail
+          type:
+            const: confirmation
+          prompt:
+            type: string
+            minLength: 1
+            maxLength: 4000
+          inputSchema:
+            type: object
+      - type: object
+        additionalProperties: false
+        required:
+        - id
+        - name
+        - inputMapping
+        - onFailure
+        - type
+        - toolName
+        - requiresConfirmation
+        properties:
+          id:
+            type: string
+            pattern: ^[A-Za-z0-9_-]{1,80}$
+          name:
+            type: string
+            minLength: 1
+            maxLength: 120
+          inputMapping:
+            type: array
+            maxItems: 100
+            items:
+              $ref: '#/components/schemas/WorkflowMapping'
+          prerequisite:
+            type: array
+            minItems: 1
+            maxItems: 20
+            items:
+              $ref: '#/components/schemas/WorkflowPredicate'
+          branches:
+            type: array
+            minItems: 1
+            maxItems: 20
+            items:
+              type: object
+              additionalProperties: false
+              required:
+              - when
+              - target
+              properties:
+                when:
+                  type: array
+                  minItems: 1
+                  maxItems: 20
+                  items:
+                    $ref: '#/components/schemas/WorkflowPredicate'
+                target:
+                  type: string
+                  minLength: 1
+                  maxLength: 80
+          onFailure:
+            enum:
+            - wait
+            - fail
+          repeat:
+            type: object
+            additionalProperties: false
+            required:
+            - while
+            - maxIterations
+            - onLimit
+            properties:
+              while:
+                type: array
+                minItems: 1
+                maxItems: 20
+                items:
+                  $ref: '#/components/schemas/WorkflowPredicate'
+              maxIterations:
+                type: integer
+                minimum: 1
+                maximum: 10
+              onLimit:
+                enum:
+                - wait
+                - fail
+          type:
+            const: tool
+          toolName:
+            type: string
+            minLength: 1
+            maxLength: 160
+          requiresConfirmation:
+            type: boolean
+      description: Ordered finite step table; forward-only branches or $end, repeat is local to the current step. Tool outputs
+        cannot feed mappings/conditions without a trusted native output schema. No execution is performed in B.
+    WorkflowDefinition:
+      type: object
+      additionalProperties: false
+      required:
+      - name
+      - description
+      - category
+      - roles
+      - inputSchema
+      - outputSchema
+      - steps
+      - outputMapping
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 2000
+        category:
+          type: string
+          minLength: 1
+          maxLength: 80
+        roles:
+          type: array
+          minItems: 1
+          maxItems: 7
+          uniqueItems: true
+          items:
+            enum:
+            - sales
+            - pre_sales
+            - delivery
+            - pm
+            - pmo
+            - dev
+            - admin
+        inputSchema:
+          type: object
+        outputSchema:
+          type: object
+        steps:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/WorkflowStep'
+        outputMapping:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/WorkflowMapping'
+      description: Maximum serialized UTF-8 size 256000 bytes; at most 500 step visits. Safe object field paths only; no arbitrary
+        code. Unsupported target-root $ref/const/enum are rejected; field-level local references remain supported.
+    WorkflowToolContract:
+      type: object
+      additionalProperties: false
+      required:
+      - name
+      - description
+      - parameters
+      - mutates
+      - requiresConfirmation
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        parameters:
+          type: object
+        mutates:
+          type: boolean
+        exfiltrates:
+          type: boolean
+        simulationOnly:
+          type: boolean
+        requiresConfirmation:
+          type: boolean
+        capability:
+          type: string
+        source:
+          type: string
+        policy:
+          type: object
+        allowedRoles:
+          type: array
+          items:
+            type: string
+    WorkflowDependencySnapshot:
+      type: object
+      additionalProperties: false
+      required:
+      - schemaVersion
+      - skills
+      - tools
+      properties:
+        schemaVersion:
+          const: 1
+        skills:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - stepId
+            - skillId
+            - skillVersionId
+            - hash
+            - context
+            properties:
+              stepId:
+                type: string
+              skillId:
+                type: string
+              skillVersionId:
+                type: string
+              hash:
+                type: string
+              context:
+                $ref: '#/components/schemas/SkillDependencySnapshot'
+        tools:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - stepId
+            - contract
+            - hash
+            properties:
+              stepId:
+                type: string
+              contract:
+                $ref: '#/components/schemas/WorkflowToolContract'
+              hash:
+                type: string
+    WorkflowStaticProof:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - versionId
+      - hash
+      - dependencyHash
+      - actorId
+      - createdAt
+      - mode
+      - executionPerformed
+      properties:
+        id:
+          type: string
+        versionId:
+          type: string
+        hash:
+          type: string
+        dependencyHash:
+          type: string
+        actorId:
+          type: string
+        createdAt:
+          type: string
+        mode:
+          const: static
+        executionPerformed:
+          const: false
+    WorkflowReviewProof:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - versionId
+      - hash
+      - dependencyHash
+      - actorId
+      - createdAt
+      - mode
+      - executionPerformed
+      - validationId
+      - reason
+      properties:
+        id:
+          type: string
+        versionId:
+          type: string
+        hash:
+          type: string
+        dependencyHash:
+          type: string
+        actorId:
+          type: string
+        createdAt:
+          type: string
+        mode:
+          const: static
+        executionPerformed:
+          const: false
+        validationId:
+          type: string
+        reason:
+          type: string
+    WorkflowVersion:
+      type: object
+      additionalProperties: false
+      required:
+      - workflowVersionId
+      - versionCode
+      - majorLetter
+      - minorNumber
+      - status
+      - checkoutStatus
+      - checkedOutBy
+      - definition
+      - lastCheckinDefinition
+      - hash
+      - dependencySnapshot
+      - validation
+      - review
+      - createdAt
+      - updatedAt
+      properties:
+        workflowVersionId:
+          type: string
+        versionCode:
+          type: string
+        majorLetter:
+          type: string
+        minorNumber:
+          type: integer
+          minimum: 0
+        status:
+          enum:
+          - draft
+          - reviewed
+          - published
+        checkoutStatus:
+          enum:
+          - checked_in
+          - checked_out
+        checkedOutBy:
+          type:
+          - string
+          - 'null'
+        definition:
+          $ref: '#/components/schemas/WorkflowDefinition'
+        lastCheckinDefinition:
+          $ref: '#/components/schemas/WorkflowDefinition'
+        hash:
+          type: string
+        dependencySnapshot:
+          anyOf:
+          - $ref: '#/components/schemas/WorkflowDependencySnapshot'
+          - type: 'null'
+        validation:
+          anyOf:
+          - $ref: '#/components/schemas/WorkflowStaticProof'
+          - type: 'null'
+        review:
+          anyOf:
+          - $ref: '#/components/schemas/WorkflowReviewProof'
+          - type: 'null'
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+    WorkflowRecord:
+      type: object
+      additionalProperties: false
+      required:
+      - workflowId
+      - enabled
+      - archived
+      - currentVersionId
+      - activeVersionId
+      - revision
+      - versions
+      - audit
+      - createdAt
+      - updatedAt
+      properties:
+        workflowId:
+          type: string
+        enabled:
+          type: boolean
+        archived:
+          type: boolean
+        currentVersionId:
+          type: string
+        activeVersionId:
+          type:
+          - string
+          - 'null'
+        revision:
+          type: integer
+          minimum: 1
+        versions:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkflowVersion'
+        audit:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - id
+            - action
+            - actorId
+            - actorName
+            - versionId
+            - reason
+            - createdAt
+            properties:
+              id:
+                type: string
+              action:
+                type: string
+              actorId:
+                type: string
+              actorName:
+                type: string
+              versionId:
+                type: string
+              reason:
+                type:
+                - string
+                - 'null'
+              createdAt:
+                type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+    WorkflowError:
+      $ref: '#/components/schemas/SkillError'
+    WorkflowReadiness:
+      type: object
+      additionalProperties: false
+      required:
+      - revision
+      - versionId
+      - hash
+      - dependencyHash
+      - mode
+      - executionPerformed
+      - validation
+      - review
+      - blockers
+      - publishAvailable
+      - rollbackVersions
+      properties:
+        revision:
+          type: integer
+          minimum: 1
+        versionId:
+          type: string
+        hash:
+          type: string
+        dependencyHash:
+          type:
+          - string
+          - 'null'
+        mode:
+          const: static
+        executionPerformed:
+          const: false
+        validation:
+          anyOf:
+          - $ref: '#/components/schemas/WorkflowStaticProof'
+          - type: 'null'
+        review:
+          anyOf:
+          - $ref: '#/components/schemas/WorkflowReviewProof'
+          - type: 'null'
+        blockers:
+          type: array
+          items:
+            type: string
+        publishAvailable:
+          type: boolean
+        rollbackVersions:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - versionId
+            - versionCode
+            properties:
+              versionId:
+                type: string
+              versionCode:
+                type: string
+    WorkflowSkillInfluence:
+      type: object
+      additionalProperties: false
+      required:
+      - workflowId
+      - workflowVersionId
+      - versionCode
+      - stepId
+      - skillId
+      - skillVersionId
+      - workflowName
+      - enabled
+      - archived
+      - current
+      - active
+      - history
+      - published
+      - binding
+      - upgradePath
+      properties:
+        workflowId:
+          type: string
+        workflowVersionId:
+          type: string
+        versionCode:
+          type: string
+        stepId:
+          type: string
+        skillId:
+          type: string
+        skillVersionId:
+          type: string
+        workflowName:
+          type: string
+        enabled:
+          type: boolean
+        archived:
+          type: boolean
+        current:
+          type: boolean
+        active:
+          type: boolean
+        history:
+          type: boolean
+        published:
+          type: boolean
+        binding:
+          const: fixed
+        upgradePath:
+          type: string
+    WorkflowMetadata:
+      type: object
+      additionalProperties: false
+      required:
+      - tools
+      - publishedSkills
+      - viewerId
+      - roles
+      - features
+      properties:
+        tools:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkflowToolContract'
+        publishedSkills:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - skillId
+            - skillVersionId
+            - versionCode
+            - hash
+            - enabled
+            - archived
+            - active
+            - name
+            - description
+            - category
+            - roles
+            - inputSchema
+            - outputSchema
+            properties:
+              skillId:
+                type: string
+              skillVersionId:
+                type: string
+              versionCode:
+                type: string
+              hash:
+                type: string
+              enabled:
+                type: boolean
+              archived:
+                type: boolean
+              active:
+                type: boolean
+              name:
+                type: string
+              description:
+                type: string
+              category:
+                type: string
+              roles:
+                type: array
+                minItems: 1
+                maxItems: 7
+                uniqueItems: true
+                items:
+                  enum:
+                  - sales
+                  - pre_sales
+                  - delivery
+                  - pm
+                  - pmo
+                  - dev
+                  - admin
+              inputSchema:
+                type: object
+              outputSchema:
+                type: object
+        viewerId:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+        features:
+          type: object
+          additionalProperties: false
+          required:
+          - staticValidation
+          - execution
+          - fixedSkillVersions
+          properties:
+            staticValidation:
+              const: true
+            execution:
+              const: false
+            fixedSkillVersions:
+              const: true
+    BusinessAssessmentBasisResponse:
+      type: object
+      required: [code, message, data]
+      properties:
+        code: { const: 0 }
+        message: { type: string }
+        requestId: { type: string }
+        data:
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [kind]
+              properties:
+                kind: { const: legacy }
+            - type: object
+              additionalProperties: false
+              required: [kind, template, ruleSet, basis]
+              properties:
+                kind: { const: frozen }
+                template: { $ref: '#/components/schemas/TemplateDetail' }
+                ruleSet: { $ref: '#/components/schemas/RuleSet' }
+                basis:
+                  type: object
+                  additionalProperties: false
+                  required: [operationId, executionId, runId, rootRunId, manifestHash, workflowId, workflowVersionId, workflowHash, templateId, templateVersion, ruleSetId, ruleVersion, pipelineVersion, snapshotDigest]
+                  properties:
+                    operationId: { type: string, format: uuid }
+                    executionId: { type: string, format: uuid }
+                    runId: { type: string, format: uuid }
+                    rootRunId: { type: string, format: uuid }
+                    manifestHash: { type: string, pattern: '^[a-f0-9]{64}$' }
+                    workflowId: { type: string }
+                    workflowVersionId: { type: string }
+                    workflowHash: { type: string, pattern: '^[a-f0-9]{64}$' }
+                    templateId: { type: string }
+                    templateVersion: { type: string }
+                    ruleSetId: { type: string }
+                    ruleVersion: { type: string }
+                    pipelineVersion: { type: string }
+                    snapshotDigest: { type: string, pattern: '^[a-f0-9]{64}$' }
+
+    BusinessAssessmentCalculateRequest:
+      type: object
+      additionalProperties: false
+      required: [userCount, difficultyFactor, orgCount, orgSimilarityFactor, items]
+      properties:
+        templateId: { type: string, minLength: 1, maxLength: 160 }
+        ruleSetId: { type: string, minLength: 1, maxLength: 160 }
+        userCount: { type: integer, minimum: 0, maximum: 1000000000 }
+        orgCount: { type: integer, minimum: 0, maximum: 1000000000 }
+        difficultyFactor: { type: number, minimum: 0, maximum: 1000000 }
+        orgSimilarityFactor: { type: number, minimum: 0, maximum: 1 }
+        selectedSheet: { type: string, maxLength: 200 }
+        selectedCloudNames:
+          type: array
+          maxItems: 1000
+          items: { type: string, maxLength: 200 }
+        exportProjectName: { type: string, maxLength: 500 }
+        exportAssessmentVersionCode: { type: string, maxLength: 500 }
+        items:
+          type: array
+          minItems: 1
+          maxItems: 10000
+          items:
+            type: object
+            additionalProperties: false
+            required: [templateItemId, included]
+            properties:
+              templateItemId: { type: string, minLength: 1, maxLength: 160 }
+              included: { type: boolean }
+              customStandardDays: { type: number, minimum: 0, maximum: 1000000000 }
+
     GenericOkResponse:
       type: object
       properties:
@@ -6256,6 +10971,203 @@ components:
       required: [code, message, details, requestId]
 
     # AI Runs（RP-047 Batch C） ----------------------------------
+    ExecutionRecommendationRequest:
+      type: object
+      additionalProperties: false
+      required: [goal]
+      properties:
+        goal:
+          type: string
+          minLength: 1
+          maxLength: 4000
+          pattern: '\S'
+
+    ExecutionRecommendationResponse:
+      type: object
+      additionalProperties: false
+      required: [code, message, data]
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+        requestId:
+          type: string
+        data:
+          type: object
+          additionalProperties: false
+          required: [outcome, message, items]
+          oneOf:
+            - properties:
+                outcome:
+                  const: recommended
+                message:
+                  const: 请选择候选项，补齐输入后明确启动。
+                items:
+                  minItems: 1
+            - properties:
+                outcome:
+                  const: no_match
+                message:
+                  const: 请补充希望完成的业务目标，或继续普通对话。
+                items:
+                  maxItems: 0
+          properties:
+            outcome:
+              type: string
+              enum: [recommended, no_match]
+            message:
+              type: string
+              enum: [请选择候选项，补齐输入后明确启动。, 请补充希望完成的业务目标，或继续普通对话。]
+            items:
+              type: array
+              maxItems: 3
+              items:
+                type: object
+                additionalProperties: false
+                required: [kind, id, versionId, name, description]
+                properties:
+                  kind:
+                    type: string
+                    enum: [skill, workflow]
+                  id:
+                    type: string
+                  versionId:
+                    type: string
+                  name:
+                    type: string
+                  description:
+                    type: string
+
+    BusinessExecutionRequest:
+      type: object
+      additionalProperties: false
+      required: [kind, input]
+      properties:
+        kind:
+          type: string
+          enum: [skill, workflow]
+        skillId:
+          type: string
+        workflowId:
+          type: string
+        input:
+          description: 必须符合选中发布版本的原输入Schema
+        sources:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            additionalProperties: false
+            required: [kind, id]
+            properties:
+              kind:
+                type: string
+                enum: [file, conversation]
+              id:
+                type: string
+                minLength: 1
+                maxLength: 160
+              location:
+                type: string
+                minLength: 1
+                maxLength: 1000
+        assets:
+          type: array
+          maxItems: 10
+          description: 仅服务器解析实际目录并冻结模板和规则；空列表按省略处理
+          items:
+            type: object
+            additionalProperties: false
+            required: [kind, templateId]
+            properties:
+              kind:
+                type: string
+                enum: [assessment-catalog]
+              templateId:
+                type: string
+                minLength: 1
+                maxLength: 160
+                pattern: '^[A-Za-z0-9_-]+$'
+      oneOf:
+        - required: [skillId]
+          properties:
+            kind:
+              enum: [skill]
+          not:
+            required: [workflowId]
+        - required: [workflowId]
+          properties:
+            kind:
+              enum: [workflow]
+          not:
+            required: [skillId]
+
+    BusinessInvocationSubmitRequest:
+      type: object
+      additionalProperties: false
+      required: [submissionKey, content, execution]
+      properties:
+        submissionKey:
+          type: string
+          minLength: 1
+          maxLength: 160
+        content:
+          type: string
+          minLength: 1
+        execution:
+          $ref: "#/components/schemas/BusinessExecutionRequest"
+
+    BusinessExecutionInputAnswer:
+      type: object
+      additionalProperties: false
+      required: [actionId, kind, stepId, contentHash, input]
+      properties:
+        actionId:
+          type: string
+        kind:
+          type: string
+          enum: [userInput]
+        stepId:
+          type: string
+        contentHash:
+          type: string
+        input:
+          description: 按pendingInput.outputSchema校验的回答
+
+    BusinessWorkflowDecision:
+      type: object
+      additionalProperties: false
+      required: [stepId, contentHash]
+      properties:
+        stepId:
+          type: string
+        contentHash:
+          type: string
+
+    BusinessOperationDecision:
+      type: object
+      additionalProperties: false
+      required: [confirmationHash]
+      properties:
+        confirmationHash:
+          type: string
+
+    BusinessExecutionRetryRequest:
+      type: object
+      additionalProperties: false
+      required: [submissionKey, reason]
+      properties:
+        submissionKey:
+          type: string
+          minLength: 1
+          maxLength: 160
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 1000
+
     AiRunSubmitRequest:
       type: object
       properties:
@@ -6326,6 +11238,83 @@ components:
           description: SSE 回放起始游标（事件 sequence）
       required: [runId, sessionId, status, eventCursor]
 
+    BusinessExecutionTimeline:
+      type: object
+      additionalProperties: false
+      description: >
+        只读阶段消息投影；来源仅限当前用户、会话及经验证的物理重试祖先链。
+        runId 仅在物理来源已验证时返回；不以逻辑执行ID或最终完成Run猜测来源。
+        历史缺失时保留可验证阶段并标记partial，不生成推测消息。GET不写会话、账本或业务数据。
+        最终业务产物仍由businessExecution.results.output提供。
+      required: [version, rootRunId, entries, coverage, unavailable]
+      properties:
+        version:
+          type: integer
+          enum: [1]
+        rootRunId:
+          type: string
+          format: uuid
+        entries:
+          type: array
+          maxItems: 4096
+          items:
+            $ref: "#/components/schemas/BusinessExecutionTimelineEntry"
+        coverage:
+          type: string
+          enum: [complete, partial]
+        unavailable:
+          type: array
+          uniqueItems: true
+          maxItems: 4
+          items:
+            type: string
+            enum: [receipt_origin_missing, wait_history_missing, unsupported_history, state_missing]
+
+    BusinessExecutionTimelineEntry:
+      type: object
+      additionalProperties: false
+      required: [id, kind, role, title, status]
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+          enum: [stage, question, answer, confirmation, decision, tool_result, result, failure]
+        role:
+          type: string
+          enum: [assistant, user, system]
+        title:
+          type: string
+        status:
+          type: string
+        runId:
+          type: string
+          format: uuid
+        stageId:
+          type: string
+          description: 服务端生成的逻辑阶段关联ID；客户端无需重新运行工作流解释器。
+        stepId:
+          type: string
+        stepType:
+          type: string
+          enum: [skill, tool, userInput, confirmation]
+        operationId:
+          type: string
+        iteration:
+          type: integer
+          minimum: 0
+        ordinal:
+          type: integer
+          minimum: 0
+        toolName:
+          type: string
+        content:
+          description: 经脱敏业务JSON；不包含host状态、权限依据或账本私有信封。
+        occurredAt:
+          type: string
+          format: date-time
+          description: 仅在存在已验证真实时间时返回，不用最近检查点时间补齐。
+
     AiRunSnapshotEnvelope:
       type: object
       properties:
@@ -6338,7 +11327,9 @@ components:
           type: string
         data:
           type: object
-          description: run 行 + 当前 attempt + 最近 checkpoint + output（可空字段）
+          description: >
+            run 行 + 当前 attempt + 最近 checkpoint + output（可空字段）。业务 Skill 运行省略
+            run.executionConfig 及 checkpoint.state、checkpoint.aiMilestone；这些私有字段不属于公开投影。
           properties:
             run:
               type: object
@@ -6355,6 +11346,13 @@ components:
               type: object
               additionalProperties: true
               nullable: true
+            businessExecution:
+              type: object
+              additionalProperties: true
+              description: 业务Skill和工作流的用户可见投影；旧客户端可以忽略新增timeline字段。
+              properties:
+                timeline:
+                  $ref: "#/components/schemas/BusinessExecutionTimeline"
           required: [run, attempt, checkpoint, output]
       required: [code, message, data]
 
@@ -6362,7 +11360,8 @@ components:
       type: object
       description: >
         409 业务冲突；code 为字符串业务码：SESSION_HAS_ACTIVE_RUN /
-        RUN_ALREADY_TERMINAL / RUN_NOT_WAITING / RUN_NOT_FAILED / RUN_NOT_RETRYABLE
+        RUN_ALREADY_TERMINAL / RUN_NOT_WAITING / RUN_NOT_FAILED / RUN_NOT_RETRYABLE /
+        BUSINESS_SKILLS_WAIT_CHANNEL_REQUIRED / BUSINESS_SKILLS_RETRY_CHANNEL_REQUIRED
       properties:
         code:
           type: string
@@ -6892,19 +11891,21 @@ components:
 
     VersionCreateRequest:
       type: object
-      required: [type, versionCode, status]
+      required: [type]
       properties:
         type:
           type: string
           enum: [requirementImport, assessment, resource, dev, global]
         versionCode:
           type: string
+          description: 可选；省略或空串时按当前生效的模块编码规则分配，assessment 分配与插入处于同一事务。
         templateId:
           type: string
           default: default
         status:
           type: string
           enum: [draft, reviewed, published]
+          default: draft
         payload:
           type: object
           additionalProperties: true
