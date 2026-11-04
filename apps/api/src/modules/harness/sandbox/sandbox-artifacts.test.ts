@@ -65,6 +65,33 @@ test('HTML acceptance follows raw-text elements and requires actual closed head 
   for (const html of ['<html><head><title>broken</head><body>report</body></html>', '<html><head><style>broken</head><body>report</body></html>', '<html><head></head><body><div>unclosed</body></html>']) await assert.rejects(validateSandboxArtifact('x.html', 'html', Buffer.from(html)));
   assert.ok(await validateSandboxArtifact('x.html', 'html', Buffer.from('<!doctype html><html><head><meta charset="utf-8"><style>p::before{content:"<body>"}</style><title>Report</title></head><body><p>正文<br>第二行</p></body></html>')));
 });
+test('XML parser rejects depth, attribute, namespace and aggregate node resource attacks', async () => {
+  const root = '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>', end = '</w:body></w:document>';
+  const bad = [
+    root + '<w:p>'.repeat(129) + '</w:p>'.repeat(129) + end,
+    root + '<w:p ' + Array.from({ length: 65 }, (_, i) => `a${i}="v"`).join(' ') + '/>' + end,
+    root + Array.from({ length: 260 }, (_, i) => `<w:p xmlns:n${i}="urn:${i}"/>`).join('') + end,
+  ];
+  for (const document of bad) await assert.rejects(validateSandboxArtifact('x.docx', 'docx', await office('docx', { 'word/document.xml': document })));
+  const many = (seed: number, count: number) => '<root>' + Array.from({ length: count }, (_, i) => `<p a="${seed + i}"/>`).join('') + '</root>';
+  // Neither XML entry alone exhausts the package node budget.
+  await assert.rejects(validateSandboxArtifact('x.docx', 'docx', await office('docx', { 'word/part1.xml': many(0, 50000), 'word/part2.xml': many(50000, 50000) })));
+});
+test('HTML rejects active navigation independently of CSP, preserving fragment references', async () => {
+  const wrap = (head: string, body = '') => Buffer.from(`<html><head>${head}</head><body>${body}</body></html>`);
+  for (const [head, body] of [
+    ['<meta http-equiv="refresh" content="0;url=https://bad.example">', ''],
+    ['<META HTTP-EQUIV = ReFrEsH content="0; url=https://bad.example">', ''],
+    ['<meta http-equiv="&#114;efresh" content="0;url=https://bad.example">', ''],
+    ['<base href="https://bad.example">', ''],
+    ['', '<a href="https://bad.example">go</a>'],
+    ['', '<a href="&#104;ttps://bad.example">go</a>'],
+    ['', '<form action="https://bad.example"><button>send</button></form>'],
+    ['', '<svg><a xlink:href="https://bad.example">go</a></svg>'],
+    ['', '<svg><style><meta http-equiv="refresh" content="0;url=https://bad.example"></style></svg>'],
+  ]) await assert.rejects(validateSandboxArtifact('x.html', 'html', wrap(head, body)));
+  assert.ok(await validateSandboxArtifact('x.html', 'html', wrap('<meta charset="utf-8">', '<a href="#section">jump</a><p id="section">正文</p>')));
+});
 test('private store roundtrip is atomic, UUID-only, bounded and refuses symlinks', async () => {
   const root = await mkdtemp(join(tmpdir(), 'wes-artifacts-')); const store = new LocalSandboxArtifactStore(root); const id = randomUUID();
   try {

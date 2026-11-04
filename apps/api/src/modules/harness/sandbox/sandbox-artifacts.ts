@@ -54,6 +54,8 @@ function crc32(bytes: Buffer): number {
 }
 
 interface XmlTag { name: string; namespace: string; attrs: Record<string, string>; namespacedAttrs: Record<string, string>; depth: number }
+interface XmlBudget { nodes: number; attributes: number; namespaceDeclarations: number }
+const XML_LIMITS = { depth: 128, attributesPerNode: 64, attributesPerPackage: 200000, nodesPerPackage: 100000, namespaceDeclarations: 256, activeNamespaces: 64, tagBytes: 65536, attributeLength: 8192 };
 function xmlEntities(value: string): string {
   return value.replace(/&([^;]*);/g, (_, entity: string) => {
     const named: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
@@ -64,44 +66,55 @@ function xmlEntities(value: string): string {
     return String.fromCodePoint(n);
   });
 }
-function parseXml(bytes: Buffer): XmlTag[] {
+function parseXml(bytes: Buffer, budget: XmlBudget): XmlTag[] {
   const text = utf8(bytes).replace(/^\uFEFF/, '').replace(/^\s*<\?xml\s[^?]*\?>/, '');
   if (/<!|<\?/.test(text) || /&(?!amp;|lt;|gt;|quot;|apos;|#\d+;|#x[\da-f]+;)/i.test(text)) fail();
-  const stack: Array<{ qName: string; namespaces: Record<string, string> }> = [], tags: XmlTag[] = []; let previous = 0; let roots = 0;
+  type NamespaceChange = { prefix: string; previous?: string };
+  const stack: Array<{ qName: string; changes: NamespaceChange[] }> = [], tags: XmlTag[] = []; let previous = 0; let roots = 0;
+  const namespaces = new Map<string, string>([['xml', 'http://www.w3.org/XML/1998/namespace']]);
+  const restoreNamespaces = (changes: NamespaceChange[]) => { for (const change of changes.reverse()) { if (change.previous === undefined) namespaces.delete(change.prefix); else namespaces.set(change.prefix, change.previous); } };
   const token = /<([^<>]+)>/g; let match: RegExpExecArray | null;
   while ((match = token.exec(text))) {
     const between = text.slice(previous, match.index); if (between.includes('<') || (!stack.length && between.trim())) fail();
     const body = match[1]; previous = token.lastIndex;
-    if (body.startsWith('/')) { if (!/^\/[A-Za-z_][\w.-]*(?::[A-Za-z_][\w.-]*)?\s*$/.test(body) || stack.pop()?.qName !== body.slice(1).trim()) fail(); continue; }
+    if (body.length > XML_LIMITS.tagBytes) fail();
+    if (body.startsWith('/')) {
+      const frame = stack.pop();
+      if (!/^\/[A-Za-z_][\w.-]*(?::[A-Za-z_][\w.-]*)?\s*$/.test(body) || frame?.qName !== body.slice(1).trim()) fail();
+      restoreNamespaces(frame!.changes); continue;
+    }
+    if (stack.length >= XML_LIMITS.depth || ++budget.nodes > XML_LIMITS.nodesPerPackage) fail();
     const start = /^([A-Za-z_][\w.-]*(?::[A-Za-z_][\w.-]*)?)([\s\S]*?)\/?$/.exec(body); if (!start) fail();
-    const attrs: Record<string, string> = {}; let remainder = start![2];
+    const attrs: Record<string, string> = Object.create(null); let remainder = start![2]; let attributeCount = 0;
     while (remainder.trim()) {
       const attr = /^\s+([A-Za-z_][\w.-]*(?::[A-Za-z_][\w.-]*)?)\s*=\s*(?:"([^"<]*)"|'([^'<]*)')/.exec(remainder);
       if (!attr || Object.prototype.hasOwnProperty.call(attrs, attr[1])) fail();
+      if (++attributeCount > XML_LIMITS.attributesPerNode || ++budget.attributes > XML_LIMITS.attributesPerPackage || attr![1].length > 128 || (attr![2] ?? attr![3]).length > XML_LIMITS.attributeLength) fail();
       attrs[attr![1]] = xmlEntities(attr![2] ?? attr![3]); remainder = remainder.slice(attr![0].length);
     }
     if (!stack.length && ++roots > 1) fail();
-    const namespaces: Record<string, string> = { xml: 'http://www.w3.org/XML/1998/namespace', ...(stack[stack.length - 1]?.namespaces ?? {}) };
+    const changes: NamespaceChange[] = [];
     for (const [key, value] of Object.entries(attrs)) {
-      if (key === 'xmlns') namespaces[''] = value;
-      else if (key.startsWith('xmlns:')) {
-        const prefix = key.slice(6);
-        if (!value || prefix === 'xmlns' || (prefix === 'xml' && value !== 'http://www.w3.org/XML/1998/namespace')) fail();
-        namespaces[prefix] = value;
-      }
+      if (key !== 'xmlns' && !key.startsWith('xmlns:')) continue;
+      const prefix = key === 'xmlns' ? '' : key.slice(6);
+      if (++budget.namespaceDeclarations > XML_LIMITS.namespaceDeclarations || (prefix && !value) || prefix === 'xmlns' || (prefix === 'xml' && value !== 'http://www.w3.org/XML/1998/namespace')) fail();
+      changes.push({ prefix, previous: namespaces.get(prefix) });
+      namespaces.set(prefix, value);
+      if (namespaces.size > XML_LIMITS.activeNamespaces) fail();
     }
     const [prefix, name] = start![1].includes(':') ? start![1].split(':') : ['', start![1]];
-    if (prefix === 'xmlns' || (prefix && !namespaces[prefix])) fail();
-    const namespacedAttrs: Record<string, string> = {};
+    if (prefix === 'xmlns' || (prefix && !namespaces.has(prefix))) fail();
+    const namespacedAttrs: Record<string, string> = Object.create(null);
     for (const [key, value] of Object.entries(attrs)) if (key !== 'xmlns' && !key.startsWith('xmlns:')) {
       const [attrPrefix, local] = key.includes(':') ? key.split(':') : ['', key];
-      if (attrPrefix && !namespaces[attrPrefix]) fail();
-      const expanded = `{${attrPrefix ? namespaces[attrPrefix] : ''}}${local}`;
+      if (attrPrefix && !namespaces.has(attrPrefix)) fail();
+      const expanded = `{${attrPrefix ? namespaces.get(attrPrefix) : ''}}${local}`;
       if (Object.prototype.hasOwnProperty.call(namespacedAttrs, expanded)) fail();
       namespacedAttrs[expanded] = value;
     }
-    tags.push({ name, namespace: namespaces[prefix] ?? '', attrs, namespacedAttrs, depth: stack.length });
-    if (!body.endsWith('/')) stack.push({ qName: start![1], namespaces });
+    tags.push({ name, namespace: namespaces.get(prefix) ?? '', attrs, namespacedAttrs, depth: stack.length });
+    if (!body.endsWith('/')) stack.push({ qName: start![1], changes });
+    else restoreNamespaces(changes);
   }
   if (stack.length || roots !== 1 || text.slice(previous).trim()) fail();
   return tags;
@@ -111,10 +124,11 @@ function validateOffice(format: 'docx' | 'xlsx', bytes: Buffer): void {
   const files = unzip(bytes), main = format === 'docx' ? 'word/document.xml' : 'xl/workbook.xml';
   for (const name of ['[Content_Types].xml', '_rels/.rels', main]) if (!files.has(name)) fail();
   const xml = new Map<string, XmlTag[]>();
+  const budget: XmlBudget = { nodes: 0, attributes: 0, namespaceDeclarations: 0 };
   for (const [path, content] of files) {
     if (/vba|macro|activex|embeddings|externalLinks|connections|queryTables|customUI/i.test(path) || /\.(?:bin|exe|js|vbs|html?|mhtml|svg)$/i.test(path)) fail();
     if (path.endsWith('.xml') || path.endsWith('.rels')) {
-      const tags = parseXml(content); xml.set(path, tags);
+      const tags = parseXml(content, budget); xml.set(path, tags);
       if (tags.some(tag => /^(?:object|oleObject|altChunk|externalLink|externalData|connection|queryTable|ddeLink|webQuery|control|attachedTemplate|f|instrText|fldSimple|definedName|hyperlink)$/i.test(tag.name))) fail();
     } else if (!/\.(?:png|jpe?g|gif)$/i.test(path)) fail();
   }
@@ -211,6 +225,21 @@ function validateHtml(bytes: Buffer): void {
     const open = /^([a-z][a-z0-9:-]*)(?:\s[^<>]*)?\/?$/i.exec(token);
     if (!open) fail();
     const name = open![1].toLowerCase(), parent = stack[stack.length - 1];
+    // Foreign-content parsing changes HTML raw-text rules, so inline SVG/MathML
+    // are outside this conservative preview grammar; data images remain usable.
+    if (['base', 'form', 'iframe', 'frame', 'frameset', 'object', 'embed', 'portal', 'link', 'set', 'svg', 'math', 'plaintext'].includes(name) || name.startsWith('animate')) fail();
+    // CSP does not prevent this iframe from navigating itself. Reject refresh,
+    // embedded browsing contexts and navigation attributes before preview.
+    let attributes = token.slice(open![1].length).replace(/\/$/, '');
+    const seen = new Set<string>();
+    while (attributes.trim()) {
+      const attr = /^\s+([^\s"'<>/=\x00-\x20]+)(?:\s*=\s*(?:"([^"<]*)"|'([^'<]*)'|([^\s"'`=<>]+)))?/.exec(attributes);
+      if (!attr) fail();
+      const key = attr![1].toLowerCase(), value = attr![2] ?? attr![3] ?? attr![4] ?? '';
+      if (seen.has(key) || seen.size >= 64 || key.startsWith('on') || ['http-equiv', 'target', 'action', 'formaction', 'ping', 'srcdoc'].includes(key)) fail();
+      if ((key === 'href' || key.endsWith(':href')) && !/^#[a-zA-Z0-9_.:-]*$/.test(value)) fail();
+      seen.add(key); attributes = attributes.slice(attr![0].length);
+    }
     if (name === 'html') { if (sections || stack.length) fail(); sections = 1; }
     else if (name === 'head') { if (sections !== 1 || parent !== 'html') fail(); sections = 2; }
     else if (name === 'body') { if (sections !== 2 || parent !== 'html') fail(); sections = 3; }
@@ -223,7 +252,7 @@ function validateHtml(bytes: Buffer): void {
       const closing = new RegExp(`</${name}\\s*>`, 'ig'); closing.lastIndex = cursor;
       const found = closing.exec(html); if (!found) fail();
       cursor = closing.lastIndex;
-    } else stack.push(name);
+    } else { if (stack.length >= 128) fail(); stack.push(name); }
   }
   if (stack.length || sections !== 3) fail();
 }

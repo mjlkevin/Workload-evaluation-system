@@ -64,7 +64,60 @@ print(base64.b64encode(b).decode("ascii"),end="")
 os.close(f)
 os.close(fd)
 `;
+// The SDK receives only this trusted runner's bounded ASCII envelope. Model
+// stdout/stderr stay on private pipes, are continuously drained, and never flow
+// directly into the SDK's unbounded string accumulator.
+const RUN_BOUNDED = `import os,pwd,subprocess,selectors,time,signal,base64,json
+LIMIT=16384
+account=pwd.getpwnam("user")
+if account.pw_uid==0: raise ValueError("unsafe user")
+argv={"python":["python","task.py"],"node":["node","task.mjs"]}[os.environ["WES_LANGUAGE"]]
+deadline=time.monotonic()+int(os.environ["WES_TIMEOUT_MS"])/1000
+env={"PATH":"/usr/local/bin:/usr/bin:/bin","HOME":account.pw_dir,"LANG":"C.UTF-8"}
+process=subprocess.Popen(argv,cwd=os.environ["WES_ROOT"]+"/work",env=env,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE,user=account.pw_uid,group=account.pw_gid,extra_groups=[],start_new_session=True,close_fds=True,umask=0o077)
+selector=selectors.DefaultSelector()
+buffers={"stdout":bytearray(),"stderr":bytearray()}
+for name,pipe in (("stdout",process.stdout),("stderr",process.stderr)):
+ os.set_blocking(pipe.fileno(),False)
+ selector.register(pipe,selectors.EVENT_READ,name)
+timedout=False
+try:
+ while selector.get_map() or process.poll() is None:
+  remaining=deadline-time.monotonic()
+  if remaining<=0:
+   timedout=True
+   break
+  for key,events in selector.select(min(0.05,remaining)):
+   try: chunk=os.read(key.fd,65536)
+   except BlockingIOError: continue
+   if not chunk:
+    selector.unregister(key.fileobj)
+    key.fileobj.close()
+    continue
+   name=key.data
+   buffers[name].extend(chunk[:max(0,LIMIT-len(buffers[name]))])
+finally:
+ try: os.killpg(process.pid,signal.SIGKILL)
+ except ProcessLookupError: pass
+ for key in list(selector.get_map().values()): key.fileobj.close()
+ selector.close()
+ process.wait(timeout=2)
+result={"exitCode":124 if timedout else process.returncode,"stdout":base64.b64encode(buffers["stdout"]).decode("ascii"),"stderr":base64.b64encode(buffers["stderr"]).decode("ascii")}
+print(json.dumps(result,separators=(",",":")),end="")
+`;
 const helperCommand = (script: string) => "python -I -c '" + script.replace(/'/g, "'\"'\"'") + "'";
+const RUNNER_ENVELOPE_LIMIT = 45000;
+function decodeRunnerResult(stdout: string): { exitCode: number; stdout: string; stderr: string } {
+  if (Buffer.byteLength(stdout) > RUNNER_ENVELOPE_LIMIT) throw new Error();
+  const result = JSON.parse(stdout) as Record<string, unknown>;
+  if (!Number.isInteger(result.exitCode) || Number(result.exitCode) < -255 || Number(result.exitCode) > 255) throw new Error();
+  const decode = (value: unknown) => {
+    if (typeof value !== 'string' || value.length > 21848 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) throw new Error();
+    const bytes = Buffer.from(value, 'base64'); if (bytes.length > 16384) throw new Error();
+    return bytes.toString('utf8');
+  };
+  return { exitCode: Number(result.exitCode), stdout: decode(result.stdout), stderr: decode(result.stderr) };
+}
 
 export function createBailianSandboxProvider(connection: SandboxConnection, apiKey: string, deps: BailianProviderDependencies = {}): SandboxProvider {
   // Never accept endpoints or credential-bearing strings from model arguments.
@@ -127,18 +180,17 @@ export function createBailianSandboxProvider(connection: SandboxConnection, apiK
         const entry = language === 'python' ? 'task.py' : 'task.mjs';
         const abort = () => { void instance.release().catch(() => undefined); };
         running = true;
-        let dispatched = false;
         signal?.addEventListener('abort', abort, { once: true });
         try {
           await writeInput(entry, Buffer.from(code));
           if (signal?.aborted) throw new Error();
-          dispatched = true;
-          const result = await sandbox.commands.run(language === 'python' ? 'python task.py' : 'node task.mjs', { cwd: `${root}/work`, user: 'user', timeoutMs: Math.min(Math.floor(timeoutMs), 120000), envs: {}, signal });
+          const limit = Math.min(Math.floor(timeoutMs), 120000);
+          const envelope = await sandbox.commands.run(helperCommand(RUN_BOUNDED), { cwd: `${root}/work`, user: 'root', timeoutMs: limit + 5000, envs: { WES_ROOT: root, WES_LANGUAGE: language, WES_TIMEOUT_MS: String(limit) }, signal });
           if (signal?.aborted) throw new Error();
+          if (envelope.exitCode !== 0 || envelope.stderr) throw new Error();
+          const result = decodeRunnerResult(envelope.stdout);
           return { exitCode: result.exitCode, stdout: safeText(result.stdout), stderr: safeText(result.stderr) };
-        } catch (error) {
-          const result = error as { name?: string; exitCode?: number; stdout?: string; stderr?: string };
-          if (!signal?.aborted && dispatched && result?.name === 'CommandExitError' && Number.isInteger(result.exitCode) && typeof result.stdout === 'string' && typeof result.stderr === 'string') return { exitCode: result.exitCode!, stdout: safeText(result.stdout), stderr: safeText(result.stderr) };
+        } catch {
           throw new Error(signal?.aborted ? 'SANDBOX_CANCELLED' : 'SANDBOX_EXECUTION_UNKNOWN');
         }
         finally { running = false; signal?.removeEventListener('abort', abort); }

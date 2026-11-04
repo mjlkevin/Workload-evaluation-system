@@ -11,7 +11,12 @@ function fixture(metadata: Record<string, unknown> = {}) {
   const sandbox = {
     sandboxId: 'managed-1', getInfo: async () => info,
     files: { write: async (...args: any[]) => { calls.push({ name: 'write', args }); } },
-    commands: { run: async (...args: any[]) => { calls.push({ name: 'run', args }); return commandResult; } },
+    commands: { run: async (...args: any[]) => {
+      calls.push({ name: 'run', args });
+      if (args[1]?.envs?.WES_LANGUAGE) return { exitCode: 0, stdout: JSON.stringify({ exitCode: commandResult.exitCode, stdout: Buffer.from(commandResult.stdout).toString('base64'), stderr: Buffer.from(commandResult.stderr).toString('base64') }), stderr: '' };
+      if (args[1]?.envs?.WES_UPLOAD) return { exitCode: 0, stdout: '', stderr: '' };
+      return commandResult;
+    } },
     kill: async () => { calls.push({ name: 'kill', args: [] }); return true; },
   };
   const template = { templateID: connection.templateCode, builds: [{ buildID: 'build-1', status: 'ready' }], envConfig: {}, mntConfig: [], networkConfig: { allowOut: [], denyOut: ['0.0.0.0/0', '::/0'] }, ...metadata };
@@ -43,8 +48,9 @@ test('model code is uploaded as bytes and only fixed entrypoints execute in a pr
   const f = fixture(); const instance = await f.provider.create(jobId, 300);
   await instance.execute('python', 'print("$(touch /bad)")', 999999);
   const run = f.calls.filter(c => c.name === 'run').at(-1)!;
-  assert.equal(run.args[0], 'python task.py'); assert.equal(run.args[1].user, 'user');
-  assert.equal(run.args[1].timeoutMs, 120000); assert.match(run.args[1].cwd, /^\/tmp\/wes-job-[a-f0-9-]+\/work$/);
+  assert.match(run.args[0], /"python",\s*"task.py"/); assert.match(run.args[0], /"node",\s*"task.mjs"/);
+  assert.equal(run.args[1].user, 'root'); assert.match(run.args[0], /user=account.pw_uid/);
+  assert.equal(run.args[1].envs.WES_TIMEOUT_MS, '120000'); assert.equal(run.args[1].timeoutMs, 125000); assert.match(run.args[1].cwd, /^\/tmp\/wes-job-[a-f0-9-]+\/work$/);
   assert.equal(run.args[0].includes('touch'), false);
 });
 
@@ -98,12 +104,22 @@ test('failed provisioning cleanup preserves only managed ID for durable compensa
   await assert.rejects(f.provider.create(jobId, 300), error => error instanceof Error && error.message === 'SANDBOX_PROVISIONING_FAILED' && (error as Error & { managedSandboxId?: string }).managedSandboxId === 'managed-1' && !JSON.stringify(error).includes('private-key'));
 });
 
-test('SDK nonzero script exits return the known sanitized result, not an unknown execution', async () => {
+test('bounded runner returns nonzero script exits as a known sanitized result', async () => {
   const f = fixture(); const instance = await f.provider.create(jobId, 300);
-  const run = f.sandbox.commands.run;
-  f.sandbox.commands.run = async (...args: any[]) => {
-    if (args[0] === 'python task.py') throw Object.assign(new Error('SDK private details'), { name: 'CommandExitError', exitCode: 2, stdout: 'private-key', stderr: 'invalid input' });
-    return run(...args);
-  };
+  f.setResult({ exitCode: 2, stdout: 'private-key', stderr: 'invalid input' });
   assert.deepEqual(await instance.execute('python', 'raise ValueError()', 1000), { exitCode: 2, stdout: '[redacted]', stderr: 'invalid input' });
+});
+test('untrusted streams terminate inside a bounded cloud runner before SDK transport', async () => {
+  const f = fixture(); const instance = await f.provider.create(jobId, 300);
+  f.setResult({ exitCode: 0, stdout: 'x'.repeat(16384), stderr: 'y'.repeat(16384) });
+  const result = await instance.execute('node', 'console.log("flood")', 1000);
+  assert.equal(result.stdout.length, 16384); assert.equal(result.stderr.length, 16384);
+  const runner = f.calls.filter(c => c.name === 'run').at(-1)!;
+  assert.match(runner.args[0], /selectors.DefaultSelector/); assert.match(runner.args[0], /os.read\(key.fd,65536\)/);
+  assert.match(runner.args[0], /chunk\[:max\(0,LIMIT-len\(buffers\[name\]\)\)\]/);
+  assert.match(runner.args[0], /start_new_session=True/); assert.match(runner.args[0], /os.killpg/);
+  assert.match(runner.args[0], /time.monotonic/); assert.match(runner.args[0], /extra_groups=\[\]/);
+  assert.equal(JSON.stringify(runner.args[1].envs).includes('private-key'), false);
+  f.setResult({ exitCode: 0, stdout: 'x'.repeat(16385), stderr: '' });
+  await assert.rejects(instance.execute('node', 'console.log(1)', 1000), /SANDBOX_EXECUTION_UNKNOWN/);
 });
