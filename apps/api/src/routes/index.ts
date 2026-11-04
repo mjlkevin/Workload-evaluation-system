@@ -44,7 +44,10 @@ import { getKnowledgeRepository } from "../modules/knowledge/knowledge.module";
 import { createMasterDataRouter } from "./master-data.routes";
 import { getIndustryRepository, getProductMasterDataRepository } from "../modules/master-data/master-data.module";
 
+import { createSandboxRouter } from "./sandbox.routes";
+
 const router = Router();
+router.use(createSandboxRouter());
 router.use('/skills', createSkillsRouter());
 router.use('/workflows', createWorkflowsRouter());
 

@@ -32,6 +32,9 @@ export const testDb = drizzle(testPool, { schema });
 // 顺序无关（RESTART IDENTITY CASCADE 自行处理外键依赖）。
 
 export const TRUNCATE_TEST_TABLE_NAMES: string[] = [
+  "harness_sandbox_artifacts",
+  "harness_sandbox_jobs",
+  "harness_sandbox_connections",
   "execution_emergency_audits",
   "workflow_skill_dependencies",
   "workflow_revisions",
