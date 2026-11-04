@@ -7,9 +7,9 @@ const jobId = '00000000-0000-4000-8000-000000000001';
 function fixture(metadata: Record<string, unknown> = {}) {
   const calls: Array<{ name: string; args: any[] }> = [];
   let commandResult = { exitCode: 0, stdout: '', stderr: '' };
-  const info = { metadata: { wesManaged: 'true', wesConnectionId: connection.id, wesJobId: jobId, wesTemplateRevision: connection.templateRevision }, templateId: connection.templateCode };
+  const info = { metadata: { wesManaged: 'true', wesConnectionId: connection.id, wesJobId: jobId, wesTemplateRevision: connection.templateRevision }, templateId: connection.templateCode, allowInternetAccess: false, network: { allowOut: ['*.oss-cn-hangzhou-internal.aliyuncs.com', '*.oss-cn-beijing-internal.aliyuncs.com'], denyOut: ['0.0.0.0/0', '::/0'], allowPublicTraffic: false } };
   const sandbox = {
-    sandboxId: 'managed-1', getInfo: async () => info,
+    sandboxId: 'managed-1', getInfo: async () => { calls.push({ name: 'getInfo', args: [] }); return info; },
     files: { write: async (...args: any[]) => { calls.push({ name: 'write', args }); } },
     commands: { run: async (...args: any[]) => {
       calls.push({ name: 'run', args });
@@ -44,6 +44,36 @@ test('SDK uses real bearer auth, pinned template, no secret environment and TTL 
   assert.equal(args[1].metadata.wesManaged, 'true'); assert.equal(args[1].metadata.wesJobId, jobId);
   assert.equal(args[1].allowInternetAccess, false);
   assert.deepEqual(args[1].network, { allowOut: [], denyOut: ['0.0.0.0/0', '::/0'], allowPublicTraffic: false });
+});
+test('actual instance policy must be read back before staging and permits only fixed system channels', async () => {
+  for (const allowOut of [[], ['*.oss-cn-hangzhou-internal.aliyuncs.com'], ['*.oss-cn-beijing-internal.aliyuncs.com'], ['*.oss-cn-hangzhou-internal.aliyuncs.com', '*.oss-cn-beijing-internal.aliyuncs.com']]) {
+    const f = fixture(); f.info.network.allowOut = allowOut;
+    await f.provider.create(jobId, 300);
+    const readBack = f.calls.findIndex(c => c.name === 'getInfo');
+    assert.ok(readBack >= 0); assert.ok(readBack < f.calls.findIndex(c => c.name === 'run'));
+  }
+});
+test('missing or drifted instance network policy fails closed and releases only the newly created handle', async () => {
+  for (const patch of [
+    { allowInternetAccess: undefined }, { allowInternetAccess: true }, { network: undefined },
+    { network: { allowOut: [], denyOut: ['0.0.0.0/0', '::/0'] } },
+    { network: { allowOut: [], denyOut: ['0.0.0.0/0'], allowPublicTraffic: false } },
+    { network: { allowOut: undefined, denyOut: ['0.0.0.0/0', '::/0'], allowPublicTraffic: false } },
+    { network: { allowOut: ['*.aliyuncs.com'], denyOut: ['0.0.0.0/0', '::/0'], allowPublicTraffic: false } },
+    { network: { allowOut: ['https://*.oss-cn-hangzhou-internal.aliyuncs.com'], denyOut: ['0.0.0.0/0', '::/0'], allowPublicTraffic: false } },
+    { network: { allowOut: [], denyOut: ['0.0.0.0/0', '::/0'], allowPublicTraffic: true } },
+  ]) {
+    const f = fixture(); Object.assign(f.info, patch);
+    await assert.rejects(f.provider.create(jobId, 300), /SANDBOX_PROVISIONING_FAILED/);
+    assert.equal(f.calls.filter(c => c.name === 'kill').length, 1);
+    assert.equal(f.calls.some(c => c.name === 'run' || c.name === 'write'), false);
+  }
+});
+test('managed reconnect rejects instance policy drift before returning an execution handle', async () => {
+  const f = fixture(); f.info.network.allowOut.push('example.com');
+  await assert.rejects(f.provider.connect('managed-1'), /SANDBOX_NOT_MANAGED/);
+  assert.equal(f.calls.some(c => c.name === 'run'), false);
+  assert.equal(f.calls.some(c => c.name === 'kill'), false);
 });
 
 test('model code is uploaded as bytes and only fixed entrypoints execute in a private job cwd', async () => {

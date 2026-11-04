@@ -1,11 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import { assertSandboxRelativePath, SANDBOX_MAX_FILE_BYTES, SANDBOX_UUID, type SandboxConnection, type SandboxInstance, type SandboxProvider } from './sandbox-provider';
 
+interface RemoteSandboxInfo {
+  templateId: string;
+  metadata: Record<string, string>;
+  allowInternetAccess?: boolean;
+  network?: { allowOut?: string[]; denyOut?: string[]; allowPublicTraffic?: boolean };
+}
 interface RemoteSandbox {
   sandboxId: string;
   files: { write(path: string, bytes: ArrayBuffer, opts?: { user: string }): Promise<unknown> };
   commands: { run(command: string, opts: { cwd?: string; user: string; timeoutMs: number; envs?: Record<string, string>; signal?: AbortSignal }): Promise<{ exitCode: number; stdout: string; stderr: string }> };
-  getInfo(): Promise<{ templateId: string; metadata: Record<string, string> }>;
+  getInfo(): Promise<RemoteSandboxInfo>;
   kill(): Promise<unknown>;
 }
 export interface BailianProviderDependencies {
@@ -107,6 +113,13 @@ print(json.dumps(result,separators=(",",":")),end="")
 `;
 const helperCommand = (script: string) => "python -I -c '" + script.replace(/'/g, "'\"'\"'") + "'";
 const RUNNER_ENVELOPE_LIMIT = 45000;
+// Platform isolation includes these fixed provider-owned system channels. This
+// is not an air gap; callers cannot add destinations or broaden these patterns.
+const PLATFORM_SYSTEM_CHANNELS = new Set(['*.oss-cn-hangzhou-internal.aliyuncs.com', '*.oss-cn-beijing-internal.aliyuncs.com']);
+function verifyInstanceNetwork(info: RemoteSandboxInfo): void {
+  const network = info.network;
+  if (info.allowInternetAccess !== false || !network || network.allowPublicTraffic !== false || !Array.isArray(network.denyOut) || !network.denyOut.includes('0.0.0.0/0') || !network.denyOut.includes('::/0') || !Array.isArray(network.allowOut) || !network.allowOut.every(target => PLATFORM_SYSTEM_CHANNELS.has(target))) throw new Error('SANDBOX_INSTANCE_NETWORK_UNVERIFIED');
+}
 function decodeRunnerResult(stdout: string): { exitCode: number; stdout: string; stderr: string } {
   if (Buffer.byteLength(stdout) > RUNNER_ENVELOPE_LIMIT) throw new Error();
   const result = JSON.parse(stdout) as Record<string, unknown>;
@@ -229,6 +242,7 @@ export function createBailianSandboxProvider(connection: SandboxConnection, apiK
       let sandbox: RemoteSandbox | undefined;
       try {
         sandbox = await sdk.create(config.templateCode, { ...options, timeoutMs: Math.min(Math.floor(ttlSeconds), 900) * 1000, envs: {}, metadata: { wesManaged: 'true', wesConnectionId: config.id, wesJobId: jobId, wesTemplateRevision: config.templateRevision }, allowInternetAccess: false, network: { allowOut: [], denyOut: ['0.0.0.0/0', '::/0'], allowPublicTraffic: false } });
+        verifyInstanceNetwork(await sandbox.getInfo());
         const result = await sandbox.commands.run(helperCommand(BOOTSTRAP), { user: 'root', timeoutMs: 15000, envs: { WES_ROOT: `/tmp/wes-job-${jobId}` } });
         if (result.exitCode !== 0) throw new Error();
         return wrap(sandbox, jobId);
@@ -249,6 +263,7 @@ export function createBailianSandboxProvider(connection: SandboxConnection, apiK
         const sandbox = await sdk.connect(id, options);
         const info = await sandbox.getInfo();
         if (sandbox.sandboxId !== id || info.templateId !== config.templateCode || info.metadata.wesManaged !== 'true' || info.metadata.wesConnectionId !== config.id || info.metadata.wesTemplateRevision !== config.templateRevision || !SANDBOX_UUID.test(info.metadata.wesJobId)) throw new Error();
+        verifyInstanceNetwork(info);
         return wrap(sandbox, info.metadata.wesJobId);
       } catch { throw new Error('SANDBOX_NOT_MANAGED'); }
     },
